@@ -125,6 +125,36 @@ tr:last-child td{border-bottom:none}
 .form-input,.form-select{width:100%;border:1px solid var(--border2);border-radius:6px;padding:9px 10px;font-size:14px;background:#fff;color:var(--text)}
 .form-input:focus,.form-select:focus{outline:none;border-color:var(--accent)}
 
+/* Register toolbar + chips */
+.toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px}
+.search{flex:1;min-width:180px;border:1px solid var(--border2);border-radius:6px;padding:7px 10px;font-size:13px;background:#fff;color:var(--text)}
+.search:focus{outline:none;border-color:var(--accent)}
+.chip{border:1px solid var(--border2);background:#fff;border-radius:20px;padding:4px 11px;font-size:12px;color:var(--text2);display:inline-flex;gap:6px;align-items:center}
+.chip .cnt{font-family:var(--font-mono);font-size:11px;background:var(--bg2);border-radius:10px;padding:0 6px}
+.chip.active{background:var(--accent);border-color:var(--accent);color:#fff}
+.chip.active .cnt{background:rgba(255,255,255,.2);color:#fff}
+.pager{display:flex;gap:8px;align-items:center;justify-content:flex-end;margin-top:10px;font-size:12px;color:var(--text3)}
+tr.rowlink{cursor:pointer}
+tr.rowlink:hover td{background:var(--bg)}
+
+/* Slide-over / bottom sheet (§6.3) */
+.drawer-scrim{position:fixed;inset:0;background:rgba(0,0,0,.32);z-index:50;opacity:0;animation:fade .15s forwards}
+@keyframes fade{to{opacity:1}}
+.drawer{position:fixed;top:0;right:0;bottom:0;width:520px;max-width:94vw;background:var(--bg);z-index:51;box-shadow:-4px 0 24px rgba(0,0,0,.14);display:flex;flex-direction:column;transform:translateX(100%);animation:slidein .22s cubic-bezier(.32,.72,0,1) forwards;overflow-y:auto}
+@keyframes slidein{to{transform:translateX(0)}}
+.drawer-head{position:sticky;top:0;background:var(--bg2);border-bottom:1px solid var(--border);padding:14px 18px;display:flex;align-items:center;gap:10px}
+.drawer-head h2{font-family:var(--font-display);font-size:19px;font-weight:400}
+.drawer-body{padding:16px 18px}
+.drawer-x{margin-left:auto;background:none;border:1px solid var(--border2);border-radius:6px;width:28px;height:28px;color:var(--text2);font-size:16px;line-height:1}
+.kv{display:grid;grid-template-columns:130px 1fr;gap:6px 12px;font-size:13px}
+.kv dt{color:var(--text3);font-size:11px;text-transform:uppercase;letter-spacing:.04em;padding-top:2px}
+.kv dd{color:var(--text);font-family:var(--font-mono);font-size:12px}
+.band{background:var(--amber-bg);border:1px solid var(--amber-border);border-radius:8px;padding:10px 12px;font-size:12px;color:var(--amber);margin:12px 0}
+@media (max-width:700px){
+  .drawer{top:auto;left:0;right:0;bottom:0;width:100%;max-width:100%;height:82vh;border-radius:20px 20px 0 0;transform:translateY(100%);animation:sheetin .28s cubic-bezier(.32,.72,0,1) forwards}
+  @keyframes sheetin{to{transform:translateY(0)}}
+}
+
 /* Mobile */
 .sidebar-overlay{display:none}
 .bottom-nav{display:none}
@@ -217,7 +247,7 @@ function Scaffold(p){ return ce('div',null,
 
 var SCREENS = {
   structure:{title:'Structure', body:function(ctx){ return ce(StructureScreen, ctx); }},
-  register: {title:'Block Register', phase:'P2', msg:'Searchable, server-paged register of all 507 blocks with quick-filter chips wired to live counts, column chooser and export. Loads once M2 seeds the blocks.'},
+  register: {title:'Block Register', body:function(ctx){ return ce(RegisterScreen, ctx); }},
   map:      {title:'Farm Map', phase:'P6', msg:'343 Aerobotics polygons on a satellite basemap, choropleth by yield/variety/rootstock, with the "previously on this land" hover card. Needs the PostGIS migration and a basemap-provider decision.'},
   history:  {title:'Production History', phase:'P5', msg:'Per-season production bars, segment-flow Sankey, and the segment-share chart that makes the 2021 and 2024 recording changes visible.'},
   entry:    {title:'Season Entry', phase:'P3', msg:'Spreadsheet-feel grid whose columns come from farm_metric_set_items, with per-row balance dots and atomic save via fn_save_farm_season_full (a MERGE, not a replace).'},
@@ -264,6 +294,155 @@ function StructureScreen(ctx){
         ? ('The area-proportional treemap (Farm → Sector → Plot → Block, reaching all '+d.blocks+' blocks) renders here in P2. The KPI row above is live.')
         : 'The register is empty until the M2 workbook load runs. The metric registry ('+d.metrics+' metrics) is already live — the KPI row above is a real query against Supabase, proving the data path.'
     }))
+  );
+}
+
+/* ── Block Register (§6.2) — server-paged, searchable, quick-filter chips ── */
+var PAGE = 50;
+var CROP_COLORS = { citrus:'#e08a1e', grapes:'#6a3d9a', mango:'#d94f2a', pomegranate:'#b03060', olives:'#5a6b2a', berries:'#2a5a8a' };
+function fmt(n){ return n==null ? '—' : Number(n).toLocaleString(undefined,{maximumFractionDigits:2}); }
+
+function RegisterScreen(ctx){
+  var s=useState({loading:true,err:null,rows:[],total:0}); var st=s[0],set=s[1];
+  var p=useState(0); var page=p[0],setPage=p[1];
+  var q=useState(''); var search=q[0],setSearch=q[1];
+  var c=useState(null); var chip=c[0],setChip=c[1];
+  var f=useState(''); var farmF=f[0],setFarmF=f[1];
+  var d=useState(null); var sel=d[0],setSel=d[1];
+  var k=useState({}); var counts=k[0],setCounts=k[1];
+  var fl=useState([]); var farms=fl[0],setFarms=fl[1];
+
+  useEffect(function(){ setPage(0); }, [ctx.crop, search, chip, farmF]);
+  useEffect(function(){ load(); }, [ctx.crop, page, search, chip, farmF]);
+  useEffect(function(){ loadMeta(); }, [ctx.crop]);
+
+  function base(){
+    var sel='id,operational_block_id,aydi_block_number,product_id,farm_code,planting_year,total_area_fed,aerobotics_area_ha,jde_cost_center_id,rootstock_id,lifecycle,farms(name),varieties(name),farm_rootstocks(name)';
+    var query=supabase.from('farm_blocks').select(sel,{count:'exact'});
+    if(ctx.crop!=='all') query=query.eq('product_id',ctx.crop);
+    if(farmF) query=query.eq('farm_code',farmF);
+    if(search.trim()){ var t='%'+search.trim()+'%'; query=query.or('operational_block_id.ilike.'+t+',aydi_block_number.ilike.'+t); }
+    if(chip==='no_cc') query=query.is('jde_cost_center_id',null);
+    if(chip==='no_aero') query=query.is('aerobotics_area_ha',null);
+    if(chip==='no_root') query=query.is('rootstock_id',null);
+    return query;
+  }
+  function load(){
+    set(function(x){return Object.assign({},x,{loading:true,err:null});});
+    base().order('operational_block_id').range(page*PAGE,page*PAGE+PAGE-1).then(function(r){
+      if(r.error){ set({loading:false,err:r.error.message,rows:[],total:0}); return; }
+      set({loading:false,err:null,rows:r.data||[],total:r.count||0});
+    });
+  }
+  function loadMeta(){
+    var cropEq=function(qq){ return ctx.crop==='all'?qq:qq.eq('product_id',ctx.crop); };
+    Promise.all([
+      cropEq(supabase.from('farm_blocks').select('id',{count:'exact',head:true})),
+      cropEq(supabase.from('farm_blocks').select('id',{count:'exact',head:true})).is('jde_cost_center_id',null),
+      cropEq(supabase.from('farm_blocks').select('id',{count:'exact',head:true})).is('aerobotics_area_ha',null),
+      cropEq(supabase.from('farm_blocks').select('id',{count:'exact',head:true})).is('rootstock_id',null)
+    ]).then(function(r){ setCounts({all:r[0].count||0,no_cc:r[1].count||0,no_aero:r[2].count||0,no_root:r[3].count||0}); });
+    supabase.from('farm_blocks').select('farm_code,farms(name)').then(function(r){
+      var seen={}; (r.data||[]).forEach(function(x){ if(x.farm_code&&!seen[x.farm_code]) seen[x.farm_code]=(x.farms&&x.farms.name)||x.farm_code; });
+      setFarms(Object.keys(seen).sort().map(function(fc){return {code:fc,name:seen[fc]};}));
+    });
+  }
+
+  var chips=[ {k:null,label:'All',n:counts.all}, {k:'no_cc',label:'Missing cost centre',n:counts.no_cc},
+              {k:'no_aero',label:'No Aerobotics',n:counts.no_aero}, {k:'no_root',label:'Rootstock blank',n:counts.no_root} ];
+  var pages=Math.max(1,Math.ceil(st.total/PAGE));
+
+  return ce('div',null,
+    ce('div',{className:'toolbar'},
+      ce('input',{className:'search',placeholder:'Search block ID or Aydi…',value:search,onChange:function(e){setSearch(e.target.value);}}),
+      ce('select',{className:'tb-select',value:farmF,onChange:function(e){setFarmF(e.target.value);}},
+        ce('option',{value:''},'All farms'), farms.map(function(fm){return ce('option',{key:fm.code,value:fm.code}, fm.name);})),
+      ce('button',{className:'btn btn-secondary btn-sm',onClick:function(){ exportCsv(base); }},'Export CSV')
+    ),
+    ce('div',{className:'toolbar'}, chips.map(function(ch){
+      return ce('button',{key:ch.label,className:'chip'+(chip===ch.k?' active':''),onClick:function(){setChip(ch.k);}},
+        ch.label, ce('span',{className:'cnt'}, ch.n==null?'…':ch.n));
+    })),
+    st.err ? ce(ErrorState,{msg:st.err,onRetry:load}) :
+    st.loading ? ce(Loading,{rows:8}) :
+    st.rows.length===0 ? ce('div',{className:'card'},ce(EmptyState,{title:'No blocks match',msg:(search||chip||farmF)?'Try clearing the search, chip, or farm filter.':'The register is empty for this crop.',action:(search||chip||farmF)?'Clear filters':null,onAction:function(){setSearch('');setChip(null);setFarmF('');}})) :
+    ce('div',null,
+      ce('div',{className:'table-wrap'},
+        ce('table',null,
+          ce('thead',null,ce('tr',null,['Block ID','Crop','Farm','Aydi','Variety','Rootstock','Planted','Area fed','Aero ha','Cost ctr','Status'].map(function(h){return ce('th',{key:h},h);}))),
+          ce('tbody',null, st.rows.map(function(b){
+            return ce('tr',{key:b.id,className:'rowlink',onClick:function(){setSel(b);}},
+              ce('td',null, ce('span',{className:'lot'}, b.operational_block_id)),
+              ce('td',null, ce('span',{style:{display:'inline-block',width:8,height:8,borderRadius:2,background:CROP_COLORS[b.product_id]||'#999',marginRight:6}}), b.product_id),
+              ce('td',null, (b.farms&&b.farms.name)||b.farm_code),
+              ce('td',{className:'num'}, b.aydi_block_number),
+              ce('td',{className:'ar',dir:'auto'}, (b.varieties&&b.varieties.name)||'—'),
+              ce('td',{className:'ar',dir:'auto'}, (b.farm_rootstocks&&b.farm_rootstocks.name)||'—'),
+              ce('td',{className:'num'}, b.planting_year),
+              ce('td',{className:'num'}, fmt(b.total_area_fed)),
+              ce('td',{className:'num'}, b.aerobotics_area_ha==null?ce('span',{style:{color:'var(--text3)'}},'—'):fmt(b.aerobotics_area_ha)),
+              ce('td',{className:'num',style:b.jde_cost_center_id?null:{color:'var(--amber)'}}, b.jde_cost_center_id||'—'),
+              ce('td',null, ce('span',{className:'badge '+(b.lifecycle==='nursery'?'badge-warn':b.lifecycle==='bearing'?'badge-pass':'badge-neutral')}, b.lifecycle))
+            );
+          }))
+        )
+      ),
+      ce('div',{className:'pager'},
+        ce('span',null, (st.total===0?0:page*PAGE+1)+'–'+Math.min((page+1)*PAGE,st.total)+' of '+st.total),
+        ce('button',{className:'btn btn-secondary btn-sm',disabled:page<=0,onClick:function(){setPage(page-1);}},'‹ Prev'),
+        ce('button',{className:'btn btn-secondary btn-sm',disabled:page>=pages-1,onClick:function(){setPage(page+1);}},'Next ›')
+      )
+    ),
+    sel ? ce(BlockDetail,{block:sel,onClose:function(){setSel(null);}}) : null
+  );
+}
+
+function exportCsv(base){
+  base().order('operational_block_id').range(0,9999).then(function(r){
+    var rows=r.data||[]; if(!rows.length) return;
+    var cols=['operational_block_id','product_id','farm_code','aydi_block_number','planting_year','total_area_fed','aerobotics_area_ha','jde_cost_center_id','lifecycle'];
+    var lines=[cols.join(',')].concat(rows.map(function(b){return cols.map(function(c){var v=b[c];return v==null?'':(''+v).indexOf(',')>=0?'"'+v+'"':v;}).join(',');}));
+    var blob=new Blob([lines.join('\n')],{type:'text/csv'}); var a=document.createElement('a');
+    a.href=URL.createObjectURL(blob); a.download='farm_blocks.csv'; a.click();
+  });
+}
+
+/* ── Block detail slide-over (§6.3 — identity + areas; history/lineage in later phases) ── */
+function BlockDetail(p){
+  var b=p.block;
+  var aeroFed = b.aerobotics_area_ha==null ? null : Math.round(b.aerobotics_area_ha*2.38095*100)/100;
+  var variance = (aeroFed!=null && b.total_area_fed>0) ? Math.round((aeroFed-b.total_area_fed)/b.total_area_fed*1000)/10 : null;
+  useEffect(function(){ function esc(e){ if(e.key==='Escape') p.onClose(); } window.addEventListener('keydown',esc); return function(){window.removeEventListener('keydown',esc);}; },[]);
+  function row(k,v){ return [ce('dt',{key:k+'k'},k), ce('dd',{key:k+'v',className:/[؀-ۿ]/.test(String(v))?'ar':null,dir:'auto'},v)]; }
+  return ce('div',null,
+    ce('div',{className:'drawer-scrim',onClick:p.onClose}),
+    ce('div',{className:'drawer',role:'dialog','aria-label':'Block detail'},
+      ce('div',{className:'drawer-head'},
+        ce('h2',{className:'ar',dir:'auto'}, b.aydi_block_number),
+        ce('button',{className:'drawer-x','aria-label':'Close',onClick:p.onClose},'×')),
+      ce('div',{className:'drawer-body'},
+        ce('div',{className:'section-title'},ce('span',{className:'section-title-bar'}),'Identity'),
+        ce('dl',{className:'kv'},
+          row('Operational ID', b.operational_block_id),
+          row('Crop', b.product_id),
+          row('Farm', (b.farms&&b.farms.name)||b.farm_code),
+          row('Variety', (b.varieties&&b.varieties.name)||'—'),
+          row('Rootstock', (b.farm_rootstocks&&b.farm_rootstocks.name)||'own-rooted / none'),
+          row('Planting year', b.planting_year),
+          row('Cost centre', b.jde_cost_center_id||'— not assigned'),
+          row('Lifecycle', b.lifecycle)
+        ),
+        ce('div',{className:'section-title',style:{marginTop:18}},ce('span',{className:'section-title-bar'}),'Area'),
+        ce('dl',{className:'kv'},
+          row('Book area', fmt(b.total_area_fed)+' fed'),
+          row('Aerobotics', b.aerobotics_area_ha==null?'not measured':(fmt(b.aerobotics_area_ha)+' ha · '+fmt(aeroFed)+' fed')),
+          row('Variance', variance==null?'—':(variance+' %'))
+        ),
+        (variance!=null && Math.abs(variance)>10) ? ce('div',{className:'band'}, 'Area variance '+variance+'% exceeds ±10% — flag for reconciliation (§6.10).') : null,
+        ce('div',{className:'band',style:{background:'var(--bg2)',borderColor:'var(--border)',color:'var(--text3)'}},
+          'Production history, lineage and the segment-flow view arrive with Season Entry (P3) and Production History (P5).')
+      )
+    )
   );
 }
 
