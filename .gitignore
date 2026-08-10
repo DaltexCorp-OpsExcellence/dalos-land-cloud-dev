@@ -60,3 +60,4 @@ scripts/m2_blocks.sql
 
 scripts/m2_*.sql
 scripts/m2_reference.json
+scripts/m3_*.sql

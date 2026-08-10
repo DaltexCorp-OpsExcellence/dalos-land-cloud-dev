@@ -25,9 +25,26 @@ if (!process.env.DATABASE_URL) {
   process.exit(2);
 }
 
+// Build the connection config. If DB_PASSWORD is set, use discrete fields so the
+// password is passed literally — a password with URL-special chars (@ : / ? # %)
+// would otherwise be mangled by the connection-string parser.
+function connConfig() {
+  const base = { ssl: { rejectUnauthorized: false } };
+  if (process.env.DB_PASSWORD) {
+    const u = new URL(process.env.DATABASE_URL);
+    return Object.assign(base, {
+      host: u.hostname, port: +u.port || 5432,
+      user: decodeURIComponent(u.username),
+      database: u.pathname.replace(/^\//, "") || "postgres",
+      password: process.env.DB_PASSWORD,
+    });
+  }
+  return Object.assign(base, { connectionString: process.env.DATABASE_URL });
+}
+
 (async () => {
   const sql = fs.readFileSync(file, "utf8");
-  const client = new Client({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } });
+  const client = new Client(connConfig());
   const t0 = Date.now();
   try {
     await client.connect();
