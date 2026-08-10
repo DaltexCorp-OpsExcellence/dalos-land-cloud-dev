@@ -54,3 +54,9 @@ scripts/metric_sets_seed.sql
 # DB reference dump (UUIDs + roster) — regenerable, keep local
 scripts/lookups.json
 scripts/*_dryrun output
+
+# Generated block-load SQL — commercial data, never commit
+scripts/m2_blocks.sql
+
+scripts/m2_*.sql
+scripts/m2_reference.json
