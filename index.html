@@ -249,7 +249,7 @@ var SCREENS = {
   structure:{title:'Structure', body:function(ctx){ return ce(StructureScreen, ctx); }},
   register: {title:'Block Register', body:function(ctx){ return ce(RegisterScreen, ctx); }},
   map:      {title:'Farm Map', phase:'P6', msg:'343 Aerobotics polygons on a satellite basemap, choropleth by yield/variety/rootstock, with the "previously on this land" hover card. Needs the PostGIS migration and a basemap-provider decision.'},
-  history:  {title:'Production History', phase:'P5', msg:'Per-season production bars, segment-flow Sankey, and the segment-share chart that makes the 2021 and 2024 recording changes visible.'},
+  history:  {title:'Production History', body:function(ctx){ return ce(ProductionHistoryScreen, ctx); }},
   entry:    {title:'Season Entry', phase:'P3', msg:'Spreadsheet-feel grid whose columns come from farm_metric_set_items, with per-row balance dots and atomic save via fn_save_farm_season_full (a MERGE, not a replace).'},
   import:   {title:'Bulk Import', phase:'P4', msg:'Upload → map columns (Arabic headers auto-matched on farm_metrics.aliases) → validate → commit, fully reversible per batch.'},
   recon:    {title:'Reconciliation', phase:'P7', msg:'Cost-centre and area reconciliation for finance — book vs Aerobotics area, JDE cost-centre gaps, lifecycle audit. Aerobotics variance renders "not measured", never 0, for Mango/Pom/Olives/Berries.'},
@@ -407,13 +407,61 @@ function exportCsv(base){
   });
 }
 
-/* ── Block detail slide-over (§6.3 — identity + areas; history/lineage in later phases) ── */
+/* ── Block detail slide-over (§6.3) — identity, area, real production history ── */
+var BAL = { balanced:{c:'var(--green)',t:'balanced'}, breach:{c:'var(--red)',t:'breach'}, residual:{c:'var(--amber)',t:'residual'}, unchecked:{c:'var(--text3)',t:'—'} };
 function BlockDetail(p){
   var b=p.block;
   var aeroFed = b.aerobotics_area_ha==null ? null : Math.round(b.aerobotics_area_ha*2.38095*100)/100;
   var variance = (aeroFed!=null && b.total_area_fed>0) ? Math.round((aeroFed-b.total_area_fed)/b.total_area_fed*1000)/10 : null;
+  var h=useState({loading:true,err:null,seasons:[]}); var hist=h[0],setHist=h[1];
   useEffect(function(){ function esc(e){ if(e.key==='Escape') p.onClose(); } window.addEventListener('keydown',esc); return function(){window.removeEventListener('keydown',esc);}; },[]);
+  useEffect(function(){
+    supabase.from('v_farm_season_wide').select('season_year,scenario,bearing_area_fed,balance_status,metrics')
+      .eq('block_id',b.id).eq('scenario','actual').order('season_year').then(function(r){
+        if(r.error) setHist({loading:false,err:r.error.message,seasons:[]});
+        else setHist({loading:false,err:null,seasons:r.data||[]});
+      });
+  },[b.id]);
   function row(k,v){ return [ce('dt',{key:k+'k'},k), ce('dd',{key:k+'v',className:/[؀-ۿ]/.test(String(v))?'ar':null,dir:'auto'},v)]; }
+
+  var seasons=hist.seasons;
+  var withProd=seasons.filter(function(s){return s.metrics&&s.metrics.actual_production!=null;});
+  var maxP=withProd.reduce(function(m,s){return Math.max(m,s.metrics.actual_production);},0)||1;
+
+  var historySection;
+  if(hist.loading) historySection=ce('div',{className:'skel',style:{height:70,marginTop:8}});
+  else if(hist.err) historySection=ce('div',{className:'band'},'Could not load history: '+hist.err);
+  else if(withProd.length===0) historySection=ce('div',{className:'band',style:{background:'var(--bg2)',borderColor:'var(--border)',color:'var(--text3)'}}, seasons.length?'No production recorded for this block yet.':'No seasons on record.');
+  else historySection=ce('div',null,
+    ce('div',{style:{display:'flex',alignItems:'flex-end',gap:6,height:120,padding:'8px 0',borderBottom:'1px solid var(--border)'}},
+      seasons.map(function(s){
+        var v=s.metrics&&s.metrics.actual_production; var bearing=+s.bearing_area_fed;
+        var h=v!=null?Math.max(3,Math.round(v/maxP*100)):3;
+        var pre=v==null;
+        return ce('div',{key:s.season_year,title:(v!=null?fmt(v)+' t':(bearing>0?'not recorded':'pre-bearing')),style:{flex:1,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'flex-end',height:'100%'}},
+          ce('div',{style:{width:'70%',height:h+'%',background:pre?'var(--bg3)':'var(--accent)',borderRadius:'3px 3px 0 0'}}),
+          ce('div',{style:{fontSize:9,color:'var(--text3)',marginTop:3,fontFamily:'var(--font-mono)'}}, String(s.season_year).slice(2))
+        );
+      })),
+    ce('div',{className:'table-wrap',style:{marginTop:12}},
+      ce('table',null,
+        ce('thead',null,ce('tr',null,['Year','Bearing','Production t','t/fed','Export t','Balance'].map(function(x){return ce('th',{key:x},x);}))),
+        ce('tbody',null, withProd.slice().reverse().map(function(s){
+          var m=s.metrics, prod=m.actual_production, ba=+s.bearing_area_fed;
+          var exp=m.export_packhouse!=null?m.export_packhouse:(m.export_carton!=null?m.export_carton:null);
+          var bal=BAL[s.balance_status]||BAL.unchecked;
+          return ce('tr',{key:s.season_year},
+            ce('td',{className:'num'}, s.season_year),
+            ce('td',{className:'num'}, ba>0?fmt(ba):ce('span',{style:{color:'var(--text3)'}},'—')),
+            ce('td',{className:'num'}, fmt(prod)),
+            ce('td',{className:'num'}, ba>0?fmt(Math.round(prod/ba*100)/100):'—'),
+            ce('td',{className:'num'}, exp!=null?fmt(exp):'—'),
+            ce('td',null, ce('span',{style:{display:'inline-flex',alignItems:'center',gap:5,fontSize:11}}, ce('span',{style:{width:8,height:8,borderRadius:'50%',background:bal.c,display:'inline-block'}}), bal.t))
+          );
+        }))
+      ))
+  );
+
   return ce('div',null,
     ce('div',{className:'drawer-scrim',onClick:p.onClose}),
     ce('div',{className:'drawer',role:'dialog','aria-label':'Block detail'},
@@ -439,10 +487,78 @@ function BlockDetail(p){
           row('Variance', variance==null?'—':(variance+' %'))
         ),
         (variance!=null && Math.abs(variance)>10) ? ce('div',{className:'band'}, 'Area variance '+variance+'% exceeds ±10% — flag for reconciliation (§6.10).') : null,
-        ce('div',{className:'band',style:{background:'var(--bg2)',borderColor:'var(--border)',color:'var(--text3)'}},
-          'Production history, lineage and the segment-flow view arrive with Season Entry (P3) and Production History (P5).')
+        ce('div',{className:'section-title',style:{marginTop:18}},ce('span',{className:'section-title-bar'}),'Production history'),
+        historySection
       )
     )
+  );
+}
+
+/* ── Production History (§6.4) — crop production by season, from the rollup ── */
+var SEG = [
+  {k:'export', label:'Export', color:'var(--accent)', codes:['export_carton','export_packhouse','export_total']},
+  {k:'local',  label:'Local / farm-gate', color:'var(--accent2)', codes:['farm_gate_sales','local_sales_combined','raw_to_traders','field_reject_sales']},
+  {k:'reject', label:'Reject / loss', color:'var(--amber)', codes:['packhouse_reject','weight_loss','weight_loss_damaged','shortage_dryout']}
+];
+function ProductionHistoryScreen(ctx){
+  var s=useState({loading:true,err:null,rows:[]}); var st=s[0],set=s[1];
+  useEffect(function(){ load(); },[ctx.crop]);
+  function load(){
+    set({loading:true,err:null,rows:[]});
+    var q=supabase.from('v_farm_production_rollup').select('season_year,metric_code,total_t,area_fed,blocks').eq('scenario','actual');
+    if(ctx.crop!=='all') q=q.eq('product_id',ctx.crop);
+    q.then(function(r){ if(r.error) set({loading:false,err:r.error.message,rows:[]}); else set({loading:false,err:null,rows:r.data||[]}); });
+  }
+  if(st.loading) return ce(Loading,{rows:6});
+  if(st.err) return ce(ErrorState,{msg:st.err,onRetry:load});
+  // aggregate by season
+  var byYear={};
+  st.rows.forEach(function(r){ var y=byYear[r.season_year]=byYear[r.season_year]||{codes:{},area:0,blocks:0};
+    y.codes[r.metric_code]=(y.codes[r.metric_code]||0)+Number(r.total_t||0);
+    if(r.metric_code==='actual_production'){ y.area+=Number(r.area_fed||0); y.blocks+=Number(r.blocks||0); } });
+  var years=Object.keys(byYear).map(Number).sort();
+  if(years.length===0) return ce('div',{className:'card'},ce(EmptyState,{title:'No production history yet',msg:(ctx.crop==='all'?'No crop':ctx.crop)+' has no recorded seasons. Grapes 2017–2025 is loaded; other crops load with their history.'}));
+  var maxP=years.reduce(function(m,y){return Math.max(m,byYear[y].codes.actual_production||0);},0)||1;
+  function segTotal(y,seg){ var c=byYear[y].codes; for(var i=0;i<seg.codes.length;i++){ if(c[seg.codes[i]]!=null) return c[seg.codes[i]]; } return 0; }
+  // for stacked bars use the first present code per segment (export_total supersedes carton etc.)
+  var latest=byYear[years[years.length-1]];
+  return ce('div',null,
+    ce('div',{className:'kpi-grid'},
+      ce('div',{className:'kpi'},ce('div',{className:'kpi-label'},'Latest season'),ce('div',{className:'kpi-val'},years[years.length-1]),ce('div',{className:'kpi-sub'},(ctx.crop==='all'?'all crops':ctx.crop))),
+      ce('div',{className:'kpi'},ce('div',{className:'kpi-label'},'Production'),ce('div',{className:'kpi-val'},fmt(Math.round(latest.codes.actual_production||0))),ce('div',{className:'kpi-sub'},'t')),
+      ce('div',{className:'kpi'},ce('div',{className:'kpi-label'},'Bearing area'),ce('div',{className:'kpi-val'},fmt(Math.round(latest.area))),ce('div',{className:'kpi-sub'},'fed · '+latest.blocks+' blocks')),
+      ce('div',{className:'kpi'},ce('div',{className:'kpi-label'},'Yield'),ce('div',{className:'kpi-val'},latest.area>0?fmt(Math.round((latest.codes.actual_production||0)/latest.area*100)/100):'—'),ce('div',{className:'kpi-sub'},'t/fed'))
+    ),
+    ce('div',{className:'section-title'},ce('span',{className:'section-title-bar'}),'Production by season (t)'),
+    ce('div',{className:'card'},
+      ce('div',{style:{display:'flex',alignItems:'flex-end',gap:8,height:180}},
+        years.map(function(y){ var v=byYear[y].codes.actual_production||0; var h=Math.max(2,Math.round(v/maxP*100));
+          return ce('div',{key:y,title:fmt(v)+' t',style:{flex:1,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'flex-end',height:'100%'}},
+            ce('div',{style:{fontSize:10,fontFamily:'var(--font-mono)',color:'var(--text3)',marginBottom:3}}, v>=1000?Math.round(v/1000)+'k':Math.round(v)),
+            ce('div',{style:{width:'64%',height:h+'%',background:'var(--accent)',borderRadius:'3px 3px 0 0'}}),
+            ce('div',{style:{fontSize:10,color:'var(--text3)',marginTop:4,fontFamily:'var(--font-mono)'}}, y)
+          );
+        }))
+    ),
+    ce('div',{className:'section-title',style:{marginTop:16}},ce('span',{className:'section-title-bar'}),'Segment share by season'),
+    ce('div',{style:{display:'flex',gap:14,fontSize:11,color:'var(--text3)',marginBottom:8}},
+      SEG.map(function(sg){return ce('span',{key:sg.k},ce('span',{style:{display:'inline-block',width:9,height:9,background:sg.color,borderRadius:2,marginRight:5}}),sg.label);})),
+    ce('div',{className:'card'},
+      ce('div',{style:{display:'flex',alignItems:'flex-end',gap:8,height:170}},
+        years.map(function(y){
+          var parts=SEG.map(function(sg){return {sg:sg,v:segTotal(y,sg)};});
+          var tot=parts.reduce(function(a,p){return a+p.v;},0)||1;
+          var barMax=years.reduce(function(m,yy){return Math.max(m, SEG.reduce(function(a,sg){return a+segTotal(yy,sg);},0));},0)||1;
+          var colH=Math.max(2,Math.round(tot/barMax*100));
+          return ce('div',{key:y,style:{flex:1,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'flex-end',height:'100%'}},
+            ce('div',{style:{width:'64%',height:colH+'%',display:'flex',flexDirection:'column',justifyContent:'flex-end',borderRadius:'3px 3px 0 0',overflow:'hidden'}},
+              parts.map(function(p){return ce('div',{key:p.sg.k,title:p.sg.label+' '+fmt(p.v)+' t',style:{height:(p.v/tot*100)+'%',background:p.sg.color}});})),
+            ce('div',{style:{fontSize:10,color:'var(--text3)',marginTop:4,fontFamily:'var(--font-mono)'}}, y)
+          );
+        }))
+    ),
+    ce('div',{className:'band',style:{background:'var(--bg2)',borderColor:'var(--border)',color:'var(--text3)'}},
+      'Grapes 2017–2025 shown. The 2021 local-sales split and 2024 export unbundling are visible in the segment shares. Rollup refreshes hourly (P5 cron).')
   );
 }
 
