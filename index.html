@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"/>
+<title>DalOS Land Cloud</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Mono:wght@400;500&family=Instrument+Sans:wght@400;500;600&family=Noto+Sans+Arabic:wght@400;500;600&display=swap" rel="stylesheet"/>
+<style>
+/* ── Farm Structure Cloud — Vision structure, Teal & Sand palette (PRD §10) ── */
+:root{
+  --bg:#eef1f0;--bg2:#e0e8e6;--bg3:#cedad7;
+  --sidebar:#0e3a3d;--sidebar2:#164c4f;
+  --sidebar-text:#bdd8d6;--sidebar-muted:#5f8583;
+  --accent:#0d6a68;--accent2:#159490;
+  --amber:#b87820;--amber-bg:#fdf3e0;--amber-border:#e8c87a;
+  --red:#b03030;--red-bg:#faeaea;--red-border:#e8a0a0;
+  --green:#1e6b3a;--green-bg:#e8f5ec;--green-border:#8ecba4;
+  --text:#111f1f;--text2:#3b4b4a;--text3:#6a7a79;
+  --border:#c6d4d2;--border2:#aabdbb;--card:#ffffff;
+  --font-display:'DM Serif Display',serif;
+  --font-body:'Instrument Sans','Noto Sans Arabic',sans-serif;
+  --font-mono:'DM Mono','Noto Sans Arabic',monospace;
+  --r:8px;--r2:12px;
+  --sidebar-w:218px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{font-family:var(--font-body);font-size:14px;line-height:1.5;color:var(--text);background:var(--bg);-webkit-font-smoothing:antialiased}
+input,button,select{font-family:inherit}
+button{cursor:pointer}
+.ar{unicode-bidi:plaintext}                 /* Arabic-in-LTR: resolve per-string (§11c) */
+.mono{font-family:var(--font-mono)}
+
+/* Shell */
+.app{display:flex;height:100vh;overflow:hidden}
+.sidebar{width:var(--sidebar-w);flex-shrink:0;background:var(--sidebar);color:var(--sidebar-text);display:flex;flex-direction:column;overflow-y:auto}
+.logo{padding:16px 16px 14px;border-bottom:1px solid rgba(255,255,255,.07)}
+.logo-name{font-family:var(--font-display);font-size:19px;color:#fff;line-height:1}
+.logo-sub{display:flex;align-items:center;gap:6px;margin-top:6px;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--sidebar-muted)}
+.logo-dot{width:6px;height:6px;border-radius:50%;background:var(--accent2)}
+.nav{padding:10px 8px;flex:1}
+.nav-section{font-size:10px;font-weight:600;letter-spacing:.11em;text-transform:uppercase;color:var(--sidebar-muted);padding:12px 8px 5px}
+.nav-item{display:flex;align-items:center;gap:9px;padding:8px 9px;border-radius:var(--r);font-size:13px;color:var(--sidebar-text);border:none;background:none;width:100%;text-align:left;transition:background .12s}
+.nav-item svg{width:15px;height:15px;opacity:.65;flex-shrink:0}
+.nav-item:hover{background:rgba(255,255,255,.05)}
+.nav-item.active{background:var(--accent);color:#fff;font-weight:500}
+.nav-item.active svg{opacity:1}
+.side-foot{padding:12px;border-top:1px solid rgba(255,255,255,.07);font-size:11px}
+.side-user{color:#fff;font-size:12px}
+.side-role{color:var(--sidebar-muted);font-size:10px;text-transform:uppercase;letter-spacing:.08em;margin-top:2px}
+.side-link{color:var(--sidebar-text);background:none;border:none;font-size:11px;padding:6px 0 0;display:block}
+.side-link:hover{color:#fff}
+.side-build{color:var(--sidebar-muted);font-size:10px;margin-top:8px}
+
+.main{flex:1;display:flex;flex-direction:column;overflow:hidden}
+.topbar{height:50px;flex-shrink:0;background:var(--bg);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px;padding:0 16px;position:sticky;top:0;z-index:10}
+.topbar h1{font-family:var(--font-display);font-size:17px;font-weight:400;color:var(--text)}
+.topbar-spacer{flex:1}
+.menu-btn{display:none;background:none;border:1px solid var(--border2);border-radius:var(--r);padding:5px 9px;color:var(--text2)}
+.page{flex:1;overflow-y:auto;padding:16px}
+
+/* Filters in topbar */
+.tb-select{font-size:12px;padding:5px 8px;border:1px solid var(--border2);border-radius:6px;background:#fff;color:var(--text2)}
+.tb-label{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--text3);font-weight:600}
+
+/* Cards / grids */
+.card{background:var(--card);border:1px solid var(--border);border-radius:var(--r2);padding:14px 16px}
+.grid2{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px}
+.kpi{background:var(--card);border:1px solid var(--border);border-radius:var(--r2);padding:14px 16px}
+.kpi-label{font-size:11px;color:var(--text3)}
+.kpi-val{font-family:var(--font-display);font-size:26px;line-height:1.1;margin-top:4px;color:var(--text)}
+.kpi-sub{font-size:11px;margin-top:2px;color:var(--text3)}
+.section-title{display:flex;align-items:center;gap:8px;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.09em;color:var(--text3);margin:4px 0 10px}
+.section-title-bar{width:20px;height:2px;background:var(--accent);display:inline-block}
+
+/* Badges */
+.badge{display:inline-flex;align-items:center;border-radius:20px;padding:2px 8px;font-size:11px;font-weight:500;border:1px solid}
+.badge-pass{background:var(--green-bg);border-color:var(--green-border);color:var(--green)}
+.badge-warn{background:var(--amber-bg);border-color:var(--amber-border);color:var(--amber)}
+.badge-fail{background:var(--red-bg);border-color:var(--red-border);color:var(--red)}
+.badge-neutral{background:var(--bg2);border-color:var(--border2);color:var(--text3)}
+
+/* Buttons */
+.btn{border-radius:var(--r);font-size:13px;font-weight:500;padding:7px 14px;border:1px solid transparent;transition:background .12s}
+.btn-primary{background:var(--accent);color:#fff}
+.btn-primary:hover{background:var(--accent2)}
+.btn-secondary{background:#fff;border-color:var(--border2);color:var(--text2)}
+.btn-secondary:hover{background:var(--bg2)}
+.btn-sm{padding:4px 10px;font-size:12px}
+
+/* Tables */
+.table-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:var(--r2);background:#fff}
+table{width:100%;border-collapse:collapse;min-width:600px}
+th{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--text3);text-align:left;padding:9px 12px;border-bottom:2px solid var(--border2);font-weight:600}
+td{font-size:13px;color:var(--text2);padding:9px 12px;border-bottom:1px solid var(--border)}
+tr:last-child td{border-bottom:none}
+.lot{font-family:var(--font-mono);font-size:11px;background:var(--bg2);border-radius:4px;padding:1px 6px}
+.num{font-family:var(--font-mono);text-align:right}
+
+/* Runtime states (§11c) */
+.skel{background:linear-gradient(90deg,var(--bg2) 25%,var(--bg3) 50%,var(--bg2) 75%);background-size:200% 100%;animation:sh 1.3s infinite;border-radius:5px;height:13px}
+@keyframes sh{0%{background-position:200% 0}100%{background-position:-200% 0}}
+.state{text-align:center;padding:44px 20px;color:var(--text3)}
+.state-icon{width:40px;height:40px;margin:0 auto 12px;opacity:.5}
+.state-title{font-size:15px;color:var(--text2);font-weight:500;margin-bottom:5px}
+.state-msg{font-size:13px;max-width:420px;margin:0 auto 14px}
+.state-err{color:var(--red)}
+
+/* Staging badge (shared.md, byte-for-byte) */
+.staging-badge{display:none;align-items:center;gap:7px;background:linear-gradient(135deg,#ff6b35 0%,#f7c948 100%);color:#fff;padding:5px 14px 5px 10px;border-radius:20px;box-shadow:0 3px 14px rgba(255,107,53,.45);font-size:10px;font-family:'Courier New',monospace;font-weight:700;letter-spacing:.2em;text-transform:uppercase}
+.staging-badge.on{display:inline-flex}
+.staging-dot{width:7px;height:7px;border-radius:50%;background:rgba(255,255,255,.9);display:inline-block;flex-shrink:0;animation:pulse 1.4s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(1.3)}}
+
+/* Login */
+.login-wrap{height:100vh;display:flex;align-items:center;justify-content:center;background:var(--sidebar)}
+.login-card{background:#fff;border-radius:16px;padding:32px 30px;width:340px;max-width:90vw}
+.login-title{font-family:var(--font-display);font-size:24px;text-align:center}
+.login-sub{text-align:center;font-size:11px;text-transform:uppercase;letter-spacing:.14em;color:var(--text3);margin:6px 0 22px}
+.form-label{font-size:10px;text-transform:uppercase;letter-spacing:.05em;font-weight:600;color:var(--text3);display:block;margin:12px 0 5px}
+.form-input,.form-select{width:100%;border:1px solid var(--border2);border-radius:6px;padding:9px 10px;font-size:14px;background:#fff;color:var(--text)}
+.form-input:focus,.form-select:focus{outline:none;border-color:var(--accent)}
+
+/* Mobile */
+.sidebar-overlay{display:none}
+.bottom-nav{display:none}
+@media (max-width:1024px){
+  :root{--sidebar-w:190px}
+  .kpi-grid,.grid3{grid-template-columns:repeat(2,1fr)}
+  .kpi-val{font-size:22px}
+}
+@media (max-width:767px){
+  .sidebar{position:fixed;left:0;top:0;bottom:0;z-index:40;transform:translateX(-100%);transition:transform .2s}
+  .sidebar.open{transform:translateX(0)}
+  .sidebar-overlay.on{display:block;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:39}
+  .menu-btn{display:inline-flex}
+  .page{padding:14px;padding-bottom:70px}
+  .kpi-grid,.grid2,.grid3{grid-template-columns:1fr}
+  .bottom-nav{display:flex;position:fixed;left:0;right:0;bottom:0;height:56px;background:var(--sidebar);z-index:30;overflow-x:auto}
+  .bn-item{flex:0 0 auto;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:0 15px;color:var(--sidebar-muted);background:none;border:none;font-size:10px}
+  .bn-item svg{width:18px;height:18px}
+  .bn-item.active{color:#fff}
+}
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+<!-- supabase-js pinned to 2.110.8 via jsDelivr — DalOS auth invariant -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.110.8/dist/umd/supabase.js"></script>
+
+<script>
+"use strict";
+var ce = React.createElement, useState = React.useState, useEffect = React.useEffect;
+
+/* ── Supabase: shared DalOS client. No storageKey override → shares the default
+   `sb-<ref>-auth-token` with Vision/Analytics/Workspace on the one Pages origin,
+   which is how SSO works across the family. Do not add an idle timer that signs
+   out (that caused the family-wide random sign-outs). ── */
+var DALOS_SUPABASE_URL = 'https://sfyjvgjwvtwkrnqrvqyc.supabase.co';
+var DALOS_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNmeWp2Z2p3dnR3a3JucXJ2cXljIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ4NzIxNjYsImV4cCI6MjA5MDQ0ODE2Nn0.FjA75XZsp0Kx5Xam_rrnYoAHX4JHKey6vEFCH_zlMuQ';
+var supabase = window.supabase.createClient(DALOS_SUPABASE_URL, DALOS_ANON_KEY);
+var BUILD = 'v0.1.0 (2026.08.10)';
+
+/* ── Nav model. Screens are scaffolds in this shell; each maps to a PRD phase. ── */
+function icon(paths){ return function(){ return ce('svg',{viewBox:'0 0 24 24',fill:'none',stroke:'currentColor',strokeWidth:2,strokeLinecap:'round',strokeLinejoin:'round'}, paths.map(function(d,i){return ce('path',{key:i,d:d});})); }; }
+var IC = {
+  structure: icon(['M3 3h7v7H3z','M14 3h7v7h-7z','M14 14h7v7h-7z','M3 14h7v7H3z']),
+  register:  icon(['M3 4h18','M3 10h18','M3 16h18','M3 22h18']),
+  map:       icon(['M9 3 3 6v15l6-3 6 3 6-3V3l-6 3-6-3z','M9 3v15','M15 6v15']),
+  history:   icon(['M3 3v18h18','M7 14l4-4 3 3 5-6']),
+  entry:     icon(['M4 4h16v16H4z','M4 9h16','M9 4v16']),
+  import:    icon(['M12 3v12','M8 11l4 4 4-4','M4 21h16']),
+  recon:     icon(['M4 7h10','M4 12h16','M4 17h7','M18 5v6','M15 8h6']),
+  health:    icon(['M22 12h-4l-3 8-4-16-3 8H2']),
+  reference: icon(['M4 5a2 2 0 0 1 2-2h13v18H6a2 2 0 0 1-2-2z','M9 7h7','M9 11h7'])
+};
+var NAV = [
+  {sec:'Orchard', items:[
+    {k:'structure', label:'Structure',        Icon:IC.structure, phase:'P2'},
+    {k:'register',  label:'Block Register',    Icon:IC.register,  phase:'P2'},
+    {k:'map',       label:'Farm Map',          Icon:IC.map,       phase:'P6'} ]},
+  {sec:'Production', items:[
+    {k:'history',   label:'Production History', Icon:IC.history,  phase:'P5'},
+    {k:'entry',     label:'Season Entry',       Icon:IC.entry,    phase:'P3'},
+    {k:'import',    label:'Bulk Import',        Icon:IC.import,   phase:'P4'} ]},
+  {sec:'Governance', items:[
+    {k:'recon',     label:'Reconciliation',     Icon:IC.recon,    phase:'P7', need:'read'},
+    {k:'health',    label:'Data Health',        Icon:IC.health,   phase:'P7'},
+    {k:'reference', label:'Reference Data',     Icon:IC.reference,phase:'P7', need:'admin'} ]}
+];
+function navItem(k){ for(var s=0;s<NAV.length;s++){ var it=NAV[s].items.filter(function(i){return i.k===k;})[0]; if(it) return it; } return NAV[0].items[0]; }
+
+/* ── Reusable runtime states (§11c) ── */
+function Loading(p){ var n=(p&&p.rows)||6; var a=[]; for(var i=0;i<n;i++) a.push(ce('div',{key:i,className:'skel',style:{margin:'9px 0',width:(60+((i*17)%38))+'%'}})); return ce('div',{className:'card'},a); }
+function EmptyState(p){ return ce('div',{className:'state'},
+  ce('div',{className:'state-title'}, p.title||'Nothing here yet'),
+  ce('div',{className:'state-msg'}, p.msg||''),
+  p.action ? ce('button',{className:'btn btn-secondary btn-sm',onClick:p.onAction}, p.action) : null ); }
+function ErrorState(p){ return ce('div',{className:'state'},
+  ce('div',{className:'state-title state-err'}, 'Something went wrong'),
+  ce('div',{className:'state-msg'}, p.msg||'Unexpected error.'),
+  ce('button',{className:'btn btn-secondary btn-sm',onClick:p.onRetry}, 'Retry') ); }
+
+/* ── Screen scaffold: honest "phase" empty state, never a fake zero (§11c) ── */
+function Scaffold(p){ return ce('div',null,
+  ce('div',{className:'section-title'}, ce('span',{className:'section-title-bar'}), p.title),
+  ce('div',{className:'card'}, ce(EmptyState,{
+    title: p.title+' — arriving in '+p.phase,
+    msg: p.msg })) ); }
+
+var SCREENS = {
+  structure:{title:'Structure', body:function(ctx){ return ce(StructureScreen, ctx); }},
+  register: {title:'Block Register', phase:'P2', msg:'Searchable, server-paged register of all 507 blocks with quick-filter chips wired to live counts, column chooser and export. Loads once M2 seeds the blocks.'},
+  map:      {title:'Farm Map', phase:'P6', msg:'343 Aerobotics polygons on a satellite basemap, choropleth by yield/variety/rootstock, with the "previously on this land" hover card. Needs the PostGIS migration and a basemap-provider decision.'},
+  history:  {title:'Production History', phase:'P5', msg:'Per-season production bars, segment-flow Sankey, and the segment-share chart that makes the 2021 and 2024 recording changes visible.'},
+  entry:    {title:'Season Entry', phase:'P3', msg:'Spreadsheet-feel grid whose columns come from farm_metric_set_items, with per-row balance dots and atomic save via fn_save_farm_season_full (a MERGE, not a replace).'},
+  import:   {title:'Bulk Import', phase:'P4', msg:'Upload → map columns (Arabic headers auto-matched on farm_metrics.aliases) → validate → commit, fully reversible per batch.'},
+  recon:    {title:'Reconciliation', phase:'P7', msg:'Cost-centre and area reconciliation for finance — book vs Aerobotics area, JDE cost-centre gaps, lifecycle audit. Aerobotics variance renders "not measured", never 0, for Mango/Pom/Olives/Berries.'},
+  health:   {title:'Data Health', phase:'P7', msg:'The live §9 issue list — blocking and warning, each naming the offending records with a deep-link to its fix.'},
+  reference:{title:'Reference Data', phase:'P7', msg:'Metrics, Rootstocks and (read-mostly) Varieties admin. Adding a 2027 metric set is three inserts here — no migration.'}
+};
+
+/* ── Structure: real KPI row proves the live data path (RLS + anon key). ── */
+function StructureScreen(ctx){
+  var s = useState({loading:true,err:null,data:null}); var st=s[0], set=s[1];
+  useEffect(function(){ load(); }, [ctx.crop, ctx.season]);
+  function load(){
+    set({loading:true,err:null,data:null});
+    var pid = ctx.crop==='all' ? null : ctx.crop;
+    var qBlocks = supabase.from('farm_blocks').select('id',{count:'exact',head:true});
+    if(pid) qBlocks = qBlocks.eq('product_id', pid);
+    Promise.all([
+      qBlocks,
+      supabase.from('farm_metrics').select('id',{count:'exact',head:true}),
+      supabase.from('farm_metric_sets').select('id',{count:'exact',head:true})
+    ]).then(function(r){
+      var e = r[0].error||r[1].error||r[2].error;
+      if(e){ set({loading:false,err:e.message,data:null}); return; }
+      set({loading:false,err:null,data:{blocks:r[0].count||0, metrics:r[1].count||0, sets:r[2].count||0}});
+    }).catch(function(e){ set({loading:false,err:String(e),data:null}); });
+  }
+  if(st.loading) return ce('div',null, ce('div',{className:'kpi-grid'},[0,1,2,3].map(function(i){return ce('div',{key:i,className:'kpi'}, ce('div',{className:'skel',style:{width:'60%'}}), ce('div',{className:'skel',style:{width:'40%',height:22,marginTop:8}}));})), ce(Loading,null));
+  if(st.err) return ce(ErrorState,{msg:st.err,onRetry:load});
+  var d = st.data;
+  var kpi = function(label,val,sub){ return ce('div',{className:'kpi'}, ce('div',{className:'kpi-label'},label), ce('div',{className:'kpi-val'}, val), ce('div',{className:'kpi-sub'}, sub)); };
+  return ce('div',null,
+    ce('div',{className:'kpi-grid'},
+      kpi('Blocks', d.blocks, ctx.crop==='all'?'all crops':ctx.crop),
+      kpi('Metrics defined', d.metrics, 'registry live'),
+      kpi('Metric sets', d.sets, d.sets? 'seeded' : 'awaiting M1 seed'),
+      kpi('Unresolved issues', '—', 'Data Health · P7')
+    ),
+    ce('div',{className:'section-title'}, ce('span',{className:'section-title-bar'}), 'Structure'),
+    ce('div',{className:'card'}, ce(EmptyState,{
+      title: d.blocks? 'Treemap arriving in P2' : 'No blocks loaded yet',
+      msg: d.blocks
+        ? ('The area-proportional treemap (Farm → Sector → Plot → Block, reaching all '+d.blocks+' blocks) renders here in P2. The KPI row above is live.')
+        : 'The register is empty until the M2 workbook load runs. The metric registry ('+d.metrics+' metrics) is already live — the KPI row above is a real query against Supabase, proving the data path.'
+    }))
+  );
+}
+
+/* ── Access gate: farm_can_read() decides entry; users.role gates writes. ── */
+function App(){
+  var a=useState({phase:'boot',session:null,role:null,canRead:false}); var auth=a[0], setAuth=a[1];
+  var n=useState('structure'); var screen=n[0], setScreen=n[1];
+  var c=useState('all'); var crop=c[0], setCrop=c[1];
+  var y=useState(2025); var season=y[0], setSeason=y[1];
+  var p=useState([]); var products=p[0], setProducts=p[1];
+  var m=useState(false); var menuOpen=m[0], setMenu=m[1];
+
+  useEffect(function(){
+    var sub = supabase.auth.onAuthStateChange(function(_e, sess){ boot(sess); });
+    supabase.auth.getSession().then(function(r){ boot(r.data.session); });
+    return function(){ try{ sub.data.subscription.unsubscribe(); }catch(e){} };
+  }, []);
+
+  function boot(sess){
+    if(!sess){ setAuth({phase:'login',session:null,role:null,canRead:false}); return; }
+    Promise.all([
+      supabase.rpc('farm_can_read'),
+      supabase.from('users').select('role,full_name,email').eq('id', sess.user.id).maybeSingle()
+    ]).then(function(r){
+      var canRead = r[0].data === true;
+      var row = r[1].data || {};
+      setAuth({phase: canRead?'in':'noaccess', session:sess, role:row.role||null, name:row.full_name||sess.user.email, canRead:canRead});
+    }).catch(function(){ setAuth({phase:'noaccess',session:sess,role:null,canRead:false}); });
+  }
+  useEffect(function(){ // crop list, once we're in
+    if(auth.phase!=='in') return;
+    supabase.from('products').select('id,name,color,bg_color,border_color').then(function(r){
+      var rows=(r.data||[]).filter(function(x){ return ['citrus','grapes','mango','pomegranate','olives','berries'].indexOf(x.id)>=0; });
+      setProducts(rows);
+    });
+  }, [auth.phase]);
+
+  if(auth.phase==='boot') return ce('div',{className:'login-wrap'}, ce('div',{style:{color:'#fff',fontFamily:'var(--font-display)',fontSize:22}},'DalOS Land Cloud'));
+  if(auth.phase==='login') return ce(Login,null);
+  if(auth.phase==='noaccess') return ce(NoAccess,{email:(auth.session&&auth.session.user.email)});
+
+  var role = auth.role;
+  var isAdmin = ['admin','power_user'].indexOf(role)>=0;
+  var canWrite = isAdmin || role==='agronomy_admin';
+  var visible = function(it){ if(it.need==='admin') return isAdmin; return true; };
+  var ctx = {crop:crop, season:season, role:role, canWrite:canWrite, isAdmin:isAdmin, products:products};
+  var scr = SCREENS[screen];
+
+  return ce('div',{className:'app'},
+    ce('div',{className:'sidebar-overlay'+(menuOpen?' on':''),onClick:function(){setMenu(false);}}),
+    ce('div',{className:'sidebar'+(menuOpen?' open':'')},
+      ce('div',{className:'logo'},
+        ce('div',{className:'logo-name'}, 'DalOS'),
+        ce('div',{className:'logo-sub'}, ce('span',{className:'logo-dot'}), 'Land Cloud')),
+      ce('div',{className:'nav'}, NAV.map(function(g){
+        return ce('div',{key:g.sec},
+          ce('div',{className:'nav-section'}, g.sec),
+          g.items.filter(visible).map(function(it){
+            return ce('button',{key:it.k,className:'nav-item'+(screen===it.k?' active':''),onClick:function(){setScreen(it.k);setMenu(false);}},
+              ce(it.Icon,null), ce('span',null, it.label));
+          }));
+      })),
+      ce('div',{className:'side-foot'},
+        ce('div',{className:'side-user'}, auth.name||'—'),
+        ce('div',{className:'side-role'}, role||'no role'),
+        ce('button',{className:'side-link',onClick:function(){ window.location.href='https://daltexcorp-opsexcellence.github.io/dalos-workspace/'; }}, '← Workspace'),
+        ce('button',{className:'side-link',onClick:function(){ supabase.auth.signOut(); }}, 'Sign out'),
+        ce('div',{className:'side-build'}, BUILD))
+    ),
+    ce('div',{className:'main'},
+      ce('div',{className:'topbar'},
+        ce('button',{className:'menu-btn',onClick:function(){setMenu(!menuOpen);}}, '☰'),
+        ce('h1',null, scr.title),
+        ce('div',{className:'topbar-spacer'}),
+        ce('span',{className:'tb-label'},'Crop'),
+        ce('select',{className:'tb-select',value:crop,onChange:function(e){setCrop(e.target.value);}},
+          ce('option',{value:'all'},'All crops'),
+          products.map(function(pr){ return ce('option',{key:pr.id,value:pr.id}, pr.name); })),
+        ce('span',{className:'tb-label'},'Season'),
+        ce('select',{className:'tb-select',value:season,onChange:function(e){setSeason(+e.target.value);}},
+          [2025,2024,2023,2022,2021,2020,2019,2018,2017].map(function(yy){ return ce('option',{key:yy,value:yy}, yy); })),
+        ce('span',{className:'staging-badge'+(location.pathname.indexOf('-dev/')>=0?' on':''),title:'Staging environment'},
+          ce('span',{className:'staging-dot'}), 'Staging')
+      ),
+      ce('div',{className:'page'},
+        scr.body ? scr.body(ctx) : ce(Scaffold,{title:scr.title,phase:scr.phase,msg:scr.msg})
+      )
+    ),
+    ce('div',{className:'bottom-nav'}, NAV.reduce(function(acc,g){ return acc.concat(g.items.filter(visible)); },[]).map(function(it){
+      return ce('button',{key:it.k,className:'bn-item'+(screen===it.k?' active':''),onClick:function(){setScreen(it.k);}},
+        ce(it.Icon,null), ce('span',null, it.label.split(' ')[0]));
+    }))
+  );
+}
+
+/* ── Login (users type their own credentials; SSO session usually pre-exists) ── */
+function Login(){
+  var e=useState(''); var f=useState(''); var b=useState({busy:false,err:null});
+  var email=e[0],setEmail=e[1], pw=f[0],setPw=f[1], st=b[0],setSt=b[1];
+  function submit(ev){ ev.preventDefault(); setSt({busy:true,err:null});
+    supabase.auth.signInWithPassword({email:email.trim(),password:pw}).then(function(r){
+      if(r.error) setSt({busy:false,err:r.error.message});
+    }); }
+  return ce('div',{className:'login-wrap'},
+    ce('form',{className:'login-card',onSubmit:submit},
+      ce('div',{className:'login-title'},'DalOS Land Cloud'),
+      ce('div',{className:'login-sub'},'Farm Structure Cloud'),
+      ce('label',{className:'form-label'},'Email'),
+      ce('input',{className:'form-input',type:'email',value:email,onChange:function(e){setEmail(e.target.value);},autoComplete:'username'}),
+      ce('label',{className:'form-label'},'Password'),
+      ce('input',{className:'form-input',type:'password',value:pw,onChange:function(e){setPw(e.target.value);},autoComplete:'current-password'}),
+      st.err? ce('div',{style:{color:'var(--red)',fontSize:12,marginTop:10}}, st.err):null,
+      ce('button',{className:'btn btn-primary',style:{width:'100%',marginTop:18},disabled:st.busy,type:'submit'}, st.busy?'Signing in…':'Sign in')
+    ));
+}
+function NoAccess(p){
+  return ce('div',{className:'login-wrap'},
+    ce('div',{className:'login-card'},
+      ce('div',{className:'login-title',style:{fontSize:20}},'No access'),
+      ce('div',{style:{fontSize:13,color:'var(--text2)',textAlign:'center',marginTop:12,lineHeight:1.6}},
+        'Your account'+(p.email?(' ('+p.email+')'):'')+' is not granted to Farm Structure Cloud. Ask an admin for the agronomy or commercial role.'),
+      ce('button',{className:'btn btn-secondary',style:{width:'100%',marginTop:20},onClick:function(){ supabase.auth.signOut(); }}, 'Sign out')));
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(ce(App));
+</script>
+</body>
+</html>
