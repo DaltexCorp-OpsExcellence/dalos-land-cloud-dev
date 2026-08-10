@@ -50,3 +50,7 @@ dist/
 # Generated M1 intermediates (the committed migration is the artifact)
 scripts/metric_sets_plan.json
 scripts/metric_sets_seed.sql
+
+# DB reference dump (UUIDs + roster) — regenerable, keep local
+scripts/lookups.json
+scripts/*_dryrun output
