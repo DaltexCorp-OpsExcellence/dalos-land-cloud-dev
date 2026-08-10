@@ -1,0 +1,48 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# THIS REPO IS PUBLIC (GitHub Pages, like the other DalOS repos).
+# Only migrations + app code are published. Everything holding real commercial
+# data is excluded and kept locally only:
+#   docs/   — real per-farm areas, tonnages, operational block IDs
+#   design/ — mockup embeds real Aerobotics polygons and block identities
+#   data/   — the raw orchard register / workbook / polygon exports
+# The anon key that ships in the app bundle is public by design; RLS is the
+# boundary. Never commit the service-role key or any connection string.
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Commercial data — never public
+docs/
+design/
+
+# Secrets — never commit
+.env
+.env.*
+!.env.example
+**/service-role*
+**/*service_role*
+*.pem
+.env
+.env.*
+!.env.example
+**/service-role*
+**/*service_role*
+*.pem
+
+# Raw source data. Excluded regardless of repo visibility: this is the orchard
+# register, areas, yields and production history — the actual commercial asset.
+data/
+*.xlsx
+*.xls
+*.csv
+
+# Aerobotics polygon exports (block geometry). Geometry only is loaded from
+# these; their attribute fields are deliberately ignored.
+*.shp
+*.dbf
+*.shx
+*.prj
+farm_*_polygons/
+
+# Build noise
+node_modules/
+dist/
+.DS_Store

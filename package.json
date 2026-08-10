@@ -1,0 +1,19 @@
+{
+  "name": "dalos-land-cloud-dev",
+  "version": "1.0.0",
+  "description": "Staging repository for **Farm Structure Cloud**, a module on DalOS separate from Vision and Analytics. It holds the orchard block register and historical agro-production broken down by segment (export / local / waste), with structure and history visualised and both single-block and bulk entry.",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "xlsx": "^0.18.5"
+  }
+}
