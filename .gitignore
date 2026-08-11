@@ -69,3 +69,4 @@ scripts/history_*.sql
 scripts/blocks_match.json
 scripts/metrics_live.json
 scripts/grapes_gap.json
+scripts/planted_area.sql

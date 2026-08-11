@@ -404,16 +404,12 @@ function StructureScreen(ctx){
   var s=useState({loading:true,err:null,blocks:[]}); var st=s[0],set=s[1];
   var pth=useState([]); var path=pth[0],setPath=pth[1];
   var d=useState(null); var sel=d[0],setSel=d[1];
-  var ba=useState({}); var bmap=ba[0],setBmap=ba[1];   // block_id -> latest recorded bearing area (fed)
   useEffect(function(){ setPath([]); load(); },[ctx.crop]);
   function load(){
-    set({loading:true,err:null,blocks:[]}); setBmap({});
-    var q=supabase.from('farm_blocks').select('id,operational_block_id,aydi_block_number,farm_code,sector_code,plot_code,planting_year,total_area_fed,aerobotics_area_ha,jde_cost_center_id,rootstock_id,lifecycle,product_id,farms(name),varieties(name),farm_rootstocks(name)').limit(1000);
+    set({loading:true,err:null,blocks:[]});
+    var q=supabase.from('farm_blocks').select('id,operational_block_id,aydi_block_number,farm_code,sector_code,plot_code,planting_year,total_area_fed,planted_area_fed,aerobotics_area_ha,jde_cost_center_id,rootstock_id,lifecycle,product_id,farms(name),varieties(name),farm_rootstocks(name)').limit(1000);
     if(ctx.crop!=='all') q=q.eq('product_id',ctx.crop);
-    var bq=supabase.from('v_farm_block_current').select('id,latest_bearing_area_fed').limit(1000);
-    if(ctx.crop!=='all') bq=bq.eq('product_id',ctx.crop);
     q.then(function(r){ if(r.error) set({loading:false,err:r.error.message,blocks:[]}); else set({loading:false,err:null,blocks:r.data||[]}); });
-    bq.then(function(br){ if(br.error||!br.data) return; var m={}; br.data.forEach(function(x){ if(x.latest_bearing_area_fed!=null) m[x.id]=Number(x.latest_bearing_area_fed); }); setBmap(m); });
   }
   if(st.loading) return ce('div',null, ce('div',{className:'kpi-grid'},[0,1,2,3].map(function(i){return ce('div',{key:i,className:'kpi'}, ce('div',{className:'skel',style:{width:'60%'}}), ce('div',{className:'skel',style:{width:'40%',height:22,marginTop:8}}));})), ce('div',{className:'skel',style:{height:400,marginTop:12}}));
   if(st.err) return ce(ErrorState,{msg:st.err,onRetry:load});
@@ -452,11 +448,10 @@ function StructureScreen(ctx){
   var cropName=function(id){ return id?id.charAt(0).toUpperCase()+id.slice(1):id; };
 
   // ── Bearing / Unresolved KPIs ──
-  // Productive area = each bearing block's latest RECORDED bearing area (المساحة المنزرعة);
-  // where a block has no season yet, fall back to its booked area as the best estimate.
-  var bearBlocks=scope.filter(function(b){return b.lifecycle==='bearing';});
-  var bearArea=bearBlocks.reduce(function(a,b){return a+(bmap[b.id]!=null?bmap[b.id]:Number(b.total_area_fed||0));},0);
-  var bearEst=bearBlocks.filter(function(b){return bmap[b.id]==null;}).length;
+  // Bearing area = each plot's current cultivated area (planted_area_fed = المساحة المنزرعة),
+  // net of borders and <= booked total_area_fed. Retired plots carry 0. Historical bearing
+  // area by year lives in the season data.
+  var bearArea=scope.reduce(function(a,b){return a+Number(b.planted_area_fed||0);},0);
   var bearPct=totalArea>0?Math.round(bearArea/totalArea*1000)/10:0;
   var ccMiss=scope.filter(function(b){return isActive(b.lifecycle)&&!b.jde_cost_center_id;}).length;
   var rsMiss=scope.filter(function(b){return isActive(b.lifecycle)&&!b.rootstock_id;}).length;
@@ -506,8 +501,8 @@ function StructureScreen(ctx){
   return ce('div',null,
     ce('div',{className:'kpi-grid'},
       kpi('Blocks', scope.length, level>0?'in scope':(ctx.crop==='all'?'all crops':ctx.crop)),
-      kpi('Planted area', fmt(Math.round(totalArea)), 'fed booked · '+farms.size+' farm'+(farms.size===1?'':'s')),
-      kpi('Bearing area', fmt(Math.round(bearArea)), bearPct+'% of planted'+(bearEst?' · '+bearEst+' est. from booked':'')),
+      kpi('Total area', fmt(Math.round(totalArea)), 'fed booked · '+farms.size+' farm'+(farms.size===1?'':'s')),
+      kpi('Bearing area', fmt(Math.round(bearArea)), bearPct+'% of total · cultivated'),
       kpi('Unresolved issues', issues, issues?(ccMiss+' missing cost centre · '+rsMiss+' missing rootstock'):'clean', issues?'var(--red)':null)
     ),
     ce('div',{style:{display:'flex',alignItems:'center',gap:6,fontSize:13,margin:'2px 0 10px',flexWrap:'wrap'}},
