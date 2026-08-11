@@ -257,43 +257,96 @@ var SCREENS = {
   reference:{title:'Reference Data', phase:'P7', msg:'Metrics, Rootstocks and (read-mostly) Varieties admin. Adding a 2027 metric set is three inserts here — no migration.'}
 };
 
-/* ── Structure: real KPI row proves the live data path (RLS + anon key). ── */
-function StructureScreen(ctx){
-  var s = useState({loading:true,err:null,data:null}); var st=s[0], set=s[1];
-  useEffect(function(){ load(); }, [ctx.crop, ctx.season]);
-  function load(){
-    set({loading:true,err:null,data:null});
-    var pid = ctx.crop==='all' ? null : ctx.crop;
-    var qBlocks = supabase.from('farm_blocks').select('id',{count:'exact',head:true});
-    if(pid) qBlocks = qBlocks.eq('product_id', pid);
-    Promise.all([
-      qBlocks,
-      supabase.from('farm_metrics').select('id',{count:'exact',head:true}),
-      supabase.from('farm_metric_sets').select('id',{count:'exact',head:true})
-    ]).then(function(r){
-      var e = r[0].error||r[1].error||r[2].error;
-      if(e){ set({loading:false,err:e.message,data:null}); return; }
-      set({loading:false,err:null,data:{blocks:r[0].count||0, metrics:r[1].count||0, sets:r[2].count||0}});
-    }).catch(function(e){ set({loading:false,err:String(e),data:null}); });
+/* ── Squarified treemap layout (Bruls et al.) — ~50 lines, hand-rolled (§11d) ── */
+function squarify(items, x0, y0, w0, h0){
+  var out=[]; var nodes=items.filter(function(d){return d.value>0;}).slice().sort(function(a,b){return b.value-a.value;});
+  var total=nodes.reduce(function(a,d){return a+d.value;},0); if(total<=0) return out;
+  var x=x0,y=y0,w=w0,h=h0; var scale=(w0*h0)/total;
+  var areas=nodes.map(function(d){return {d:d,a:d.value*scale};});
+  function worst(row,side){ var s=row.reduce(function(a,r){return a+r.a;},0); var mx=Math.max.apply(null,row.map(function(r){return r.a;})); var mn=Math.min.apply(null,row.map(function(r){return r.a;})); return Math.max(side*side*mx/(s*s),(s*s)/(side*side*mn)); }
+  var i=0;
+  while(i<areas.length){
+    var side=Math.min(w,h); var row=[areas[i]]; var j=i+1;
+    while(j<areas.length){ if(worst(row.concat([areas[j]]),side)<=worst(row,side)){ row.push(areas[j]); j++; } else break; }
+    var sum=row.reduce(function(a,r){return a+r.a;},0); var thick=sum/side;
+    if(w<h){ var ox=x; row.forEach(function(r){ var rw=r.a/thick; out.push(Object.assign({},r.d,{x:ox,y:y,w:rw,h:thick})); ox+=rw; }); y+=thick; h-=thick; }
+    else   { var oy=y; row.forEach(function(r){ var rh=r.a/thick; out.push(Object.assign({},r.d,{x:x,y:oy,w:thick,h:rh})); oy+=rh; }); x+=thick; w-=thick; }
+    i=j;
   }
-  if(st.loading) return ce('div',null, ce('div',{className:'kpi-grid'},[0,1,2,3].map(function(i){return ce('div',{key:i,className:'kpi'}, ce('div',{className:'skel',style:{width:'60%'}}), ce('div',{className:'skel',style:{width:'40%',height:22,marginTop:8}}));})), ce(Loading,null));
+  return out;
+}
+
+/* ── Structure (§6.1) — area-proportional treemap, Farm→Sector→Plot→Block ── */
+function StructureScreen(ctx){
+  var s=useState({loading:true,err:null,blocks:[]}); var st=s[0],set=s[1];
+  var pth=useState([]); var path=pth[0],setPath=pth[1];
+  var d=useState(null); var sel=d[0],setSel=d[1];
+  useEffect(function(){ setPath([]); load(); },[ctx.crop]);
+  function load(){
+    set({loading:true,err:null,blocks:[]});
+    var q=supabase.from('farm_blocks').select('id,operational_block_id,aydi_block_number,farm_code,sector_code,plot_code,planting_year,total_area_fed,aerobotics_area_ha,jde_cost_center_id,rootstock_id,lifecycle,product_id,farms(name),varieties(name),farm_rootstocks(name)').limit(1000);
+    if(ctx.crop!=='all') q=q.eq('product_id',ctx.crop);
+    q.then(function(r){ if(r.error) set({loading:false,err:r.error.message,blocks:[]}); else set({loading:false,err:null,blocks:r.data||[]}); });
+  }
+  if(st.loading) return ce('div',null, ce('div',{className:'kpi-grid'},[0,1,2,3].map(function(i){return ce('div',{key:i,className:'kpi'}, ce('div',{className:'skel',style:{width:'60%'}}), ce('div',{className:'skel',style:{width:'40%',height:22,marginTop:8}}));})), ce('div',{className:'skel',style:{height:400,marginTop:12}}));
   if(st.err) return ce(ErrorState,{msg:st.err,onRetry:load});
-  var d = st.data;
-  var kpi = function(label,val,sub){ return ce('div',{className:'kpi'}, ce('div',{className:'kpi-label'},label), ce('div',{className:'kpi-val'}, val), ce('div',{className:'kpi-sub'}, sub)); };
+
+  // filter blocks to current drill scope
+  var scope=st.blocks.filter(function(b){
+    if(path.length>=1 && b.farm_code!==path[0].k) return false;
+    if(path.length>=2 && b.sector_code!==path[1].k) return false;
+    if(path.length>=3 && b.plot_code!==path[2].k) return false;
+    return true;
+  });
+  var totalArea=scope.reduce(function(a,b){return a+Number(b.total_area_fed||0);},0);
+  var farms=new Set(scope.map(function(b){return b.farm_code;}));
+  var years=scope.map(function(b){return b.planting_year;}).filter(Boolean).sort(function(a,b){return a-b;});
+  var medYear=years.length?years[Math.floor(years.length/2)]:null;
+
+  // build tiles at current level
+  var level=path.length; var tiles;
+  function dominantCrop(list){ var c={}; list.forEach(function(b){c[b.product_id]=(c[b.product_id]||0)+1;}); return Object.keys(c).sort(function(a,b){return c[b]-c[a];})[0]; }
+  if(level<3){
+    var keyF = level===0?function(b){return b.farm_code;} : level===1?function(b){return b.sector_code;} : function(b){return b.plot_code;};
+    var labF = level===0?function(b){return (b.farms&&b.farms.name)||b.farm_code;} : level===1?function(b){return 'S'+b.sector_code;} : function(b){return 'P'+b.plot_code;};
+    var groups={};
+    scope.forEach(function(b){ var k=keyF(b); (groups[k]=groups[k]||{k:k,label:labF(b),list:[]}).list.push(b); });
+    tiles=Object.keys(groups).map(function(k){ var g=groups[k]; return {k:k,label:g.label,value:g.list.reduce(function(a,b){return a+Number(b.total_area_fed||0);},0),count:g.list.length,crop:dominantCrop(g.list),leaf:false}; });
+  } else {
+    tiles=scope.map(function(b){ return {k:b.operational_block_id,label:b.aydi_block_number,value:Number(b.total_area_fed||0),crop:b.product_id,leaf:true,block:b}; });
+  }
+  var W=1000,H=Math.max(320,Math.min(560, tiles.length>60?560:420));
+  var laid=squarify(tiles.map(function(t){return {value:t.value,t:t};}), 0,0,W,H).map(function(r){return Object.assign({},r.t,{x:r.x,y:r.y,w:r.w,h:r.h});});
+
+  function onTile(t){ if(t.leaf) setSel(t.block); else setPath(path.concat([{k:t.k,label:t.label}])); }
+  var crumbs=[{label:(ctx.crop==='all'?'All crops':ctx.crop),i:-1}].concat(path.map(function(p,i){return {label:p.label,i:i};}));
+
+  var kpi=function(label,val,sub){ return ce('div',{className:'kpi'}, ce('div',{className:'kpi-label'},label), ce('div',{className:'kpi-val'},val), ce('div',{className:'kpi-sub'},sub)); };
   return ce('div',null,
     ce('div',{className:'kpi-grid'},
-      kpi('Blocks', d.blocks, ctx.crop==='all'?'all crops':ctx.crop),
-      kpi('Metrics defined', d.metrics, 'registry live'),
-      kpi('Metric sets', d.sets, d.sets? 'seeded' : 'awaiting M1 seed'),
-      kpi('Unresolved issues', '—', 'Data Health · P7')
+      kpi('Blocks', scope.length, level>0?'in scope':(ctx.crop==='all'?'all crops':ctx.crop)),
+      kpi('Planted area', fmt(Math.round(totalArea)), 'fed'),
+      kpi('Farms', farms.size, level>0?path[0].label:'estates'),
+      kpi('Median planting', medYear||'—', medYear?((new Date().getFullYear()-medYear)+' yr median age'):'—')
     ),
-    ce('div',{className:'section-title'}, ce('span',{className:'section-title-bar'}), 'Structure'),
-    ce('div',{className:'card'}, ce(EmptyState,{
-      title: d.blocks? 'Treemap arriving in P2' : 'No blocks loaded yet',
-      msg: d.blocks
-        ? ('The area-proportional treemap (Farm → Sector → Plot → Block, reaching all '+d.blocks+' blocks) renders here in P2. The KPI row above is live.')
-        : 'The register is empty until the M2 workbook load runs. The metric registry ('+d.metrics+' metrics) is already live — the KPI row above is a real query against Supabase, proving the data path.'
-    }))
+    ce('div',{style:{display:'flex',alignItems:'center',gap:6,fontSize:13,margin:'2px 0 10px',flexWrap:'wrap'}},
+      crumbs.map(function(c,idx){ return ce('span',{key:idx,style:{display:'inline-flex',alignItems:'center',gap:6}},
+        idx>0?ce('span',{style:{color:'var(--text3)'}},'›'):null,
+        ce('button',{className:'side-link',style:{color:idx===crumbs.length-1?'var(--text)':'var(--accent)',padding:0,fontSize:13},onClick:function(){ setPath(path.slice(0,c.i+1)); }}, c.label));
+      })),
+    ce('div',{className:'card',style:{padding:6}},
+      ce('svg',{viewBox:'0 0 '+W+' '+H,style:{width:'100%',display:'block'},preserveAspectRatio:'none'},
+        laid.map(function(t){
+          var col=CROP_COLORS[t.crop]||'#888'; var showLabel=t.w>78&&t.h>30;
+          return ce('g',{key:t.k,style:{cursor:'pointer'},onClick:function(){onTile(t);}},
+            ce('rect',{x:t.x+1,y:t.y+1,width:Math.max(0,t.w-2),height:Math.max(0,t.h-2),rx:3,fill:col,fillOpacity:t.leaf?0.82:0.9,stroke:'#fff',strokeWidth:1}),
+            showLabel?ce('text',{x:t.x+7,y:t.y+16,style:{fill:'#fff',fontSize:t.leaf?11:13,fontFamily:t.leaf?'var(--font-mono)':'var(--font-body)',fontWeight:500,pointerEvents:'none'}}, t.label):null,
+            (showLabel&&!t.leaf)?ce('text',{x:t.x+7,y:t.y+31,style:{fill:'rgba(255,255,255,.85)',fontSize:10,pointerEvents:'none'}}, t.count+' blk · '+fmt(Math.round(t.value))+' fed'):null
+          );
+        }))
+    ),
+    ce('div',{style:{fontSize:11,color:'var(--text3)',marginTop:8}}, level<3?'Click a tile to drill in — area-proportional by planted feddan.':'Click a block to open its detail.'),
+    sel?ce(BlockDetail,{block:sel,onClose:function(){setSel(null);}}):null
   );
 }
 
