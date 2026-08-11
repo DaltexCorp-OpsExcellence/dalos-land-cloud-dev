@@ -301,6 +301,8 @@ thead .stickyc{background:var(--card)}
 <!-- Leaflet for the Farm Map (§11d sanctioned) -->
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
 
 <script>
 "use strict";
@@ -991,13 +993,14 @@ function secOf(p){ return (p.aydi_block_number||'').slice(0,2)||'—'; }
 function haOf(fed){ return Number(fed||0)/2.38095; }
 
 function FarmMapScreen(ctx){
-  var boxRef=React.useRef(null), mapRef=React.useRef(null), layerRef=React.useRef(null), baseRef=React.useRef([]), labelRef=React.useRef(null), featRef=React.useRef([]), seriesRef=React.useRef({}), lineageRef=React.useRef({}), hcT=React.useRef(null);
+  var boxRef=React.useRef(null), mapRef=React.useRef(null), layerRef=React.useRef(null), baseRef=React.useRef([]), labelRef=React.useRef(null), featRef=React.useRef([]), seriesRef=React.useRef({}), lineageRef=React.useRef({}), hcT=React.useRef(null), drawnRef=React.useRef(null), drawerRef=React.useRef(null);
   var s=useState({loading:true,err:null,feats:[]}); var st=s[0],set=s[1];
   var bm=useState('sat'); var basemap=bm[0],setBasemap=bm[1];
   var hv=useState(null); var hover=hv[0],setHover=hv[1];
   var dt=useState(null); var sel=dt[0],setSel=dt[1];
   var pl=useState(null); var plot=pl[0],setPlot=pl[1];
   var cv=useState(null); var cov=cv[0],setCov=cv[1];
+  var dw=useState(false); var drawing=dw[0],setDrawing=dw[1];
 
   function setBase(map,which){
     baseRef.current.forEach(function(l){ map.removeLayer(l); }); baseRef.current=[];
@@ -1051,6 +1054,16 @@ function FarmMapScreen(ctx){
     if(!window.L){ set({loading:false,err:'Map library failed to load.',feats:[]}); return; }
     var map=L.map(boxRef.current,{preferCanvas:false,attributionControl:true}).setView([30.3,30.9],10);
     mapRef.current=map; setBase(map,'sat'); setSel(null); setPlot(null); setCov(null);
+    // hand-drawn polygons (leaflet-draw): measure area, include in export
+    try{ drawnRef.current=L.featureGroup().addTo(map);
+      if(L.Draw){ map.on(L.Draw.Event.CREATED, function(e){
+        drawnRef.current.addLayer(e.layer);
+        var ll=e.layer.getLatLngs()[0], a=0; for(var i=0,j=ll.length-1;i<ll.length;j=i++){ a+=(ll[j].lng+ll[i].lng)*(ll[j].lat-ll[i].lat); }
+        var ha=Math.abs(a/2)*(111320*111320*Math.cos(30.4*Math.PI/180))/1e4;
+        e.layer.bindPopup('<b>Drawn polygon</b><br/>'+ha.toFixed(2)+' ha · '+(ha*2.38095).toFixed(2)+' fed<br/><span style="color:#6a7a79;font-size:11px">geom_source = manual · export to save/match</span>').openPopup();
+        drawerRef.current=null; setDrawing(false);
+      }); }
+    }catch(e){}
     // true totals for Coverage (v_farm_block_geom only returns mapped blocks, so it can't see the gap)
     var cq=supabase.from('farm_blocks').select('farm_code,product_id').limit(2000);
     if(ctx.crop!=='all') cq=cq.eq('product_id',ctx.crop);
@@ -1112,8 +1125,12 @@ function FarmMapScreen(ctx){
   },[st.feats,ctx.map.farm,ctx.map.mode,ctx.map.off]);
 
   function download(name,text,type){ var b=new Blob([text],{type:type}); var a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download=name; a.click(); }
+  function toggleDraw(){ var map=mapRef.current; if(!map||!L.Draw) return;
+    if(drawerRef.current){ drawerRef.current.disable(); drawerRef.current=null; setDrawing(false); return; }
+    drawerRef.current=new L.Draw.Polygon(map,{shapeOptions:{color:'#159490',weight:2,fillOpacity:0.25}}); drawerRef.current.enable(); setDrawing(true); }
+  function drawnFeatures(){ var out=[]; if(drawnRef.current){ drawnRef.current.eachLayer(function(l,i){ try{ out.push({type:'Feature',properties:{block:'DRAWN-'+(out.length+1),crop:'drawn',geom_source:'manual'},geometry:{type:'Polygon',coordinates:[l.getLatLngs()[0].map(function(p){return [p.lng,p.lat];})]}}); }catch(e){} }); } return out; }
   function currentFeats(){ var farm=ctx.map.farm,off=ctx.map.off,mode=ctx.map.mode; return featRef.current.filter(function(f){ return (farm==='all'||f.properties.farm_code===farm)&&!(mode==='crop'&&off.indexOf(f.properties.product_id)>=0); }); }
-  function exportGeoJSON(){ var fs=currentFeats().map(function(f){ return {type:'Feature',geometry:f.geometry,properties:{block:f.properties.aydi_block_number,operational_block_id:f.properties.operational_block_id,crop:f.properties.product_id,farm:f.properties.farm_name,variety:f.properties.variety,rootstock:f.properties.rootstock,planting_year:f.properties.planting_year,feddan:f.properties.total_area_fed}}; });
+  function exportGeoJSON(){ var fs=currentFeats().map(function(f){ return {type:'Feature',geometry:f.geometry,properties:{block:f.properties.aydi_block_number,operational_block_id:f.properties.operational_block_id,crop:f.properties.product_id,farm:f.properties.farm_name,variety:f.properties.variety,rootstock:f.properties.rootstock,planting_year:f.properties.planting_year,feddan:f.properties.total_area_fed}}; }).concat(drawnFeatures());
     download('farm-blocks-'+ctx.map.farm+'.geojson',JSON.stringify({type:'FeatureCollection',features:fs},null,1),'application/geo+json'); }
   function exportKML(){
     var esc=function(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');};
@@ -1223,7 +1240,7 @@ function FarmMapScreen(ctx){
         st.err?ce('div',{style:{position:'absolute',top:10,left:10,zIndex:600},className:'band'},st.err):null,
         ce('div',{className:'bmsw'}, [['sat','Satellite'],['hybrid','Hybrid'],['road','Roads']].map(function(b){ return ce('button',{key:b[0],className:basemap===b[0]?'on':'',onClick:function(){setBasemap(b[0]);}}, b[1]); })),
         ce('div',{className:'mact'},
-          ce('button',{className:'btn btn-secondary btn-sm',disabled:true,title:'Draw & save polygons — v2'},'Draw polygon'),
+          ce('button',{className:'btn '+(drawing?'btn-primary':'btn-secondary')+' btn-sm',onClick:toggleDraw,title:'Draw a polygon to measure it and include it in the export'}, drawing?'Drawing… click points, double-click to finish':'Draw polygon'),
           ce('button',{className:'btn btn-secondary btn-sm',onClick:exportKML},'Export KML'),
           ce('button',{className:'btn btn-secondary btn-sm',onClick:exportGeoJSON},'GeoJSON')),
         hover?ce('div',{className:'hc',style:{left:hover.x,top:hover.y}},
