@@ -1179,7 +1179,10 @@ function FarmMapScreen(ctx){
       var poly=rings.map(function(r){return '<Polygon><outerBoundaryIs><LinearRing><coordinates>'+r[0].map(function(c){return c[0].toFixed(7)+','+c[1].toFixed(7)+',0';}).join(' ')+'</coordinates></LinearRing></outerBoundaryIs></Polygon>';}).join('');
       var data=[['operational_block_id',p.operational_block_id],['farm',p.farm_name],['crop',p.product_id],['cultivar',p.variety],['rootstock',p.rootstock],['planting_year',p.planting_year],['feddan',p.total_area_fed]];
       return '<Placemark><name>'+esc(p.aydi_block_number)+'</name><styleUrl>#c_'+p.product_id+'</styleUrl><ExtendedData>'+data.map(function(kv){return '<Data name="'+kv[0]+'"><value>'+esc(kv[1])+'</value></Data>';}).join('')+'</ExtendedData>'+(rings.length>1?'<MultiGeometry>'+poly+'</MultiGeometry>':poly)+'</Placemark>';}).join('\n');
-    download('farm-blocks-'+ctx.map.farm+'.kml','<?xml version="1.0" encoding="UTF-8"?>\n<kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>DalOS Farm Structure</name>'+styles+'\n'+pm+'</Document></kml>','application/vnd.google-earth.kml+xml');
+    var drawn=drawnFeatures().map(function(f){ var r=f.geometry.coordinates[0];
+      return '<Placemark><name>'+esc(f.properties.block)+'</name><styleUrl>#c_drawn</styleUrl><ExtendedData><Data name="geom_source"><value>manual</value></Data></ExtendedData><Polygon><outerBoundaryIs><LinearRing><coordinates>'+r.map(function(c){return c[0].toFixed(7)+','+c[1].toFixed(7)+',0';}).join(' ')+'</coordinates></LinearRing></outerBoundaryIs></Polygon></Placemark>'; }).join('\n');
+    var drawnStyle='<Style id="c_drawn"><LineStyle><color>ff909415</color><width>2</width></LineStyle><PolyStyle><color>40909415</color></PolyStyle></Style>';
+    download('farm-blocks-'+ctx.map.farm+'.kml','<?xml version="1.0" encoding="UTF-8"?>\n<kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>DalOS Farm Structure</name>'+styles+drawnStyle+'\n'+pm+(drawn?'\n'+drawn:'')+'</Document></kml>','application/vnd.google-earth.kml+xml');
   }
 
   function spark(series,past){
