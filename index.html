@@ -374,7 +374,7 @@ var ce = React.createElement, useState = React.useState, useEffect = React.useEf
 var DALOS_SUPABASE_URL = 'https://sfyjvgjwvtwkrnqrvqyc.supabase.co';
 var DALOS_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNmeWp2Z2p3dnR3a3JucXJ2cXljIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ4NzIxNjYsImV4cCI6MjA5MDQ0ODE2Nn0.FjA75XZsp0Kx5Xam_rrnYoAHX4JHKey6vEFCH_zlMuQ';
 var supabase = window.supabase.createClient(DALOS_SUPABASE_URL, DALOS_ANON_KEY);
-var BUILD = 'v0.3.0 (2026.08.12)';
+var BUILD = 'v0.3.1 (2026.08.12)';
 
 /* ── Nav model. Screens are scaffolds in this shell; each maps to a PRD phase. ── */
 function icon(paths){ return function(){ return ce('svg',{viewBox:'0 0 24 24',fill:'none',stroke:'currentColor',strokeWidth:2,strokeLinecap:'round',strokeLinejoin:'round'}, paths.map(function(d,i){return ce('path',{key:i,d:d});})); }; }
@@ -770,6 +770,13 @@ function BlockDetail(p){
   var seasons=hist.seasons;
   var withProd=seasons.filter(function(s){return s.metrics&&s.metrics.actual_production!=null;});
   var maxP=withProd.reduce(function(m,s){return Math.max(m,s.metrics.actual_production);},0)||1;
+  // ── Segment flow (§6.4): latest season with a recorded segment breakdown ──
+  var flowY=null,flowParts=null,flowProd=0;
+  for(var fi=seasons.length-1;fi>=0;fi--){ var fm=seasons[fi].metrics||{}; var fpr=Number(fm.actual_production||0);
+    if(fpr>0){ var fpp=sankeyParts(fm); if(fpp.exp+fpp.rej+fpp.trd+fpp.fld>0){ flowY=seasons[fi].season_year; flowParts=fpp; flowProd=fpr; break; } } }
+  var segFlow=flowParts?ce('div',{style:{marginTop:18}},
+    ce('div',{className:'section-title'},ce('span',{className:'section-title-bar'}),'Segment flow — ',ce('span',{style:{textTransform:'none',letterSpacing:0,fontWeight:400}},flowY)),
+    sankeySVG(flowProd,flowParts.exp,flowParts.rej,flowParts.trd,flowParts.fld,480)):null;
 
   // ── Plot lineage: this plot's own production + its area-share of prior plantings ──
   var lineageSection=null;
@@ -894,7 +901,8 @@ function BlockDetail(p){
           ce('button',{className:'btn btn-secondary btn-sm',onClick:function(){setAction('history');}},'History log')) : null),
         lineageSection ? ce('div',{style:{marginTop:18}}, lineageSection) : null,
         ce('div',{className:'section-title',style:{marginTop:18}},ce('span',{className:'section-title-bar'}), lineageSection?'This planting’s seasons':'Production history'),
-        historySection
+        historySection,
+        segFlow
       )
     ),
     action==='edit'    ? ce(EditIdentityModal,{block:b,onClose:function(){setAction(null);},onDone:done}) : null,
@@ -911,22 +919,46 @@ var SEG = [
   {k:'local',  label:'Local / farm-gate', color:'var(--accent2)', codes:['farm_gate_sales','local_sales_combined','raw_to_traders','field_reject_sales']},
   {k:'reject', label:'Reject / loss', color:'var(--amber)', codes:['packhouse_reject','weight_loss','weight_loss_damaged','shortage_dryout']}
 ];
-function sankeySVG(prod,exp,loc,rej,W){
-  var H=200,pad=16,nodeW=13,xL=pad,xR=W-pad-nodeW;
-  var scale=(H-2*pad)/(prod||1);
-  var out=[['Export',exp,'var(--accent)'],['Local / farm-gate',loc,'var(--accent2)'],['Reject / loss',rej,'var(--amber)']].filter(function(o){return o[1]>0;});
-  var yL=pad, yR=pad; var srcH=Math.max(2,prod*scale);
-  var links=out.map(function(o){ var h=Math.max(1.5,o[1]*scale); var y0=yL; yL+=h; var y1=yR; yR+=h;
-    var c0=xL+nodeW, c1=xR, mx=(c0+c1)/2;
-    var path='M'+c0+','+(y0+h/2)+' C'+mx+','+(y0+h/2)+' '+mx+','+(y1+h/2)+' '+c1+','+(y1+h/2);
-    return {o:o,h:h,y1:y1,path:path,sw:h}; });
-  return ce('svg',{viewBox:'0 0 '+W+' '+H,style:{width:'100%',display:'block'},preserveAspectRatio:'none'},
-    ce('rect',{x:xL,y:pad,width:nodeW,height:srcH,rx:2,fill:'var(--text2)'}),
-    ce('text',{x:xL,y:pad-4,style:{fontSize:11,fill:'var(--text3)'}},'Production '+fmt(Math.round(prod))+'t'),
-    links.map(function(l,i){ return ce('path',{key:'p'+i,d:l.path,fill:'none',stroke:l.o[2],strokeOpacity:0.45,strokeWidth:l.sw}); }),
-    links.map(function(l,i){ return ce('g',{key:'n'+i},
-      ce('rect',{x:xR,y:l.y1,width:nodeW,height:l.h,rx:2,fill:l.o[2]}),
-      ce('text',{x:xR-5,y:l.y1+l.h/2+3,textAnchor:'end',style:{fontSize:10,fill:'var(--text2)'}}, l.o[0]+' '+Math.round(l.o[1]/(prod||1)*100)+'%')); }));
+// Map a stored-metrics object to the 4 Sankey leaves (export / packhouse reject /
+// raw→traders / field-reject sales). Falls back across code variants per crop.
+function sankeyParts(m){ m=m||{};
+  return { exp:Number(m.export_total||m.export_packhouse||m.export_carton||0),
+           rej:Number(m.packhouse_reject||0),
+           trd:Number(m.raw_to_traders||m.local_sales_combined||0),
+           fld:Number(m.field_reject_sales||m.farm_gate_sales||0) }; }
+// Clean 3-column Sankey (§6.4) — Actual production → {To packhouse, Local branch}
+// → {Export, Packhouse reject, Raw→traders, Field-reject sales}. The gap below the
+// two branches is unaccounted loss. Filled bezier ribbons, ported from the mockup.
+function sankeySVG(prod,exp,rej,trd,fld,W){
+  prod=Number(prod)||0; W=W||520;
+  if(prod<=0) return ce('div',{style:{fontSize:12,color:'var(--text3)',padding:'16px 0'}},'No production recorded.');
+  var H=250,pad=16,x0=pad,x1=W*0.42,x2=W*0.78,barW=13,sc=(H-2*pad)/prod;
+  var pk=exp+rej, local=trd+fld;
+  var nProd={y:pad,h:prod*sc}, nPk={y:pad,h:pk*sc}, nLoc={y:pad+pk*sc+10,h:local*sc};
+  var C={exp:'#0d6a68',rej:'#b87820',trd:'#159490',fld:'#7a7668'};
+  var leaves=[{n:'Export',v:exp,c:C.exp},{n:'Packhouse reject',v:rej,c:C.rej},{n:'Raw → traders',v:trd,c:C.trd},{n:'Field-reject sales',v:fld,c:C.fld}];
+  var ly=pad, lp=[]; leaves.forEach(function(l,i){ if(i===2) ly+=10; lp.push({n:l.n,v:l.v,c:l.c,y:ly,h:l.v*sc}); ly+=l.v*sc+6; });
+  var K=0;
+  function link(ax,ay,ah,bx,by,bh,col){ var mx=(ax+bx)/2;
+    return ce('path',{key:'L'+(K++),d:'M'+ax+','+ay+' C'+mx+','+ay+' '+mx+','+by+' '+bx+','+by+' L'+bx+','+(by+bh)+' C'+mx+','+(by+bh)+' '+mx+','+(ay+ah)+' '+ax+','+(ay+ah)+' Z',fill:col,opacity:0.22}); }
+  function bar(x,y,h,c){ return ce('rect',{key:'B'+(K++),x:x,y:y,width:barW,height:Math.max(h,2),rx:2.5,fill:c}); }
+  function lbl(x,y,t,v,anchor){ return ce('g',{key:'G'+(K++)},
+    ce('text',{x:x,y:y,textAnchor:anchor,style:{fontSize:10.5,fill:'#4a4840'}}, t),
+    ce('text',{x:x,y:y+12,textAnchor:anchor,style:{fontSize:10.5,fontFamily:'var(--font-mono)',fill:'#7a7668'}}, fmt(Math.round(v*10)/10)+' t')); }
+  var kids=[
+    link(x0+barW,nProd.y,pk*sc,x1,nPk.y,nPk.h,C.exp),
+    link(x0+barW,nProd.y+pk*sc,local*sc,x1,nLoc.y,nLoc.h,C.fld),
+    link(x1+barW,nPk.y,exp*sc,x2,lp[0].y,lp[0].h,C.exp),
+    link(x1+barW,nPk.y+exp*sc,rej*sc,x2,lp[1].y,lp[1].h,C.rej),
+    link(x1+barW,nLoc.y,trd*sc,x2,lp[2].y,lp[2].h,C.trd),
+    link(x1+barW,nLoc.y+trd*sc,fld*sc,x2,lp[3].y,lp[3].h,C.fld),
+    bar(x0,nProd.y,nProd.h,'#0e3a3d'), bar(x1,nPk.y,nPk.h,'#0d6a68'), bar(x1,nLoc.y,nLoc.h,'#7a7668')];
+  lp.forEach(function(l){ kids.push(bar(x2,l.y,l.h,l.c)); });
+  kids.push(lbl(x0+barW+6,nProd.y+12,'Actual production',prod,'start'));
+  kids.push(lbl(x1+barW+6,nPk.y+12,'To packhouse',pk,'start'));
+  kids.push(lbl(x1+barW+6,nLoc.y+12,'Local branch',local,'start'));
+  lp.forEach(function(l){ kids.push(lbl(x2-6,l.y+11,l.n,l.v,'end')); });
+  return ce('svg',{viewBox:'0 0 '+W+' '+H,style:{width:'100%',height:'auto',display:'block'}}, kids);
 }
 function ProductionHistoryScreen(ctx){
   var s=useState({loading:true,err:null,rows:[]}); var st=s[0],set=s[1];
@@ -982,11 +1014,12 @@ function ProductionHistoryScreen(ctx){
         );
       })));
 
+  var sankeyP=sankeyParts(latest.codes);
   var sankeyPanel=ce('div',{className:'card'},
     ce('div',{className:'section-title'},ce('span',{className:'section-title-bar'}),'Where the crop went — ',ce('span',{style:{textTransform:'none',letterSpacing:0,fontWeight:400}},latestYear)),
-    (sExp+sLoc+sRej>0)?sankeySVG(latest.codes.actual_production||0,sExp,sLoc,sRej,520)
+    (sankeyP.exp+sankeyP.rej+sankeyP.trd+sankeyP.fld>0)?sankeySVG(latest.codes.actual_production||0,sankeyP.exp,sankeyP.rej,sankeyP.trd,sankeyP.fld,560)
       :ce('div',{style:{fontSize:12,color:'var(--text3)',padding:'20px 0'}},'No segment breakdown recorded for '+latestYear+'.'),
-    ce('div',{style:{fontSize:11,color:'var(--text3)',marginTop:6}},'Each flow is a stored metric. Widths are tonnes.'));
+    ce('div',{style:{fontSize:11,color:'var(--text3)',marginTop:6}},'Every node is a stored metric. Widths are tonnes. Missing years simply have fewer nodes — the model never breaks.'));
 
   var segPanel=ce('div',{className:'card'},
     ce('div',{className:'section-title'},ce('span',{className:'section-title-bar'}),'Segment share by season'),
