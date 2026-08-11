@@ -15,7 +15,7 @@ function connConfig(){ const base={ssl:{rejectUnauthorized:false}};
   const c=new Client(connConfig()); await c.connect();
   const blocks=(await c.query(`
     select b.id, b.product_id, b.farm_code, b.aydi_block_number, b.jde_cost_center_id,
-           b.planting_year, b.lifecycle, r.code as rootstock_code, v.code as variety_code, v.name as variety_name
+           b.planting_year, b.lifecycle, b.aerobotics_area_ha, r.code as rootstock_code, v.code as variety_code, v.name as variety_name
     from farm_blocks b
     left join farm_rootstocks r on r.id=b.rootstock_id
     left join varieties v on v.id=b.variety_id
