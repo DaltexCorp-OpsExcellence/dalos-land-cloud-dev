@@ -79,7 +79,12 @@ for(const cf of CROPS){
     const rootCode=(rr&&rr.code&&rr.code!=="NO")?rr.code:(rr&&rr.code==="NO"?"NO":null);
     // olives/berries carry no rootstock at all (workbook blank) -> NULL, not the No row
     const rootFinal=(pid==="olives"||cf.berries)?null:rootCode;
-    const lifecycle=(vv.code==="ROS"||vv.code==="BNU")?"nursery":"bearing";
+    // "Last produc. season" = ON/blank/2025+ => active; a PAST year => retired (grubbed).
+    // Retired blocks legitimately carry no cost centre — do not flag them as gaps.
+    const lastRaw=has("Last produc. season")?cell(r,col("Last produc. season")):"";
+    const lastYr=/^\d{4}$/.test(lastRaw)?parseInt(lastRaw,10):null;
+    const retired=lastYr!=null && lastYr<2025;
+    const lifecycle=(vv.code==="ROS"||vv.code==="BNU")?"nursery":(retired?"retired":"bearing");
     const area=num(areaRaw); const total=area==null?0:area;
 
     recs.push({
@@ -88,7 +93,7 @@ for(const cf of CROPS){
       total_area_fed:total, aero:num(has("Aerobotics Area (ha)")?cell(r,col("Aerobotics Area (ha)")):""),
       jde:(has("JD. E. Cost Center ID")?cell(r,col("JD. E. Cost Center ID")):"")||null,
       trees:intOf(has("Number of trees")?cell(r,col("Number of trees")):""),
-      lifecycle, legacy_fin:legacyFin, legacy_plot:oldPlot,
+      lifecycle, last_prod:(retired?lastYr:null), legacy_fin:legacyFin, legacy_plot:oldPlot,
       comments:(has("Comments")?cell(r,col("Comments")):(has("ملاحظات")?cell(r,col("ملاحظات")):""))||null,
       // predicted op-id for a final self-check
       op:farm.farm_code+sector+plot+(add||"")+vv.code+String(year).slice(-2)+(rootFinal||"")
@@ -109,15 +114,15 @@ const q=s=>s==null?"null":"'"+String(s).replace(/'/g,"''")+"'";
 const nq=n=>n==null?"null":String(n);
 function rowSQL(x,cast){
   const t=cast?"::text":"", i=cast?"::int":"", d=cast?"::numeric":"";
-  return `(${q(x.product)+t}, ${q(x.farm_code)+t}, ${q(x.sector)+t}, ${q(x.plot)+t}, ${q(x.block_add)+t}, ${q(x.variety_code)+t}, ${q(x.rootstock_code)+t}, ${nq(x.year)+i}, ${nq(x.total_area_fed)+d}, ${nq(x.aero)+d}, ${q(x.jde)+t}, ${nq(x.trees)+i}, ${q(x.lifecycle)+t}, ${q(x.legacy_fin)+t}, ${q(x.legacy_plot)+t}, ${q(x.comments)+t})`;
+  return `(${q(x.product)+t}, ${q(x.farm_code)+t}, ${q(x.sector)+t}, ${q(x.plot)+t}, ${q(x.block_add)+t}, ${q(x.variety_code)+t}, ${q(x.rootstock_code)+t}, ${nq(x.year)+i}, ${nq(x.total_area_fed)+d}, ${nq(x.aero)+d}, ${q(x.jde)+t}, ${nq(x.trees)+i}, ${q(x.lifecycle)+t}, ${nq(x.last_prod)+i}, ${q(x.legacy_fin)+t}, ${q(x.legacy_plot)+t}, ${q(x.comments)+t})`;
 }
 const byCrop={};recs.forEach(x=>{(byCrop[x.product]=byCrop[x.product]||[]).push(x);});
 let sql="-- M2 block load (GENERATED, gitignored — commercial data). Apply via execute_sql.\n";
 for(const p of Object.keys(byCrop)){
   const rows=byCrop[p];
-  sql+=`\n-- ${p}: ${rows.length} blocks\ninsert into public.farm_blocks\n  (product_id, farm_id, sector_code, plot_code, block_add, variety_id, rootstock_id, planting_year,\n   total_area_fed, aerobotics_area_ha, jde_cost_center_id, tree_count_planted, lifecycle,\n   legacy_financial_block_id, legacy_old_plot, comments)\nselect v.product_id, f.id, v.sector_code, v.plot_code, v.block_add, vr.id, rs.id, v.planting_year,\n       v.total_area_fed, v.aerobotics_area_ha, v.jde, v.trees, v.lifecycle, v.legacy_fin, v.legacy_plot, v.comments\nfrom (values\n`;
+  sql+=`\n-- ${p}: ${rows.length} blocks\ninsert into public.farm_blocks\n  (product_id, farm_id, sector_code, plot_code, block_add, variety_id, rootstock_id, planting_year,\n   total_area_fed, aerobotics_area_ha, jde_cost_center_id, tree_count_planted, lifecycle, last_producing_season,\n   legacy_financial_block_id, legacy_old_plot, comments)\nselect v.product_id, f.id, v.sector_code, v.plot_code, v.block_add, vr.id, rs.id, v.planting_year,\n       v.total_area_fed, v.aerobotics_area_ha, v.jde, v.trees, v.lifecycle, v.last_prod, v.legacy_fin, v.legacy_plot, v.comments\nfrom (values\n`;
   sql+=rows.map((x,i)=>"  "+rowSQL(x,i===0)).join(",\n");
-  sql+=`\n) as v(product_id, farm_code, sector_code, plot_code, block_add, variety_code, rootstock_code,\n       planting_year, total_area_fed, aerobotics_area_ha, jde, trees, lifecycle, legacy_fin, legacy_plot, comments)\njoin public.farms f on f.farm_code = v.farm_code\njoin public.varieties vr on vr.product_id = v.product_id and vr.code = v.variety_code\nleft join public.farm_rootstocks rs on rs.code = v.rootstock_code\non conflict (operational_block_id) do nothing;\n`;
+  sql+=`\n) as v(product_id, farm_code, sector_code, plot_code, block_add, variety_code, rootstock_code,\n       planting_year, total_area_fed, aerobotics_area_ha, jde, trees, lifecycle, last_prod, legacy_fin, legacy_plot, comments)\njoin public.farms f on f.farm_code = v.farm_code\njoin public.varieties vr on vr.product_id = v.product_id and vr.code = v.variety_code\nleft join public.farm_rootstocks rs on rs.code = v.rootstock_code\non conflict (operational_block_id) do nothing;\n`;
 }
 fs.writeFileSync(path.join(__dirname,"m2_blocks.sql"),sql);
 
