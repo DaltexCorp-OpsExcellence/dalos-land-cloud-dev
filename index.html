@@ -699,10 +699,11 @@ var YELLOW_GREEN=['#eef2ea','#cfe0cd','#a6c9a8','#79ae83','#4f9670','#2b7a53','#
 function rampColor(v,min,max){ if(v==null||max<=min) return 'var(--border2)'; var t=Math.max(0,Math.min(1,(v-min)/(max-min))); return YELLOW_GREEN[Math.round(t*(YELLOW_GREEN.length-1))]; }
 
 function FarmMapScreen(ctx){
-  var boxRef=React.useRef(null), mapRef=React.useRef(null), layerRef=React.useRef(null), baseRef=React.useRef([]);
+  var boxRef=React.useRef(null), mapRef=React.useRef(null), layerRef=React.useRef(null), baseRef=React.useRef([]), featRef=React.useRef([]);
   var s=useState({loading:true,err:null,feats:[]}); var st=s[0],set=s[1];
   var cb=useState('crop'); var colourBy=cb[0],setColourBy=cb[1];
   var bm=useState('sat'); var basemap=bm[0],setBasemap=bm[1];
+  var fm=useState('all'); var farm=fm[0],setFarm=fm[1];
   var hv=useState(null); var hover=hv[0],setHover=hv[1];
   var dt=useState(null); var sel=dt[0],setSel=dt[1];
 
@@ -720,32 +721,49 @@ function FarmMapScreen(ctx){
 
   function styleFn(){ var sc=scheme().fn; return function(f){ return {color:'#fff',weight:1,fillColor:sc(f.properties),fillOpacity:0.72}; }; }
 
+  function buildLayer(){
+    var map=mapRef.current; if(!map) return;
+    if(layerRef.current){ map.removeLayer(layerRef.current); layerRef.current=null; }
+    var feats=featRef.current.filter(function(f){ return farm==='all'||f.properties.farm_code===farm; });
+    if(!feats.length) return;
+    var layer=L.geoJSON({type:'FeatureCollection',features:feats},{ style:styleFn(), onEachFeature:function(f,lyr){
+      lyr.on('mouseover',function(e){ lyr.setStyle({weight:2.5,color:'#0d6a68'}); lyr.bringToFront(); setHover({p:f.properties,x:e.containerPoint.x,y:e.containerPoint.y}); });
+      lyr.on('mouseout',function(){ layer.resetStyle(lyr); setHover(null); });
+      lyr.on('click',function(){ openBlock(f.properties.id); });
+    }});
+    layer.addTo(map); layerRef.current=layer;
+    try{ map.fitBounds(layer.getBounds(),{padding:[24,24]}); }catch(e){}
+  }
   useEffect(function(){
     if(!window.L){ set({loading:false,err:'Map library failed to load.',feats:[]}); return; }
     var map=L.map(boxRef.current,{preferCanvas:false,attributionControl:true}).setView([30.3,30.9],10);
-    mapRef.current=map;
-    setBase(map,'sat');
+    mapRef.current=map; setBase(map,'sat'); setFarm('all');
     var q=supabase.from('v_farm_block_geom').select('*');
     if(ctx.crop!=='all') q=q.eq('product_id',ctx.crop);
     q.then(function(r){
       if(r.error){ set({loading:false,err:r.error.message,feats:[]}); return; }
       var rows=r.data||[]; var features=[];
       rows.forEach(function(row){ if(!row.geojson) return; try{ features.push({type:'Feature',geometry:JSON.parse(row.geojson),properties:row}); }catch(e){} });
-      set({loading:false,err:null,feats:rows});
-      var fc={type:'FeatureCollection',features:features};
-      var layer=L.geoJSON(fc,{ style:styleFn(), onEachFeature:function(f,lyr){
-        lyr.on('mouseover',function(e){ lyr.setStyle({weight:2.5,color:'#0d6a68'}); lyr.bringToFront(); setHover({p:f.properties,x:e.containerPoint.x,y:e.containerPoint.y}); });
-        lyr.on('mouseout',function(){ layer.resetStyle(lyr); setHover(null); });
-        lyr.on('click',function(){ openBlock(f.properties.id); });
-      }});
-      layer.addTo(map); layerRef.current=layer;
-      try{ map.fitBounds(layer.getBounds(),{padding:[20,20]}); }catch(e){}
+      featRef.current=features; set({loading:false,err:null,feats:rows}); buildLayer();
     });
     return function(){ if(mapRef.current){ mapRef.current.remove(); mapRef.current=null; } };
   },[ctx.crop]);
 
-  useEffect(function(){ if(layerRef.current) layerRef.current.setStyle(styleFn()); },[colourBy,st.feats]);
+  useEffect(function(){ if(layerRef.current) layerRef.current.setStyle(styleFn()); },[colourBy]);
+  useEffect(function(){ buildLayer(); },[farm]);
   useEffect(function(){ if(mapRef.current) setBase(mapRef.current,basemap); },[basemap]);
+
+  function download(name,text,type){ var b=new Blob([text],{type:type}); var a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download=name; a.click(); }
+  function currentFeats(){ return featRef.current.filter(function(f){return farm==='all'||f.properties.farm_code===farm;}); }
+  function exportGeoJSON(){ var fs=currentFeats().map(function(f){return {type:'Feature',geometry:f.geometry,properties:{block:f.properties.operational_block_id,crop:f.properties.product_id,farm:f.properties.farm_name,variety:f.properties.variety,rootstock:f.properties.rootstock,planting_year:f.properties.planting_year,feddan:f.properties.total_area_fed}};}); download('farm_blocks'+(farm!=='all'?'_'+farm:'')+'.geojson',JSON.stringify({type:'FeatureCollection',features:fs}),'application/geo+json'); }
+  function exportKML(){
+    var esc=function(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');};
+    var styles=Object.keys(CROP_COLORS).map(function(c){var hex=CROP_COLORS[c].replace('#','');var abgr='cc'+hex.slice(4,6)+hex.slice(2,4)+hex.slice(0,2);return '<Style id="'+c+'"><LineStyle><color>ffffffff</color><width>1</width></LineStyle><PolyStyle><color>'+abgr+'</color></PolyStyle></Style>';}).join('');
+    var pm=currentFeats().map(function(f){var p=f.properties;var coords=(f.geometry.coordinates[0][0]||f.geometry.coordinates[0]).map(function(c){return c[0]+','+c[1]+',0';}).join(' ');
+      return '<Placemark><name>'+esc(p.aydi_block_number)+'</name><styleUrl>#'+p.product_id+'</styleUrl><ExtendedData>'+['operational_block_id','farm_name','variety','rootstock','planting_year','total_area_fed'].map(function(k){return '<Data name="'+k+'"><value>'+esc(p[k])+'</value></Data>';}).join('')+'</ExtendedData><Polygon><outerBoundaryIs><LinearRing><coordinates>'+coords+'</coordinates></LinearRing></outerBoundaryIs></Polygon></Placemark>';
+    }).join('');
+    download('farm_blocks'+(farm!=='all'?'_'+farm:'')+'.kml','<?xml version="1.0" encoding="UTF-8"?><kml xmlns="http://www.opengis.net/kml/2.2"><Document>'+styles+pm+'</Document></kml>','application/vnd.google-earth.kml+xml');
+  }
 
   function setBase(map,which){
     baseRef.current.forEach(function(l){ map.removeLayer(l); }); baseRef.current=[];
@@ -759,20 +777,31 @@ function FarmMapScreen(ctx){
   }
 
   var withGeom=st.feats.length; var lg=scheme().legend;
+  var farmList={}; st.feats.forEach(function(f){ farmList[f.farm_code]=f.farm_name||f.farm_code; });
+  var farmCodes=Object.keys(farmList).sort();
+  var shown=currentFeats().length;
   return ce('div',null,
     ce('div',{className:'mapwrap'},
       ce('div',{id:'farmmap',ref:boxRef}),
       st.loading?ce('div',{style:{position:'absolute',inset:0,display:'flex',alignItems:'center',justifyContent:'center',zIndex:600,color:'#fff',background:'rgba(14,26,26,.6)'}},'Loading map…'):null,
       st.err?ce('div',{style:{position:'absolute',top:10,left:10,zIndex:600},className:'band'},st.err):null,
       ce('div',{className:'mapctl'},
-        ce('label',{className:'form-label',style:{marginTop:0}},'Colour by'),
+        ce('label',{className:'form-label',style:{marginTop:0}},'Farm'),
+        ce('select',{value:farm,onChange:function(e){setFarm(e.target.value);}},
+          ce('option',{value:'all'},'All farms'), farmCodes.map(function(c){return ce('option',{key:c,value:c},farmList[c]);})),
+        ce('label',{className:'form-label'},'Colour by'),
         ce('select',{value:colourBy,onChange:function(e){setColourBy(e.target.value);}},
           [['crop','Crop'],['yield','Yield t/fed'],['variety','Variety'],['rootstock','Rootstock'],['year','Planting year'],['lifecycle','Lifecycle']].map(function(o){return ce('option',{key:o[0],value:o[0]},o[1]);})),
         ce('label',{className:'form-label'},'Basemap'),
         ce('div',{className:'bmw'}, [['sat','Satellite'],['hybrid','Hybrid'],['road','Roads']].map(function(b){return ce('button',{key:b[0],className:basemap===b[0]?'on':'',onClick:function(){setBasemap(b[0]);}},b[1]);})),
-        ce('div',{className:'maplegend'}, (lg||[]).map(function(x,i){return ce('div',{key:i,className:'lgi'},ce('span',{className:'sw',style:{background:x.c}}),ce('span',{className:/[؀-ۿ]/.test(String(x.l))?'ar':null,dir:'auto'},x.l));}))
+        ce('div',{className:'maplegend'}, (lg||[]).map(function(x,i){return ce('div',{key:i,className:'lgi'},ce('span',{className:'sw',style:{background:x.c}}),ce('span',{className:/[؀-ۿ]/.test(String(x.l))?'ar':null,dir:'auto'},x.l));})),
+        ce('div',{style:{marginTop:8,display:'flex',gap:5}},
+          ce('button',{className:'btn btn-secondary btn-sm',style:{flex:1,fontSize:11,padding:'4px 6px'},onClick:exportKML,disabled:!shown},'Export KML'),
+          ce('button',{className:'btn btn-secondary btn-sm',style:{flex:1,fontSize:11,padding:'4px 6px'},onClick:exportGeoJSON,disabled:!shown},'GeoJSON'))
       ),
-      ce('div',{className:'mapcov'}, withGeom+' of 506 blocks mapped'+(ctx.crop!=='all'?' · '+ctx.crop:'')+' · 146 missing geometry'),
+      ce('div',{className:'mapcov'},
+        ce('div',null, ce('b',null,shown+' block'+(shown===1?'':'s')), ' shown'+(farm!=='all'?' · '+farmList[farm]:'')),
+        ce('div',{style:{color:'var(--text3)'}}, withGeom+' of 506 mapped'+(ctx.crop==='all'?'':' ('+ctx.crop+')')+' · '+farmCodes.length+' farms · Olives & Berries have no polygons yet')),
       hover?ce('div',{className:'maphover',style:{left:Math.min(hover.x+14,(boxRef.current?boxRef.current.clientWidth:800)-240),top:hover.y+14}},
         ce('div',{className:'mono',style:{fontWeight:500}},hover.p.operational_block_id),
         ce('div',{className:'ar',dir:'auto',style:{fontSize:11,color:'var(--text3)'}},(hover.p.variety||'')+' · '+hover.p.product_id),
