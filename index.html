@@ -200,6 +200,22 @@ thead .stickyc{background:var(--card)}
 .srccol{font-family:var(--font-mono);font-size:12px;color:var(--text);unicode-bidi:plaintext}
 .arrow{color:var(--text3);text-align:center}
 
+/* Farm Map (§6.13) */
+.mapwrap{position:relative;height:calc(100vh - 92px);min-height:420px;border-radius:var(--r2);overflow:hidden;border:1px solid var(--border)}
+#farmmap{width:100%;height:100%}
+.leaflet-container{background:#0e1a1a;font-family:var(--font-body)}
+.mapctl{position:absolute;top:10px;right:10px;z-index:500;background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:8px 10px;font-size:12px;box-shadow:0 2px 10px rgba(0,0,0,.12);max-width:210px}
+.mapctl .form-label{margin-top:6px}
+.mapctl select{width:100%;font-size:12px;padding:4px 6px;border:1px solid var(--border2);border-radius:5px;background:#fff;color:var(--text)}
+.bmw{display:flex;gap:3px;margin-top:5px}
+.bmw button{flex:1;font-size:10px;padding:4px 2px;border:1px solid var(--border2);background:#fff;color:var(--text2);border-radius:5px}
+.bmw button.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+.maplegend{margin-top:8px;max-height:180px;overflow-y:auto}
+.maplegend .lgi{display:flex;align-items:center;gap:6px;font-size:11px;padding:1px 0}
+.maplegend .sw{width:11px;height:11px;border-radius:3px;flex-shrink:0}
+.mapcov{position:absolute;bottom:10px;left:10px;z-index:500;background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:6px 10px;font-size:11px;color:var(--text2);box-shadow:0 2px 10px rgba(0,0,0,.12)}
+.maphover{position:absolute;z-index:500;background:var(--card);border:1px solid var(--border2);border-radius:var(--r);padding:9px 11px;font-size:12px;box-shadow:0 3px 14px rgba(0,0,0,.18);max-width:240px;pointer-events:none}
+
 /* Mobile */
 .sidebar-overlay{display:none}
 .bottom-nav{display:none}
@@ -231,6 +247,9 @@ thead .stickyc{background:var(--card)}
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.110.8/dist/umd/supabase.js"></script>
 <!-- SheetJS for Bulk Import client-side parsing (§11d sanctioned) -->
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<!-- Leaflet for the Farm Map (§11d sanctioned) -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 
 <script>
 "use strict";
@@ -299,7 +318,7 @@ function Scaffold(p){ return ce('div',null,
 var SCREENS = {
   structure:{title:'Structure', body:function(ctx){ return ce(StructureScreen, ctx); }},
   register: {title:'Block Register', body:function(ctx){ return ce(RegisterScreen, ctx); }},
-  map:      {title:'Farm Map', phase:'P6', msg:'343 Aerobotics polygons on a satellite basemap, choropleth by yield/variety/rootstock, with the "previously on this land" hover card. Needs the PostGIS migration and a basemap-provider decision.'},
+  map:      {title:'Farm Map', body:function(ctx){ return ce(FarmMapScreen, ctx); }},
   history:  {title:'Production History', body:function(ctx){ return ce(ProductionHistoryScreen, ctx); }},
   heatmap:  {title:'Yield Heatmap', phase:'v2', msg:'Blocks × seasons, each cell a t/fed value on a colour ramp, sortable by trend slope. Post-v1 (L1) — pure UI on the data already loaded.'},
   bench:    {title:'Benchmark', phase:'v2', msg:'Like-for-like yield comparison controlling for variety, rootstock and age, with the rootstock × variety matrix. Post-v1 (L2).'},
@@ -667,6 +686,101 @@ function ProductionHistoryScreen(ctx){
     ),
     ce('div',{className:'band',style:{background:'var(--bg2)',borderColor:'var(--border)',color:'var(--text3)'}},
       'Grapes 2017–2025 shown. The 2021 local-sales split and 2024 export unbundling are visible in the segment shares. Rollup refreshes hourly (P5 cron).')
+  );
+}
+
+/* ── Farm Map (§6.13) — Leaflet + Esri basemaps, choropleth by metric ── */
+var ESRI={sat:'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+  road:'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',
+  ref:'https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',
+  trans:'https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}'};
+var MAP_PALETTE=['#0d6a68','#e08a1e','#6a3d9a','#b03060','#2a5a8a','#5a6b2a','#159490','#b87820','#9a1a3a','#3a7a5a','#7a5a2a','#c04070','#4a8c62','#a05a10'];
+var YELLOW_GREEN=['#eef2ea','#cfe0cd','#a6c9a8','#79ae83','#4f9670','#2b7a53','#1e6b3a'];
+function rampColor(v,min,max){ if(v==null||max<=min) return 'var(--border2)'; var t=Math.max(0,Math.min(1,(v-min)/(max-min))); return YELLOW_GREEN[Math.round(t*(YELLOW_GREEN.length-1))]; }
+
+function FarmMapScreen(ctx){
+  var boxRef=React.useRef(null), mapRef=React.useRef(null), layerRef=React.useRef(null), baseRef=React.useRef([]);
+  var s=useState({loading:true,err:null,feats:[]}); var st=s[0],set=s[1];
+  var cb=useState('crop'); var colourBy=cb[0],setColourBy=cb[1];
+  var bm=useState('sat'); var basemap=bm[0],setBasemap=bm[1];
+  var hv=useState(null); var hover=hv[0],setHover=hv[1];
+  var dt=useState(null); var sel=dt[0],setSel=dt[1];
+
+  // colour scheme derived from features + colourBy
+  function scheme(){
+    var feats=st.feats;
+    if(colourBy==='crop'){ var seen={}; feats.forEach(function(f){seen[f.product_id]=CROP_COLORS[f.product_id]||'#888';}); return {fn:function(p){return CROP_COLORS[p.product_id]||'#888';}, legend:Object.keys(seen).map(function(k){return {c:seen[k],l:k};})}; }
+    if(colourBy==='lifecycle'){ var L={bearing:'var(--green)',retired:'var(--text3)',nursery:'var(--amber)',pre_bearing:'var(--accent2)',superseded:'var(--border2)',planned:'var(--accent)'}; return {fn:function(p){return L[p.lifecycle]||'#888';}, legend:['bearing','retired','nursery'].map(function(k){return {c:L[k],l:k};})}; }
+    if(colourBy==='rootstock'||colourBy==='variety'){ var key=colourBy; var vals=[]; feats.forEach(function(f){var v=f[key]||'—';if(vals.indexOf(v)<0)vals.push(v);}); vals.sort(); var m={}; vals.forEach(function(v,i){m[v]=MAP_PALETTE[i%MAP_PALETTE.length];}); return {fn:function(p){return m[p[key]||'—'];}, legend:vals.slice(0,14).map(function(v){return {c:m[v],l:v};})}; }
+    if(colourBy==='year'){ var ys=feats.map(function(f){return f.planting_year;}).filter(Boolean); var mn=Math.min.apply(null,ys),mx=Math.max.apply(null,ys); return {fn:function(p){return rampColor(p.planting_year,mn,mx);}, legend:[{c:YELLOW_GREEN[0],l:mn+' (old)'},{c:YELLOW_GREEN[6],l:mx+' (new)'}]}; }
+    // yield t/fed
+    var yl=feats.map(function(f){return (f.latest_prod&&f.latest_bearing>0)?f.latest_prod/f.latest_bearing:null;}).filter(function(x){return x!=null;});
+    var lo=yl.length?Math.min.apply(null,yl):0, hi=yl.length?Math.max.apply(null,yl):1;
+    return {fn:function(p){var y=(p.latest_prod&&p.latest_bearing>0)?p.latest_prod/p.latest_bearing:null; return y==null?'var(--border2)':rampColor(y,lo,hi);}, legend:[{c:'var(--border2)',l:'no data'},{c:YELLOW_GREEN[1],l:fmt(Math.round(lo))+' t/fed'},{c:YELLOW_GREEN[6],l:fmt(Math.round(hi))+' t/fed'}]}; }
+
+  function styleFn(){ var sc=scheme().fn; return function(f){ return {color:'#fff',weight:1,fillColor:sc(f.properties),fillOpacity:0.72}; }; }
+
+  useEffect(function(){
+    if(!window.L){ set({loading:false,err:'Map library failed to load.',feats:[]}); return; }
+    var map=L.map(boxRef.current,{preferCanvas:false,attributionControl:true}).setView([30.3,30.9],10);
+    mapRef.current=map;
+    setBase(map,'sat');
+    var q=supabase.from('v_farm_block_geom').select('*');
+    if(ctx.crop!=='all') q=q.eq('product_id',ctx.crop);
+    q.then(function(r){
+      if(r.error){ set({loading:false,err:r.error.message,feats:[]}); return; }
+      var rows=r.data||[]; var features=[];
+      rows.forEach(function(row){ if(!row.geojson) return; try{ features.push({type:'Feature',geometry:JSON.parse(row.geojson),properties:row}); }catch(e){} });
+      set({loading:false,err:null,feats:rows});
+      var fc={type:'FeatureCollection',features:features};
+      var layer=L.geoJSON(fc,{ style:styleFn(), onEachFeature:function(f,lyr){
+        lyr.on('mouseover',function(e){ lyr.setStyle({weight:2.5,color:'#0d6a68'}); lyr.bringToFront(); setHover({p:f.properties,x:e.containerPoint.x,y:e.containerPoint.y}); });
+        lyr.on('mouseout',function(){ layer.resetStyle(lyr); setHover(null); });
+        lyr.on('click',function(){ openBlock(f.properties.id); });
+      }});
+      layer.addTo(map); layerRef.current=layer;
+      try{ map.fitBounds(layer.getBounds(),{padding:[20,20]}); }catch(e){}
+    });
+    return function(){ if(mapRef.current){ mapRef.current.remove(); mapRef.current=null; } };
+  },[ctx.crop]);
+
+  useEffect(function(){ if(layerRef.current) layerRef.current.setStyle(styleFn()); },[colourBy,st.feats]);
+  useEffect(function(){ if(mapRef.current) setBase(mapRef.current,basemap); },[basemap]);
+
+  function setBase(map,which){
+    baseRef.current.forEach(function(l){ map.removeLayer(l); }); baseRef.current=[];
+    var add=function(url,opts){ var l=L.tileLayer(url,Object.assign({maxZoom:19,attribution:'Tiles © Esri'},opts||{})); l.addTo(map); baseRef.current.push(l); return l; };
+    if(which==='road') add(ESRI.road);
+    else { add(ESRI.sat); if(which==='hybrid'){ add(ESRI.trans,{opacity:1}); add(ESRI.ref,{opacity:1}); } }
+    if(layerRef.current) layerRef.current.bringToFront();
+  }
+  function openBlock(id){
+    supabase.from('farm_blocks').select('id,operational_block_id,aydi_block_number,product_id,farm_code,planting_year,total_area_fed,aerobotics_area_ha,jde_cost_center_id,rootstock_id,lifecycle,farms(name),varieties(name),farm_rootstocks(name)').eq('id',id).single().then(function(r){ if(r.data) setSel(r.data); });
+  }
+
+  var withGeom=st.feats.length; var lg=scheme().legend;
+  return ce('div',null,
+    ce('div',{className:'mapwrap'},
+      ce('div',{id:'farmmap',ref:boxRef}),
+      st.loading?ce('div',{style:{position:'absolute',inset:0,display:'flex',alignItems:'center',justifyContent:'center',zIndex:600,color:'#fff',background:'rgba(14,26,26,.6)'}},'Loading map…'):null,
+      st.err?ce('div',{style:{position:'absolute',top:10,left:10,zIndex:600},className:'band'},st.err):null,
+      ce('div',{className:'mapctl'},
+        ce('label',{className:'form-label',style:{marginTop:0}},'Colour by'),
+        ce('select',{value:colourBy,onChange:function(e){setColourBy(e.target.value);}},
+          [['crop','Crop'],['yield','Yield t/fed'],['variety','Variety'],['rootstock','Rootstock'],['year','Planting year'],['lifecycle','Lifecycle']].map(function(o){return ce('option',{key:o[0],value:o[0]},o[1]);})),
+        ce('label',{className:'form-label'},'Basemap'),
+        ce('div',{className:'bmw'}, [['sat','Satellite'],['hybrid','Hybrid'],['road','Roads']].map(function(b){return ce('button',{key:b[0],className:basemap===b[0]?'on':'',onClick:function(){setBasemap(b[0]);}},b[1]);})),
+        ce('div',{className:'maplegend'}, (lg||[]).map(function(x,i){return ce('div',{key:i,className:'lgi'},ce('span',{className:'sw',style:{background:x.c}}),ce('span',{className:/[؀-ۿ]/.test(String(x.l))?'ar':null,dir:'auto'},x.l));}))
+      ),
+      ce('div',{className:'mapcov'}, withGeom+' of 506 blocks mapped'+(ctx.crop!=='all'?' · '+ctx.crop:'')+' · 146 missing geometry'),
+      hover?ce('div',{className:'maphover',style:{left:Math.min(hover.x+14,(boxRef.current?boxRef.current.clientWidth:800)-240),top:hover.y+14}},
+        ce('div',{className:'mono',style:{fontWeight:500}},hover.p.operational_block_id),
+        ce('div',{className:'ar',dir:'auto',style:{fontSize:11,color:'var(--text3)'}},(hover.p.variety||'')+' · '+hover.p.product_id),
+        ce('div',{style:{fontSize:11,marginTop:3}},fmt(hover.p.total_area_fed)+' fed · planted '+hover.p.planting_year),
+        hover.p.latest_prod?ce('div',{style:{fontSize:11,color:'var(--accent)'}},'latest '+fmt(hover.p.latest_prod)+' t ('+hover.p.latest_year+')'):ce('div',{style:{fontSize:11,color:'var(--text3)'}},'no production recorded')
+      ):null
+    ),
+    sel?ce(BlockDetail,{block:sel,onClose:function(){setSel(null);}}):null
   );
 }
 
