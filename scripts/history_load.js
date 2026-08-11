@@ -36,18 +36,23 @@ function classify(h){ const n=hnorm(h); if(!n) return {kind:"empty"};
   return {kind:"metric", code:code||null, scenario, raw:h};
 }
 
-// blocks indexed by product|farm|aydi
+// aydi normalisation: uppercase, strip anything but A-Z/0-9/dash (so "05-10B+C"->"05-10BC", "00-56a"->"00-56A")
+function aydiNorm(s){ return String(s==null?"":s).toUpperCase().replace(/[^A-Z0-9-]/g,""); }
+// optional allowlist: restrict emitted output to these block_ids (targeted gap-fill, never touch loaded blocks)
+let ALLOW=null; try{ ALLOW=new Set(JSON.parse(fs.readFileSync(path.join(__dirname,"grapes_gap.json"),"utf8"))); }catch(e){}
+const useAllow = process.argv.includes("--gap-only") && ALLOW;
+// blocks indexed by product|farm|aydiNorm
 const idx = {};
-for (const b of BLOCKS){ const k=b.product_id+"|"+b.farm_code+"|"+String(b.aydi_block_number).trim(); (idx[k]=idx[k]||[]).push(b); }
+for (const b of BLOCKS){ const k=b.product_id+"|"+b.farm_code+"|"+aydiNorm(b.aydi_block_number); (idx[k]=idx[k]||[]).push(b); }
 const CROP = { "Citrus":"citrus","Lemon":"citrus","Orange":"citrus","Soft Citrus":"citrus","Grapefruit":"citrus",
-               "Mango":"mango","Pomegranate":"pomegranate","Olives":"olives","Berries":"berries","Table Grapes":"grapes" };
+               "Mango":"mango","Pomegranate":"pomegranate","Olives":"olives","Berries":"berries","Table Grapes":"grapes","Grapes":"grapes" };
 
 // Badr/Hana are one physical estate split by sector (1-3 = Badr, else Hana); M2 applied
 // this to the DB farm_code, so re-derive it from the sector before matching.
 function bdha(farm, sector){ if(farm!=="BD"&&farm!=="HA") return farm; const n=parseInt(toAscii(String(sector||"")),10); return (n>=1&&n<=3)?"BD":"HA"; }
 
 function resolveBlock(prod, farm, aydi, cc, root, vcode, py){
-  let cand = idx[prod+"|"+farm+"|"+aydi] || [];
+  let cand = idx[prod+"|"+farm+"|"+aydiNorm(aydi)] || [];
   if (cand.length<=1) return {block:cand[0]||null, how: cand.length? "unique":"none"};
   const steps = [
     ["cc",   b => cc  != null && ccNorm(b.jde_cost_center_id)===cc],
@@ -60,7 +65,7 @@ function resolveBlock(prod, farm, aydi, cc, root, vcode, py){
   return {block: cand.length===1?cand[0]:null, how: cand.length===1?used.join("+"):"ambiguous("+cand.length+")"};
 }
 
-const SHEETS = ["Citrus","Mango&Pomegranate","Olives","Berries"];
+const SHEETS = process.argv.includes("--grapes") ? ["Grapes"] : ["Citrus","Mango&Pomegranate","Olives","Berries"];
 const outSeasons=[], outValues=[]; const seenSeasonKey={};
 const report = {};
 
@@ -119,6 +124,17 @@ for (const sheet of SHEETS){
   report[sheet]=rep;
 }
 
+// targeted gap-fill: keep only allowlisted block_ids (never touch already-loaded blocks)
+if(useAllow){
+  const beforeS=outSeasons.length, beforeV=outValues.length;
+  for(let i=outSeasons.length-1;i>=0;i--) if(!ALLOW.has(outSeasons[i].bid)) outSeasons.splice(i,1);
+  for(let i=outValues.length-1;i>=0;i--) if(!ALLOW.has(outValues[i].bid)) outValues.splice(i,1);
+  const filledBlocks=new Set(outSeasons.map(s=>s.bid));
+  console.log(`GAP-ONLY: allowlist ${ALLOW.size} blocks → filled ${filledBlocks.size}; seasons ${outSeasons.length}/${beforeS}, values ${outValues.length}/${beforeV}`);
+  const missed=[...ALLOW].filter(id=>!filledBlocks.has(id));
+  if(missed.length) console.log(`  allowlisted but NOT filled (${missed.length}): ${missed.join(", ")}`);
+}
+
 // ---- report ----
 for(const s of SHEETS){ const r=report[s]; if(!r){ console.log(`\n== ${s}: (sheet absent)`); continue; }
   if(r.error){ console.log(`\n== ${s}: ${r.error}`); continue; }
@@ -151,6 +167,7 @@ if(EMIT){
   sql+="select bs.id, m.id, v.val\nfrom (values\n";
   sql+=outValues.map((v,i)=>"  ("+q(v.bid)+(i===0?"::uuid":"")+", "+nq(v.year)+(i===0?"::int":"")+", "+q(v.scenario)+(i===0?"::text":"")+", "+q(v.code)+(i===0?"::text":"")+", "+nq(v.val)+(i===0?"::numeric":"")+")").join(",\n");
   sql+="\n) as v(block_id, year, scenario, code, val)\njoin public.farm_block_seasons bs on bs.block_id=v.block_id::uuid and bs.season_year=v.year and bs.scenario=v.scenario\njoin public.farm_metrics m on m.code=v.code\non conflict (block_season_id, metric_id) do update set value_t=excluded.value_t;\n";
-  fs.writeFileSync(path.join(__dirname,"history_nongrapes.sql"),sql);
-  console.log(`\nwrote scripts/history_nongrapes.sql (${(fs.statSync(path.join(__dirname,"history_nongrapes.sql")).size/1024|0)} KB)`);
+  var outName = useAllow ? "history_grapes_gap.sql" : "history_nongrapes.sql";
+  fs.writeFileSync(path.join(__dirname,outName),sql);
+  console.log(`\nwrote scripts/${outName} (${(fs.statSync(path.join(__dirname,outName)).size/1024|0)} KB)`);
 }
