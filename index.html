@@ -291,7 +291,7 @@ var SCREENS = {
   import:   {title:'Bulk Import', phase:'P4', msg:'Upload → map columns (Arabic headers auto-matched on farm_metrics.aliases) → validate → commit, fully reversible per batch.'},
   recon:    {title:'Reconciliation', body:function(ctx){ return ce(ReconciliationScreen, ctx); }},
   health:   {title:'Data Health', body:function(ctx){ return ce(DataHealthScreen, ctx); }},
-  reference:{title:'Reference Data', phase:'P7', msg:'Metrics, Rootstocks and (read-mostly) Varieties admin. Adding a 2027 metric set is three inserts here — no migration.'}
+  reference:{title:'Reference Data', body:function(ctx){ return ce(ReferenceDataScreen, ctx); }}
 };
 
 /* ── Squarified treemap layout (Bruls et al.) — ~50 lines, hand-rolled (§11d) ── */
@@ -651,6 +651,115 @@ function ProductionHistoryScreen(ctx){
     ),
     ce('div',{className:'band',style:{background:'var(--bg2)',borderColor:'var(--border)',color:'var(--text3)'}},
       'Grapes 2017–2025 shown. The 2021 local-sales split and 2024 export unbundling are visible in the segment shares. Rollup refreshes hourly (P5 cron).')
+  );
+}
+
+/* ── Reference Data (§6.11) — Metrics / Rootstocks / Varieties admin ── */
+var ROLE_BADGE={total:'badge-pass',aggregate:'badge-warn',residual:'badge-warn',plan:'badge-neutral',branch:'badge-neutral',child:'badge-neutral',other:'badge-neutral'};
+function ReferenceDataScreen(ctx){
+  var tb=useState('metrics'); var tab=tb[0],setTab=tb[1];
+  var s=useState({loading:true,err:null,d:null}); var st=s[0],set=s[1];
+  var msg=useState(null); var flash=msg[0],setFlash=msg[1];
+  useEffect(function(){ load(); },[]);
+  function load(){
+    set({loading:true,err:null,d:null});
+    Promise.all([
+      supabase.from('farm_metrics').select('code,name_en,name_ar,role,parent_code,aliases,active').order('code'),
+      supabase.from('farm_metric_sets').select('id,product_id,season_year,scenario,farm_metric_set_items(metric_id)').order('product_id').order('season_year'),
+      supabase.from('farm_rootstocks').select('code,name,product_id,raw_names,active').order('code'),
+      supabase.from('varieties').select('id,code,name,canonical_name,raw_names,product_id,active').order('product_id').order('name'),
+      supabase.from('farm_blocks').select('variety_id,rootstock_id').limit(1000)
+    ]).then(function(r){
+      var e=r.filter(function(x){return x.error;})[0]; if(e){ set({loading:false,err:e.message,d:null}); return; }
+      var vCount={},rCount={}; (r[4].data||[]).forEach(function(b){ if(b.variety_id)vCount[b.variety_id]=(vCount[b.variety_id]||0)+1; if(b.rootstock_id)rCount[b.rootstock_id]=(rCount[b.rootstock_id]||0)+1; });
+      set({loading:false,err:null,d:{metrics:r[0].data||[],sets:r[1].data||[],rootstocks:r[2].data||[],varieties:r[3].data||[],vCount:vCount,rCount:rCount}});
+    });
+  }
+  function cloneSet(setRow){
+    var ny=setRow.season_year+1;
+    setFlash({kind:'busy',t:'Cloning '+setRow.product_id+' '+setRow.scenario+' → '+ny+'…'});
+    supabase.from('farm_metric_sets').insert({product_id:setRow.product_id,season_year:ny,scenario:setRow.scenario}).select('id').single().then(function(ins){
+      if(ins.error){ setFlash({kind:'err',t:/duplicate|unique/i.test(ins.error.message)?(setRow.product_id+' '+ny+' '+setRow.scenario+' already exists.'):('Clone failed: '+ins.error.message)}); return; }
+      var items=(setRow.farm_metric_set_items||[]).map(function(it,i){return {metric_set_id:ins.data.id,metric_id:it.metric_id,sort_order:i+1};});
+      supabase.from('farm_metric_set_items').insert(items).then(function(ir){
+        if(ir.error){ setFlash({kind:'err',t:'Set created but items failed: '+ir.error.message}); return; }
+        setFlash({kind:'ok',t:'Cloned '+setRow.product_id+' '+ny+' '+setRow.scenario+' ('+items.length+' metrics) — no migration, no deploy.'}); load();
+      });
+    });
+  }
+  if(st.loading) return ce(Loading,{rows:8});
+  if(st.err) return ce(ErrorState,{msg:st.err,onRetry:load});
+  var d=st.d;
+
+  var body;
+  if(tab==='metrics'){
+    body=ce('div',null,
+      ce('div',{className:'section-title'},ce('span',{className:'section-title-bar'}),'Metrics ('+d.metrics.length+') — module-owned'),
+      ce('div',{className:'table-wrap',style:{marginBottom:14}},
+        ce('table',null,
+          ce('thead',null,ce('tr',null,['Code','English','Arabic','Role','Parent','Aliases'].map(function(h){return ce('th',{key:h},h);}))),
+          ce('tbody',null, d.metrics.map(function(m){return ce('tr',{key:m.code},
+            ce('td',null,ce('span',{className:'lot'},m.code)),
+            ce('td',null,m.name_en),
+            ce('td',{className:'ar',dir:'auto'},m.name_ar||'—'),
+            ce('td',null,ce('span',{className:'badge '+(ROLE_BADGE[m.role]||'badge-neutral'),style:{fontSize:10}},m.role)),
+            ce('td',null,m.parent_code?ce('span',{className:'lot'},m.parent_code):'—'),
+            ce('td',{className:'ar',dir:'auto',style:{fontSize:11,color:'var(--text3)'}},(m.aliases||[]).join(' · ')||'—'));}))
+        )),
+      ce('div',{className:'section-title'},ce('span',{className:'section-title-bar'}),'Metric sets ('+d.sets.length+') — clone for a new season'),
+      ce('div',{className:'note',style:{marginBottom:10}},ce('b',null,'This is the architectural claim (AC4):'),' adding next season is cloning a set here — one row in ',ce('span',{className:'lot'},'farm_metric_sets'),' and its items. No code change, no migration, no deploy.'),
+      ce('div',{className:'table-wrap'},
+        ce('table',null,
+          ce('thead',null,ce('tr',null,['Crop','Season','Scenario','Metrics',''].map(function(h){return ce('th',{key:h},h);}))),
+          ce('tbody',null, d.sets.map(function(s){return ce('tr',{key:s.id},
+            ce('td',null,ce('span',null,ce('span',{style:{display:'inline-block',width:8,height:8,borderRadius:2,background:CROP_COLORS[s.product_id]||'#999',marginRight:6}}),s.product_id)),
+            ce('td',{className:'num'},s.season_year),
+            ce('td',null,ce('span',{className:'badge '+(s.scenario==='plan'?'badge-warn':'badge-neutral'),style:{fontSize:10}},s.scenario)),
+            ce('td',{className:'num'},(s.farm_metric_set_items||[]).length),
+            ce('td',{style:{textAlign:'right'}}, ctx.isAdmin?ce('button',{className:'btn btn-secondary btn-sm',onClick:function(){cloneSet(s);}},'Clone → '+(s.season_year+1)):null));}))
+        ))
+    );
+  } else if(tab==='rootstocks'){
+    body=ce('div',null,
+      ce('div',{className:'section-title'},ce('span',{className:'section-title-bar'}),'Rootstocks ('+d.rootstocks.length+') — module-owned'),
+      ce('div',{className:'table-wrap'},
+        ce('table',null,
+          ce('thead',null,ce('tr',null,['Code','Name','Crop','Aliases','Blocks'].map(function(h){return ce('th',{key:h,className:h==='Blocks'?'num':null},h);}))),
+          ce('tbody',null, d.rootstocks.map(function(rk){ return ce('tr',{key:rk.code+rk.product_id},
+            ce('td',null,ce('span',{className:'lot'},rk.code)),
+            ce('td',null,rk.name),
+            ce('td',null,rk.product_id||ce('span',{style:{color:'var(--text3)'}},'all')),
+            ce('td',{className:'ar',dir:'auto',style:{fontSize:11,color:'var(--text3)'}},(rk.raw_names||[]).join(' · ')||'—'),
+            ce('td',{className:'num'}, '—'));}))
+        )),
+      ce('div',{className:'note',style:{marginTop:10}},'Codes are system-generated, never typed (§4.1b). A new rootstock or an alias is added here — no migration — and a block using it generates a correct operational ID immediately.')
+    );
+  } else {
+    var byProd={}; d.varieties.forEach(function(v){ (byProd[v.product_id]=byProd[v.product_id]||[]).push(v); });
+    body=ce('div',null,
+      ce('div',{className:'section-title'},ce('span',{className:'section-title-bar'}),'Varieties ('+d.varieties.length+') — shared platform table, read-mostly'),
+      ce('div',{className:'note',style:{marginBottom:10}},ce('b',null,'varieties is a platform table'),' referenced across Vision and CRM. This tab reads it and writes only ',ce('span',{className:'lot'},'code'),' and ',ce('span',{className:'lot'},'raw_names'),'. Creating, renaming or deactivating a variety happens in the platform admin, not here.'),
+      ce('div',{className:'table-wrap'},
+        ce('table',null,
+          ce('thead',null,ce('tr',null,['Crop','Code','Name','Spellings (raw_names)','Blocks'].map(function(h){return ce('th',{key:h,className:h==='Blocks'?'num':null},h);}))),
+          ce('tbody',null, d.varieties.filter(function(v){return d.vCount[v.id];}).sort(function(a,b){return (d.vCount[b.id]||0)-(d.vCount[a.id]||0);}).map(function(v){return ce('tr',{key:v.id},
+            ce('td',null,ce('span',null,ce('span',{style:{display:'inline-block',width:8,height:8,borderRadius:2,background:CROP_COLORS[v.product_id]||'#999',marginRight:6}}),v.product_id)),
+            ce('td',null,v.code?ce('span',{className:'lot'},v.code):ce('span',{style:{color:'var(--red)'}},'none')),
+            ce('td',{className:v.active?null:'',style:v.active?null:{color:'var(--text3)'}},v.name+(v.active?'':' (inactive)')),
+            ce('td',{className:'ar',dir:'auto',style:{fontSize:11,color:'var(--text3)'}},(v.raw_names||[]).join(' · ')||'—'),
+            ce('td',{className:'num'},d.vCount[v.id]||0));}))
+        )),
+      ce('div',{style:{fontSize:11,color:'var(--text3)',marginTop:8}},'Showing varieties with blocks. Full platform list & create/rename live in the variety admin.')
+    );
+  }
+
+  return ce('div',null,
+    !ctx.isAdmin?ce('div',{className:'band',style:{marginBottom:10}},'Read-only view — the metric registry is editable by admin / power_user only.'):null,
+    flash?ce('div',{className:'alert '+(flash.kind==='ok'?'alert-ok':flash.kind==='err'?'alert-fail':'alert-warn'),style:{marginBottom:10}},ce('span',null,flash.kind==='ok'?'✓':flash.kind==='err'?'✕':'…'),ce('div',null,flash.t)):null,
+    ce('div',{style:{display:'flex',gap:4,marginBottom:12}},
+      [['metrics','Metrics'],['rootstocks','Rootstocks'],['varieties','Varieties']].map(function(t){
+        return ce('button',{key:t[0],className:'chip'+(tab===t[0]?' active':''),onClick:function(){setTab(t[0]);setFlash(null);}},t[1]);})),
+    body
   );
 }
 
