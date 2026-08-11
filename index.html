@@ -1716,7 +1716,7 @@ function App(){
       ce('div',{className:'side-foot'},
         ce('div',{className:'side-user'}, auth.name||'—'),
         ce('div',{className:'side-role'}, role||'no role'),
-        ce('button',{className:'side-link',onClick:function(){ window.location.href='https://daltexcorp-opsexcellence.github.io/dalos-workspace/'; }}, '← Workspace'),
+        ce('button',{className:'side-link',onClick:function(){ window.location.href='https://daltexcorp-opsexcellence.github.io/dalos-workspace-dev/'; }}, '← Workspace'),
         ce('button',{className:'side-link',onClick:function(){ supabase.auth.signOut(); }}, 'Sign out'),
         ce('div',{className:'side-build'}, BUILD))
     ),
