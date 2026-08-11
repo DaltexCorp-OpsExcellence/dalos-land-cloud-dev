@@ -890,7 +890,7 @@ function secOf(p){ return (p.aydi_block_number||'').slice(0,2)||'—'; }
 function haOf(fed){ return Number(fed||0)/2.38095; }
 
 function FarmMapScreen(ctx){
-  var boxRef=React.useRef(null), mapRef=React.useRef(null), layerRef=React.useRef(null), baseRef=React.useRef([]), labelRef=React.useRef(null), featRef=React.useRef([]), seriesRef=React.useRef({}), hcT=React.useRef(null);
+  var boxRef=React.useRef(null), mapRef=React.useRef(null), layerRef=React.useRef(null), baseRef=React.useRef([]), labelRef=React.useRef(null), featRef=React.useRef([]), seriesRef=React.useRef({}), lineageRef=React.useRef({}), hcT=React.useRef(null);
   var s=useState({loading:true,err:null,feats:[]}); var st=s[0],set=s[1];
   var bm=useState('sat'); var basemap=bm[0],setBasemap=bm[1];
   var hv=useState(null); var hover=hv[0],setHover=hv[1];
@@ -912,7 +912,7 @@ function FarmMapScreen(ctx){
     if(y+150>r.height) y=Math.max(6,r.height-152);
     setHover({p:p,x:x,y:y}); }
   function hideHover(){ hcT.current=setTimeout(function(){ setHover(null); },140); }
-  function selectBlock(p){ setSel(p); setPlot({p:p,series:(seriesRef.current[p.id]||[])}); }
+  function selectBlock(p){ setSel(p); setPlot({p:p,series:(seriesRef.current[p.id]||[]),prev:(lineageRef.current[p.id]||[])}); }
 
   function buildLayer(fit){
     var map=mapRef.current; if(!map||!window.L) return;
@@ -962,6 +962,12 @@ function FarmMapScreen(ctx){
       if(sr.error||!sr.data) return; var mp={};
       sr.data.forEach(function(w){ var v=Number((w.metrics||{}).actual_production||0); if(!v) return; (mp[w.block_id]=mp[w.block_id]||[]).push([w.season_year,v]); });
       Object.keys(mp).forEach(function(k){ mp[k].sort(function(a,b){return a[0]-b[0];}); }); seriesRef.current=mp;
+    });
+    // replant lineage — what was planted here before (non-allocating edges; production never carries across)
+    supabase.from('farm_block_lineage').select('child_block_id,parent_block_id,event_type,parent:farm_blocks!farm_block_lineage_parent_block_id_fkey(aydi_block_number,planting_year,last_producing_season,varieties(name))').then(function(lr){
+      if(lr.error||!lr.data) return; var mp={};
+      lr.data.forEach(function(e){ var pr=e.parent||{}; (mp[e.child_block_id]=mp[e.child_block_id]||[]).push({ pid:e.parent_block_id, event:e.event_type, variety:(pr.varieties&&pr.varieties.name)||'unknown', from:pr.planting_year, to:pr.last_producing_season }); });
+      lineageRef.current=mp;
     });
     return function(){ if(mapRef.current){ mapRef.current.remove(); mapRef.current=null; } };
   },[ctx.crop]);
@@ -1033,16 +1039,23 @@ function FarmMapScreen(ctx){
     : ce('div',{className:'hint'},'Hover a block for its card. Click to select.');
 
   var plotPanel;
-  if(plot){ var p=plot.p, series=plot.series||[]; var tot=series.reduce(function(a,x){return a+x[1];},0); var mx=series.reduce(function(m,x){return Math.max(m,x[1]);},1);
+  if(plot){ var p=plot.p, series=plot.series||[]; var prev=plot.prev||[]; var tot=series.reduce(function(a,x){return a+x[1];},0); var mx=series.reduce(function(m,x){return Math.max(m,x[1]);},1);
+    var nPlant=1+prev.length;
     plotPanel=ce('div',null,
       ce('div',{style:{display:'flex',alignItems:'baseline',gap:8,marginBottom:8}},
         ce('span',{className:'lot'},p.aydi_block_number), ce('span',{style:{fontSize:12,color:'var(--text3)'}}, fmCrop(p.product_id)+' · '+Number(p.total_area_fed||0).toFixed(2)+' fed'),
-        ce('span',{style:{marginLeft:'auto',fontSize:11,color:'var(--text3)'}},'1 planting')),
+        ce('span',{style:{marginLeft:'auto',fontSize:11,color:'var(--text3)'}}, nPlant+' planting'+(nPlant>1?'s':''))),
       ce('div',{className:'plh on'}, ce('span',{className:'sw2'}),
         ce('div',null, ce('div',{className:'nm'}, p.variety||'unknown'), ce('div',{className:'sub'}, (p.planting_year||'—')+'–now · current')),
         ce('div',{className:'tot'}, ce('b',null, fmt(Math.round(tot))), ce('span',{className:'u'},'t total'))),
       series.length?ce('div',{className:'yearbars',style:{height:56,marginTop:10}}, series.map(function(x,i){ return ce('div',{key:i,className:'yb'}, ce('div',{className:'bar',style:{height:Math.max(2,x[1]/mx*40)+'px'},title:x[0]+': '+fmt(x[1])+' t'}), ce('div',{className:'yl'}, String(x[0]).slice(2))); })):null,
-      ce('div',{className:'hint',style:{marginTop:8}}, series.length?'Current planting. Production is recorded directly on this block.':'No production recorded yet for this block.'));
+      prev.length?ce('div',{style:{marginTop:12}},
+        ce('div',{style:{fontSize:10,letterSpacing:'.06em',textTransform:'uppercase',color:'var(--text3)',marginBottom:6}},'Previously on this land'),
+        prev.map(function(q,i){ var pt=(seriesRef.current[q.pid]||[]).reduce(function(a,x){return a+x[1];},0);
+          return ce('div',{key:i,className:'plh past'}, ce('span',{className:'sw2'}),
+            ce('div',null, ce('div',{className:'nm'}, q.variety), ce('div',{className:'sub'}, (q.from||'?')+'–'+(q.to||'?')+' · '+q.event)),
+            ce('div',{className:'tot'}, ce('b',null, fmt(Math.round(pt))), ce('span',{className:'u'},'t total'))); })):null,
+      ce('div',{className:'hint',style:{marginTop:8}}, prev.length?('Earlier plantings on the same land. Production never carries across a replant — those tonnes belong to '+prev[0].variety+', not '+(p.variety||'this block')+'.'):(series.length?'Current planting. Production is recorded directly on this block.':'No production recorded yet for this block.')));
   } else plotPanel=ce('div',{className:'hint'},'Click a block to open its plot history.');
 
   return ce('div',null,
