@@ -186,6 +186,20 @@ thead .stickyc{background:var(--card)}
 .st-red{color:var(--red)}.st-red .section-title-bar{background:var(--red)}
 .st-amber{color:var(--amber)}.st-amber .section-title-bar{background:var(--amber)}
 
+/* Bulk Import (mockup §6.6) */
+.steps{display:flex;gap:0;margin-bottom:14px;flex-wrap:wrap}
+.step{display:flex;align-items:center;gap:7px;padding:6px 16px 6px 10px;font-size:12px;color:var(--text3)}
+.step .n{width:20px;height:20px;border-radius:50%;background:var(--bg3);color:var(--text3);font-size:11px;display:flex;align-items:center;justify-content:center;font-family:var(--font-mono)}
+.step.done{color:var(--text2)}.step.done .n{background:var(--green);color:#fff}
+.step.cur{color:var(--text);font-weight:500}.step.cur .n{background:var(--accent);color:#fff}
+.drop{border:2px dashed var(--border2);border-radius:var(--r2);padding:26px;text-align:center;background:#fff;transition:.15s}
+.drop.over{border-color:var(--accent);background:var(--bg2)}
+.drop .big{font-family:var(--font-display);font-size:17px;margin-bottom:4px}
+.maprow{display:grid;grid-template-columns:1fr 22px 1fr 30px;gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid var(--border)}
+.maprow:last-child{border-bottom:none}
+.srccol{font-family:var(--font-mono);font-size:12px;color:var(--text);unicode-bidi:plaintext}
+.arrow{color:var(--text3);text-align:center}
+
 /* Mobile */
 .sidebar-overlay{display:none}
 .bottom-nav{display:none}
@@ -215,6 +229,8 @@ thead .stickyc{background:var(--card)}
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
 <!-- supabase-js pinned to 2.110.8 via jsDelivr — DalOS auth invariant -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.110.8/dist/umd/supabase.js"></script>
+<!-- SheetJS for Bulk Import client-side parsing (§11d sanctioned) -->
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
 <script>
 "use strict";
@@ -288,7 +304,7 @@ var SCREENS = {
   heatmap:  {title:'Yield Heatmap', phase:'v2', msg:'Blocks × seasons, each cell a t/fed value on a colour ramp, sortable by trend slope. Post-v1 (L1) — pure UI on the data already loaded.'},
   bench:    {title:'Benchmark', phase:'v2', msg:'Like-for-like yield comparison controlling for variety, rootstock and age, with the rootstock × variety matrix. Post-v1 (L2).'},
   entry:    {title:'Season Entry', body:function(ctx){ return ce(SeasonEntryScreen, ctx); }},
-  import:   {title:'Bulk Import', phase:'P4', msg:'Upload → map columns (Arabic headers auto-matched on farm_metrics.aliases) → validate → commit, fully reversible per batch.'},
+  import:   {title:'Bulk Import', body:function(ctx){ return ce(BulkImportScreen, ctx); }},
   recon:    {title:'Reconciliation', body:function(ctx){ return ce(ReconciliationScreen, ctx); }},
   health:   {title:'Data Health', body:function(ctx){ return ce(DataHealthScreen, ctx); }},
   reference:{title:'Reference Data', body:function(ctx){ return ce(ReferenceDataScreen, ctx); }}
@@ -652,6 +668,193 @@ function ProductionHistoryScreen(ctx){
     ce('div',{className:'band',style:{background:'var(--bg2)',borderColor:'var(--border)',color:'var(--text3)'}},
       'Grapes 2017–2025 shown. The 2021 local-sales split and 2024 export unbundling are visible in the segment shares. Rollup refreshes hourly (P5 cron).')
   );
+}
+
+/* ── Bulk Import (§6.6/§7) — upload → map → validate → commit (season data) ── */
+function impNorm(s){ return String(s==null?'':s).normalize('NFC').replace(/['’`´]/g,'').replace(/\s+/g,' ').trim().replace(/\s*\d{1,2}$/,'').trim(); }
+var AR_D={'٠':'0','١':'1','٢':'2','٣':'3','٤':'4','٥':'5','٦':'6','٧':'7','٨':'8','٩':'9'};
+function impVal(s){ s=String(s==null?'':s).replace(/[٠-٩]/g,function(d){return AR_D[d];}).replace(/,/g,'').trim();
+  if(s===''||s==='-'||s==='–'||s==='—'||/^#/.test(s)) return null; var n=parseFloat(s); return isFinite(n)?n:null; }
+var IMP_LOCAL=['local_sales_combined','raw_to_traders','field_reject_sales','farm_gate_sales','condemned'];
+
+function BulkImportScreen(ctx){
+  var stp=useState(1); var step=stp[0],setStep=stp[1];
+  var mm=useState(null); var metrics=mm[0],setMetrics=mm[1];
+  var fi=useState(null); var file=fi[0],setFile=fi[1];
+  var mp=useState({}); var map=mp[0],setMap=mp[1];
+  var mo=useState('upsert'); var mode=mo[0],setMode=mo[1];
+  var cr=useState(ctx.crop==='all'?'grapes':ctx.crop); var crop=cr[0],setCrop=cr[1];
+  var se=useState(ctx.season); var season=se[0],setSeason=se[1];
+  var sc=useState('actual'); var scenario=sc[0],setScenario=sc[1];
+  var va=useState(null); var valn=va[0],setValn=va[1];
+  var cm=useState({busy:false,res:null,err:null}); var commit=cm[0],setCommit=cm[1];
+  var ov=useState(false); var over=ov[0],setOver=ov[1];
+
+  useEffect(function(){ supabase.from('farm_metrics').select('code,name_en,aliases,role').order('code').then(function(r){ setMetrics(r.data||[]); }); },[]);
+
+  function alias2code(){ var m={}; (metrics||[]).forEach(function(x){ m[impNorm(x.code)]=x.code; (x.aliases||[]).forEach(function(a){ m[impNorm(a)]=x.code; }); }); return m; }
+  function classify(h){ var n=impNorm(h); if(!n) return {kind:'skip'};
+    if(/operational.*block|block.*id|^op.*id|aydi/i.test(n)||/^[A-Z]{2}\d/.test(String(h).trim())) return {kind:'block'};
+    if(n.startsWith('معدل')||n.startsWith('نسبة')) return {kind:'skip'};
+    if(n.indexOf('منتج')>=0) return {kind:'flag'};
+    if(n.indexOf('المساحة المنزرعة')>=0||n.indexOf('المساحه المنزرعة')>=0) return {kind:'bearing'};
+    var code=alias2code()[n]; if(code) return {kind:'metric',code:code};
+    return {kind:'need'};
+  }
+
+  function onFile(f){
+    if(!f) return; var rd=new FileReader();
+    rd.onload=function(ev){
+      try{
+        var wb=window.XLSX.read(new Uint8Array(ev.target.result),{type:'array'});
+        // prefer a sheet matching the crop name, else first
+        var sheetName=wb.SheetNames.filter(function(n){return n.toLowerCase().indexOf(crop)>=0;})[0]||wb.SheetNames[0];
+        var aoa=window.XLSX.utils.sheet_to_json(wb.Sheets[sheetName],{header:1,raw:false,defval:''});
+        // header row = the row (first 5) with the most non-empty cells
+        var hr=0,best=-1; for(var i=0;i<Math.min(5,aoa.length);i++){ var c=(aoa[i]||[]).filter(function(x){return String(x).trim();}).length; if(c>best){best=c;hr=i;} }
+        var headers=(aoa[hr]||[]).map(function(x){return String(x).trim();});
+        var dataRows=aoa.slice(hr+1).filter(function(row){return (row||[]).some(function(x){return String(x).trim();});});
+        setFile({name:f.name,sheet:sheetName,headerRow:hr,headers:headers,rows:dataRows,nCols:headers.length});
+        // auto-map
+        var m={}; headers.forEach(function(h,ci){ if(!h)return; m[ci]=classify(h); }); setMap(m);
+        setValn(null); setCommit({busy:false,res:null,err:null}); setStep(2);
+      }catch(e){ setFile({error:'Could not read file: '+e.message}); }
+    };
+    rd.readAsArrayBuffer(f);
+  }
+
+  function validate(){
+    var blockCol=Object.keys(map).filter(function(ci){return map[ci].kind==='block';})[0];
+    var bearingCol=Object.keys(map).filter(function(ci){return map[ci].kind==='bearing';})[0];
+    var metricCols=Object.keys(map).filter(function(ci){return map[ci].kind==='metric';});
+    if(blockCol==null){ setValn({error:'Designate which column holds the Operational Block ID (map it to “— block id —”).'}); return; }
+    setValn({loading:true});
+    var ops=file.rows.map(function(r){return String(r[blockCol]||'').trim();}).filter(Boolean);
+    supabase.from('farm_blocks').select('id,operational_block_id,total_area_fed').eq('product_id',crop).in('operational_block_id',ops.length?ops:['x']).then(function(br){
+      var byOp={}; (br.data||[]).forEach(function(b){byOp[b.operational_block_id]=b;});
+      var ids=(br.data||[]).map(function(b){return b.id;});
+      supabase.from('v_farm_season_wide').select('block_id,updated_at,metrics').eq('season_year',season).eq('scenario',scenario).in('block_id',ids.length?ids:['00000000-0000-0000-0000-000000000000']).then(function(sr){
+        var byId={}; (sr.data||[]).forEach(function(s){byId[s.block_id]=s;});
+        var out=file.rows.map(function(r){
+          var op=String(r[blockCol]||'').trim(); var b=byOp[op];
+          var vals={}; metricCols.forEach(function(ci){ var v=impVal(r[ci]); if(v!=null) vals[map[ci].code]=v; });
+          var bearing=bearingCol!=null?impVal(r[bearingCol]):null;
+          var row={op:op,block:b,vals:vals,bearing:bearing};
+          if(!op){ row.outcome='blocked'; row.why='no block id'; return row; }
+          if(!b){ row.outcome='blocked'; row.why='block not found in '+crop; return row; }
+          if(bearing!=null && bearing>Number(b.total_area_fed)+0.01){ row.outcome='blocked'; row.why='bearing > total area'; return row; }
+          if(Object.keys(vals).some(function(k){return vals[k]<0;})){ row.outcome='blocked'; row.why='negative value'; return row; }
+          var existing=byId[b.id]; row.existing=existing;
+          // balance warn (§3.5)
+          if(vals.actual_production!=null && vals.raw_to_packhouse!=null){ var sum=vals.raw_to_packhouse; IMP_LOCAL.forEach(function(c){if(vals[c]!=null)sum+=vals[c];}); if(Math.abs(vals.actual_production-sum)>Math.max(0.5,0.01*vals.actual_production)) row.warn='off by '+(Math.round((vals.actual_production-sum)*10)/10)+' t'; }
+          row.outcome = existing ? 'update' : 'insert';
+          return row;
+        });
+        var sum={insert:0,update:0,blocked:0,warn:0}; out.forEach(function(r){ sum[r.outcome]=(sum[r.outcome]||0)+1; if(r.warn)sum.warn++; });
+        setValn({loading:false,rows:out,summary:sum,blockCol:blockCol,bearingCol:bearingCol,metricCols:metricCols});
+        setStep(3);
+      });
+    });
+  }
+
+  function doCommit(){
+    if(mode==='dry_run'){ setCommit({busy:false,res:{dry:true},err:null}); setStep(4); return; }
+    setCommit({busy:true,res:null,err:null}); setStep(4);
+    var rows=valn.rows.filter(function(r){return r.outcome==='insert'||r.outcome==='update';}).map(function(r){
+      var payload={block_id:r.block.id, expected_updated_at:(r.existing&&r.existing.updated_at)||null, values:r.vals};
+      if(r.bearing!=null) payload.bearing_area_fed=r.bearing;
+      return payload;
+    });
+    supabase.rpc('fn_save_farm_season_full',{p_payload:{product_id:crop,season_year:season,scenario:scenario,rows:rows}}).then(function(rr){
+      if(rr.error){ var m=rr.error.message||''; setCommit({busy:false,res:null,err:/conflict_stale_season/.test(m)?'A row changed since validation — re-validate and retry.':m}); return; }
+      setCommit({busy:false,res:{saved:(rr.data&&rr.data.saved)||rows.length},err:null});
+    });
+  }
+
+  var steps=['Upload','Map columns','Validate','Commit'];
+  var stepBar=ce('div',{className:'steps'}, steps.map(function(s,i){ var n=i+1; var cls=n<step?'step done':n===step?'step cur':'step'; return ce('div',{key:s,className:cls}, ce('span',{className:'n'}, n<step?'✓':n), s); }));
+
+  // ---- step bodies ----
+  var bodyStep;
+  if(step===1||!file){
+    bodyStep=ce('div',{className:'grid2'},
+      ce('div',{className:'card'},
+        ce('div',{className:'section-title'},ce('span',{className:'section-title-bar'}),'Source file'),
+        ce('div',{className:'drop'+(over?' over':''),onDragOver:function(e){e.preventDefault();setOver(true);},onDragLeave:function(){setOver(false);},onDrop:function(e){e.preventDefault();setOver(false);onFile(e.dataTransfer.files[0]);}},
+          ce('div',{className:'big'},'Drop an .xlsx or .csv here'),
+          ce('div',{style:{fontSize:12,color:'var(--text3)',marginBottom:10}},'or'),
+          ce('label',{className:'btn btn-secondary btn-sm',style:{cursor:'pointer'}}, 'Choose file', ce('input',{type:'file',accept:'.xlsx,.xls,.csv',style:{display:'none'},onChange:function(e){onFile(e.target.files[0]);}}))),
+        file&&file.error?ce('div',{className:'alert alert-fail',style:{marginTop:10}},ce('span',null,'✕'),ce('div',null,file.error)):null,
+        ce('div',{className:'note',style:{marginTop:10}},'Header row is auto-detected (row 2 for most sheets, row 3 for Grapes). Arabic metric headers map themselves via the registry aliases.')),
+      ce('div',{className:'card'},
+        ce('div',{className:'section-title'},ce('span',{className:'section-title-bar'}),'Target & mode'),
+        ce('div',{style:{display:'flex',gap:8,flexWrap:'wrap',marginBottom:12}},
+          ce('div',null,ce('label',{className:'form-label'},'Crop'),ce('select',{className:'tb-select',value:crop,onChange:function(e){setCrop(e.target.value);}},['citrus','grapes','mango','pomegranate','olives','berries'].map(function(c){return ce('option',{key:c,value:c},c);}))),
+          ce('div',null,ce('label',{className:'form-label'},'Season'),ce('select',{className:'tb-select',value:season,onChange:function(e){setSeason(+e.target.value);}},[2025,2024,2023,2022,2021,2020,2019,2018,2017].map(function(y){return ce('option',{key:y,value:y},y);}))),
+          ce('div',null,ce('label',{className:'form-label'},'Scenario'),ce('select',{className:'tb-select',value:scenario,onChange:function(e){setScenario(e.target.value);}},['actual','plan'].map(function(x){return ce('option',{key:x,value:x},x);})))),
+        ce('div',{style:{display:'flex',flexDirection:'column',gap:8}},
+          [['upsert','Upsert','Match on Operational Block ID + season; update changed, insert new. Safe to re-run.'],['dry_run','Dry run','Produce the diff, write nothing.']].map(function(m){
+            return ce('label',{key:m[0],style:{display:'flex',gap:8,alignItems:'flex-start',fontSize:13}}, ce('input',{type:'radio',name:'impmode',checked:mode===m[0],onChange:function(){setMode(m[0]);},style:{marginTop:3}}), ce('span',null,ce('b',null,m[1]),' — '+m[2]));})))
+    );
+  } else if(step===2){
+    var autoN=Object.keys(map).filter(function(ci){return map[ci].kind==='metric';}).length;
+    var needN=Object.keys(map).filter(function(ci){return map[ci].kind==='need';}).length;
+    bodyStep=ce('div',null,
+      ce('div',{className:'card',style:{marginBottom:10}},
+        ce('div',{style:{fontSize:13}}, ce('b',null,file.name), ' · sheet ',ce('span',{className:'lot'},file.sheet),' · '+file.rows.length+' rows · header row '+(file.headerRow+1))),
+      ce('div',{className:'card'},
+        ce('div',{className:'section-title'},ce('span',{className:'section-title-bar'}),'Column mapping — '+autoN+' auto-matched'+(needN?', '+needN+' need you':'')),
+        file.headers.map(function(h,ci){ if(!h) return null; var mo=map[ci]||{kind:'skip'};
+          return ce('div',{key:ci,className:'maprow'},
+            ce('div',{className:'srccol'}, h),
+            ce('div',{className:'arrow'},'→'),
+            ce('select',{className:'form-select',style:{padding:'5px 8px',fontSize:12.5,borderColor:mo.kind==='need'?'var(--amber)':null},value:mo.kind==='metric'?('m:'+mo.code):mo.kind,onChange:function(e){var v=e.target.value; var nm={kind:v}; if(v.indexOf('m:')===0){nm={kind:'metric',code:v.slice(2)};} setMap(function(p){var n=Object.assign({},p);n[ci]=nm;return n;}); }},
+              ce('option',{value:'block'},'— Operational Block ID —'),
+              ce('option',{value:'bearing'},'— Bearing area —'),
+              ce('option',{value:'flag'},'— Bearing flag —'),
+              ce('option',{value:'skip'},'— derived / skip —'),
+              ce('option',{value:'need',disabled:true},mo.kind==='need'?'— needs mapping —':'—'),
+              (metrics||[]).map(function(m){return ce('option',{key:m.code,value:'m:'+m.code}, m.name_en+' ('+m.code+')');})),
+            ce('div',{style:{textAlign:'center',color:mo.kind==='need'?'var(--amber)':mo.kind==='skip'?'var(--text3)':'var(--green)'}}, mo.kind==='need'?'⚠':mo.kind==='skip'?'·':'✓'));
+        }),
+        ce('div',{className:'note',style:{marginTop:10}},ce('b',null,'Arabic header aliasing.'),' A metric spelled ',ce('span',{className:'mono ar',dir:'auto'},'فعلى خام محطة'),' / ',ce('span',{className:'mono ar',dir:'auto'},'للمحطه'),' maps via the registry aliases. Rate (',ce('span',{className:'mono ar',dir:'auto'},'معدل ف'),') columns are skipped — derived, never stored.'),
+        ce('div',{style:{display:'flex',gap:8,marginTop:12,justifyContent:'flex-end'}},
+          ce('button',{className:'btn btn-secondary btn-sm',onClick:function(){setStep(1);}},'Back'),
+          ce('button',{className:'btn btn-primary btn-sm',onClick:validate},'Validate')))
+    );
+  } else if(step===3){
+    if(valn&&valn.error) bodyStep=ce('div',{className:'card'},ce('div',{className:'alert alert-fail'},ce('span',null,'✕'),ce('div',null,valn.error)),ce('button',{className:'btn btn-secondary btn-sm',style:{marginTop:10},onClick:function(){setStep(2);}},'Back to mapping'));
+    else if(!valn||valn.loading) bodyStep=ce(Loading,{rows:6});
+    else { var s=valn.summary;
+      bodyStep=ce('div',{className:'card'},
+        ce('div',{className:'section-title st-amber'},ce('span',{className:'section-title-bar'}),'Validation preview'),
+        ce('div',{className:'table-wrap',style:{maxHeight:360,overflowY:'auto'}},
+          ce('table',null,
+            ce('thead',null,ce('tr',null,ce('th',{style:{width:26}},''),ce('th',null,'Block'),ce('th',{className:'num'},'Bearing'),ce('th',{className:'num'},'Production'),ce('th',null,'Result'))),
+            ce('tbody',null, valn.rows.slice(0,300).map(function(r,i){ var col=r.outcome==='blocked'?'var(--red)':r.warn?'var(--amber)':'var(--green)';
+              return ce('tr',{key:i},
+                ce('td',null,ce('span',{style:{width:8,height:8,borderRadius:'50%',background:col,display:'inline-block'}})),
+                ce('td',null,ce('span',{className:'lot'},r.op||'—')),
+                ce('td',{className:'num'},r.bearing==null?'—':fmt(r.bearing)),
+                ce('td',{className:'num'},r.vals.actual_production==null?'—':fmt(r.vals.actual_production)),
+                ce('td',null,r.outcome==='blocked'?ce('span',{className:'badge badge-fail',style:{fontSize:10}},'blocked: '+r.why):r.warn?ce('span',{className:'badge badge-warn',style:{fontSize:10}},r.outcome+' · '+r.warn):ce('span',{className:'badge badge-pass',style:{fontSize:10}},r.outcome)));}))
+          )),
+        ce('div',{style:{display:'flex',gap:8,marginTop:12,alignItems:'center',flexWrap:'wrap'}},
+          ce('span',{className:'badge badge-pass'},(s.insert||0)+' insert'),ce('span',{className:'badge badge-pass'},(s.update||0)+' update'),
+          ce('span',{className:'badge badge-warn'},(s.warn||0)+' warn'),ce('span',{className:'badge badge-fail'},(s.blocked||0)+' blocked'),
+          ce('button',{className:'btn btn-secondary btn-sm',style:{marginLeft:'auto'},onClick:function(){setStep(2);}},'Back'),
+          ctx.canWrite?ce('button',{className:'btn btn-primary btn-sm',disabled:(s.insert||0)+(s.update||0)===0,onClick:doCommit}, mode==='dry_run'?'Finish dry run':'Commit '+((s.insert||0)+(s.update||0))+' rows'):ce('span',{style:{fontSize:11,color:'var(--text3)'}},'read-only role')));
+    }
+  } else {
+    bodyStep=ce('div',{className:'card'},
+      commit.busy?ce(Loading,{rows:2}):
+      commit.err?ce('div',null,ce('div',{className:'alert alert-fail'},ce('span',null,'✕'),ce('div',null,'Commit failed: '+commit.err)),ce('button',{className:'btn btn-secondary btn-sm',style:{marginTop:10},onClick:function(){setStep(3);}},'Back')):
+      commit.res&&commit.res.dry?ce('div',{className:'state'},ce('div',{className:'state-title'},'Dry run complete'),ce('div',{className:'state-msg'},'No data written. '+((valn.summary.insert||0)+(valn.summary.update||0))+' rows would have been saved, '+(valn.summary.blocked||0)+' blocked.'),ce('button',{className:'btn btn-secondary btn-sm',onClick:function(){setFile(null);setStep(1);}},'New import')):
+      commit.res?ce('div',{className:'state'},ce('div',{className:'state-title',style:{color:'var(--green)'}},'✓ Committed '+commit.res.saved+' rows'),ce('div',{className:'state-msg'},crop+' · '+season+' · '+scenario+'. Re-running the same file is a no-op. Production History and rollups update on the next refresh.'),ce('button',{className:'btn btn-secondary btn-sm',onClick:function(){setFile(null);setValn(null);setStep(1);}},'New import')):null);
+  }
+
+  if(!window.XLSX) return ce('div',{className:'card'},ce(EmptyState,{title:'Loading parser…',msg:'The spreadsheet parser is still loading — one moment.'}));
+  return ce('div',null, stepBar, bodyStep);
 }
 
 /* ── Reference Data (§6.11) — Metrics / Rootstocks / Varieties admin ── */
