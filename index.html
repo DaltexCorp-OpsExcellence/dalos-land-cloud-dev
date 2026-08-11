@@ -957,12 +957,19 @@ function FarmMapScreen(ctx){
       rows.forEach(function(row){ if(!row.geojson) return; try{ features.push({type:'Feature',geometry:JSON.parse(row.geojson),properties:row}); }catch(e){} });
       featRef.current=features; set({loading:false,err:null,feats:rows}); buildLayer(true);
     });
-    // per-block production series (grapes today) for the hover sparkline + plot history
-    supabase.from('v_farm_season_wide').select('block_id,season_year,metrics').eq('scenario','actual').limit(2000).then(function(sr){
-      if(sr.error||!sr.data) return; var mp={};
-      sr.data.forEach(function(w){ var v=Number((w.metrics||{}).actual_production||0); if(!v) return; (mp[w.block_id]=mp[w.block_id]||[]).push([w.season_year,v]); });
-      Object.keys(mp).forEach(function(k){ mp[k].sort(function(a,b){return a[0]-b[0];}); }); seriesRef.current=mp;
-    });
+    // per-block production series for the hover sparkline + plot history. PostgREST caps
+    // unpaginated reads at 1000 rows; v_farm_season_wide holds ~3.5k actual rows, so page it.
+    (function(){ var mp={}; var PAGE=1000;
+      function fin(){ Object.keys(mp).forEach(function(k){ mp[k].sort(function(a,b){return a[0]-b[0];}); }); seriesRef.current=mp; }
+      function page(from){
+        supabase.from('v_farm_season_wide').select('block_id,season_year,metrics').eq('scenario','actual').order('block_id',{ascending:true}).order('season_year',{ascending:true}).range(from,from+PAGE-1).then(function(sr){
+          if(sr.error||!sr.data){ fin(); return; }
+          sr.data.forEach(function(w){ var v=Number((w.metrics||{}).actual_production||0); if(!v) return; (mp[w.block_id]=mp[w.block_id]||[]).push([w.season_year,v]); });
+          if(sr.data.length===PAGE) page(from+PAGE); else fin();
+        });
+      }
+      page(0);
+    })();
     // replant lineage — what was planted here before (non-allocating edges; production never carries across)
     supabase.from('farm_block_lineage').select('child_block_id,parent_block_id,event_type,parent:farm_blocks!farm_block_lineage_parent_block_id_fkey(aydi_block_number,planting_year,last_producing_season,varieties(name))').then(function(lr){
       if(lr.error||!lr.data) return; var mp={};
