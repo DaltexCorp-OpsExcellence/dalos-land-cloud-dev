@@ -393,31 +393,83 @@ function StructureScreen(ctx){
   function onTile(t){ if(t.leaf) setSel(t.block); else setPath(path.concat([{k:t.k,label:t.label}])); }
   var crumbs=[{label:(ctx.crop==='all'?'All crops':ctx.crop),i:-1}].concat(path.map(function(p,i){return {label:p.label,i:i};}));
 
-  var kpi=function(label,val,sub){ return ce('div',{className:'kpi'}, ce('div',{className:'kpi-label'},label), ce('div',{className:'kpi-val'},val), ce('div',{className:'kpi-sub'},sub)); };
+  var kpi=function(label,val,sub,color){ return ce('div',{className:'kpi'}, ce('div',{className:'kpi-label'},label), ce('div',{className:'kpi-val',style:color?{color:color}:null},val), ce('div',{className:'kpi-sub'},sub)); };
+  var cropName=function(id){ return id?id.charAt(0).toUpperCase()+id.slice(1):id; };
+
+  // ── Bearing / Unresolved KPIs ──
+  var bearArea=scope.filter(function(b){return b.lifecycle==='bearing';}).reduce(function(a,b){return a+Number(b.total_area_fed||0);},0);
+  var bearPct=totalArea>0?Math.round(bearArea/totalArea*1000)/10:0;
+  var ccMiss=scope.filter(function(b){return isActive(b.lifecycle)&&!b.jde_cost_center_id;}).length;
+  var rsMiss=scope.filter(function(b){return isActive(b.lifecycle)&&!b.rootstock_id;}).length;
+  var issues=scope.filter(function(b){return isActive(b.lifecycle)&&(!b.jde_cost_center_id||!b.rootstock_id);}).length;
+
+  // ── Crop mix (planted area share) ──
+  var mix={}; scope.forEach(function(b){ mix[b.product_id]=(mix[b.product_id]||0)+Number(b.total_area_fed||0); });
+  var mixTot=Object.keys(mix).reduce(function(a,k){return a+mix[k];},0)||1;
+  var mixKeys=Object.keys(mix).sort(function(a,b){return mix[b]-mix[a];});
+
+  // ── Planting-age profile (3-year buckets) ──
+  var buck={}; scope.forEach(function(b){ if(!b.planting_year) return; var d=Math.floor(b.planting_year/3)*3; buck[d]=(buck[d]||0)+1; });
+  var buckKeys=Object.keys(buck).sort(); var buckMax=buckKeys.reduce(function(m,k){return Math.max(m,buck[k]);},1);
+
+  var mixPanel=ce('div',{className:'card'},
+    ce('div',{className:'section-title'},ce('span',{className:'section-title-bar'}),'Crop mix'),
+    mixKeys.length?mixKeys.map(function(c){ var v=mix[c];
+      return ce('div',{key:c,style:{marginBottom:8}},
+        ce('div',{style:{display:'flex',fontSize:12,marginBottom:3}}, ce('span',null,cropName(c)),
+          ce('span',{style:{marginLeft:'auto',fontFamily:'var(--font-mono)',color:'var(--text3)'}}, fmt(Math.round(v))+' fed · '+Math.round(v/mixTot*100)+'%')),
+        ce('div',{style:{height:7,background:'var(--bg2)',borderRadius:4,overflow:'hidden'}},
+          ce('div',{style:{height:'100%',width:(v/mixTot*100)+'%',background:CROP_COLORS[c]||'#888',borderRadius:4}})));
+    }):ce('div',{style:{fontSize:12,color:'var(--text3)'}},'No blocks in scope.'));
+
+  var agePanel=ce('div',{className:'card'},
+    ce('div',{className:'section-title'},ce('span',{className:'section-title-bar'}),'Planting age profile'),
+    ce('div',{style:{display:'flex',alignItems:'flex-end',gap:5,height:88}},
+      buckKeys.length?buckKeys.map(function(k){
+        return ce('div',{key:k,title:buck[k]+' blocks planted '+k+'–'+(Number(k)+2),style:{flex:1,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'flex-end',height:'100%'}},
+          ce('div',{style:{width:'70%',height:Math.max(2,Math.round(buck[k]/buckMax*72))+'px',background:'var(--accent)',borderRadius:'3px 3px 0 0'}}),
+          ce('div',{style:{fontSize:10,color:'var(--text3)',marginTop:4,fontFamily:'var(--font-mono)'}}, "'"+String(k).slice(2)));
+      }):ce('div',{style:{fontSize:12,color:'var(--text3)'}},'No planting years recorded.')),
+    ce('div',{style:{fontSize:11,color:'var(--text3)',marginTop:6}},'Blocks by planting year (3-yr buckets).'));
+
+  var bview=scope.slice(0,72);
+  var blocksInView=ce('div',{className:'card'},
+    ce('div',{className:'section-title'},ce('span',{className:'section-title-bar'}),'Blocks in view ',ce('span',{style:{color:'var(--text3)',fontWeight:400,textTransform:'none',letterSpacing:0}}, '— '+scope.length+(scope.length===1?' block':' blocks'))),
+    ce('div',{style:{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(150px,1fr))',gap:8}},
+      bview.map(function(b){
+        return ce('div',{key:b.id,onClick:function(){setSel(b);},style:{cursor:'pointer',padding:'8px 10px',background:'var(--bg2)',borderRadius:6,borderLeft:'3px solid '+(CROP_COLORS[b.product_id]||'#888')}},
+          ce('div',{style:{fontFamily:'var(--font-mono)',fontSize:12,fontWeight:600}}, b.aydi_block_number||b.operational_block_id),
+          ce('div',{style:{fontSize:12,color:'var(--text2)',margin:'2px 0'}}, (b.varieties&&b.varieties.name)||'—'),
+          ce('div',{style:{fontSize:11,color:'var(--text3)',fontFamily:'var(--font-mono)'}}, fmt(b.total_area_fed)+' fed · '+(b.planting_year||'—')));
+      }),
+      scope.length>72?ce('div',{style:{display:'flex',alignItems:'center',justifyContent:'center',color:'var(--text3)',fontSize:11,padding:'8px 10px',background:'var(--bg2)',borderRadius:6}}, '+'+(scope.length-72)+' more'):null));
+
   return ce('div',null,
     ce('div',{className:'kpi-grid'},
       kpi('Blocks', scope.length, level>0?'in scope':(ctx.crop==='all'?'all crops':ctx.crop)),
-      kpi('Planted area', fmt(Math.round(totalArea)), 'fed'),
-      kpi('Farms', farms.size, level>0?path[0].label:'estates'),
-      kpi('Median planting', medYear||'—', medYear?((new Date().getFullYear()-medYear)+' yr median age'):'—')
+      kpi('Planted area', fmt(Math.round(totalArea)), 'fed · '+farms.size+' farm'+(farms.size===1?'':'s')),
+      kpi('Bearing this season', fmt(Math.round(bearArea)), bearPct+'% of planted'),
+      kpi('Unresolved issues', issues, issues?(ccMiss+' missing cost centre · '+rsMiss+' missing rootstock'):'clean', issues?'var(--red)':null)
     ),
     ce('div',{style:{display:'flex',alignItems:'center',gap:6,fontSize:13,margin:'2px 0 10px',flexWrap:'wrap'}},
       crumbs.map(function(c,idx){ return ce('span',{key:idx,style:{display:'inline-flex',alignItems:'center',gap:6}},
         idx>0?ce('span',{style:{color:'var(--text3)'}},'›'):null,
         ce('button',{className:'side-link',style:{color:idx===crumbs.length-1?'var(--text)':'var(--accent)',padding:0,fontSize:13},onClick:function(){ setPath(path.slice(0,c.i+1)); }}, c.label));
       })),
-    ce('div',{className:'card',style:{padding:6}},
-      ce('svg',{viewBox:'0 0 '+W+' '+H,style:{width:'100%',display:'block'},preserveAspectRatio:'none'},
-        laid.map(function(t){
-          var col=CROP_COLORS[t.crop]||'#888'; var showLabel=t.w>78&&t.h>30;
-          return ce('g',{key:t.k,style:{cursor:'pointer'},onClick:function(){onTile(t);}},
-            ce('rect',{x:t.x+1,y:t.y+1,width:Math.max(0,t.w-2),height:Math.max(0,t.h-2),rx:3,fill:col,fillOpacity:t.leaf?0.82:0.9,stroke:'#fff',strokeWidth:1}),
-            showLabel?ce('text',{x:t.x+7,y:t.y+16,style:{fill:'#fff',fontSize:t.leaf?11:13,fontFamily:t.leaf?'var(--font-mono)':'var(--font-body)',fontWeight:500,pointerEvents:'none'}}, t.label):null,
-            (showLabel&&!t.leaf)?ce('text',{x:t.x+7,y:t.y+31,style:{fill:'rgba(255,255,255,.85)',fontSize:10,pointerEvents:'none'}}, t.count+' blk · '+fmt(Math.round(t.value))+' fed'):null
-          );
-        }))
-    ),
-    ce('div',{style:{fontSize:11,color:'var(--text3)',marginTop:8}}, level<3?'Click a tile to drill in — area-proportional by planted feddan.':'Click a block to open its detail.'),
+    ce('div',{className:'grid2',style:{gridTemplateColumns:'1.55fr 1fr',marginBottom:10}},
+      ce('div',{className:'card',style:{padding:6}},
+        ce('svg',{viewBox:'0 0 '+W+' '+H,style:{width:'100%',display:'block'},preserveAspectRatio:'none'},
+          laid.map(function(t){
+            var col=CROP_COLORS[t.crop]||'#888'; var showLabel=t.w>78&&t.h>30;
+            return ce('g',{key:t.k,style:{cursor:'pointer'},onClick:function(){onTile(t);}},
+              ce('rect',{x:t.x+1,y:t.y+1,width:Math.max(0,t.w-2),height:Math.max(0,t.h-2),rx:3,fill:col,fillOpacity:t.leaf?0.82:0.9,stroke:'#fff',strokeWidth:1}),
+              showLabel?ce('text',{x:t.x+7,y:t.y+16,style:{fill:'#fff',fontSize:t.leaf?11:13,fontFamily:t.leaf?'var(--font-mono)':'var(--font-body)',fontWeight:500,pointerEvents:'none'}}, t.label):null,
+              (showLabel&&!t.leaf)?ce('text',{x:t.x+7,y:t.y+31,style:{fill:'rgba(255,255,255,.85)',fontSize:10,pointerEvents:'none'}}, t.count+' blk · '+fmt(Math.round(t.value))+' fed'):null
+            );
+          })),
+        ce('div',{style:{fontSize:11,color:'var(--text3)',marginTop:8,padding:'0 4px'}}, level<3?'Tile area = feddan. Click to drill Farm › Sector › Plot › Block. Colour = crop.':'Click a block to open its detail.')),
+      ce('div',{style:{display:'flex',flexDirection:'column',gap:10}}, mixPanel, agePanel)),
+    blocksInView,
     sel?ce(BlockDetail,{block:sel,onClose:function(){setSel(null);}}):null
   );
 }
@@ -627,14 +679,49 @@ var SEG = [
   {k:'local',  label:'Local / farm-gate', color:'var(--accent2)', codes:['farm_gate_sales','local_sales_combined','raw_to_traders','field_reject_sales']},
   {k:'reject', label:'Reject / loss', color:'var(--amber)', codes:['packhouse_reject','weight_loss','weight_loss_damaged','shortage_dryout']}
 ];
+function sankeySVG(prod,exp,loc,rej,W){
+  var H=200,pad=16,nodeW=13,xL=pad,xR=W-pad-nodeW;
+  var scale=(H-2*pad)/(prod||1);
+  var out=[['Export',exp,'var(--accent)'],['Local / farm-gate',loc,'var(--accent2)'],['Reject / loss',rej,'var(--amber)']].filter(function(o){return o[1]>0;});
+  var yL=pad, yR=pad; var srcH=Math.max(2,prod*scale);
+  var links=out.map(function(o){ var h=Math.max(1.5,o[1]*scale); var y0=yL; yL+=h; var y1=yR; yR+=h;
+    var c0=xL+nodeW, c1=xR, mx=(c0+c1)/2;
+    var path='M'+c0+','+(y0+h/2)+' C'+mx+','+(y0+h/2)+' '+mx+','+(y1+h/2)+' '+c1+','+(y1+h/2);
+    return {o:o,h:h,y1:y1,path:path,sw:h}; });
+  return ce('svg',{viewBox:'0 0 '+W+' '+H,style:{width:'100%',display:'block'},preserveAspectRatio:'none'},
+    ce('rect',{x:xL,y:pad,width:nodeW,height:srcH,rx:2,fill:'var(--text2)'}),
+    ce('text',{x:xL,y:pad-4,style:{fontSize:11,fill:'var(--text3)'}},'Production '+fmt(Math.round(prod))+'t'),
+    links.map(function(l,i){ return ce('path',{key:'p'+i,d:l.path,fill:'none',stroke:l.o[2],strokeOpacity:0.45,strokeWidth:l.sw}); }),
+    links.map(function(l,i){ return ce('g',{key:'n'+i},
+      ce('rect',{x:xR,y:l.y1,width:nodeW,height:l.h,rx:2,fill:l.o[2]}),
+      ce('text',{x:xR-5,y:l.y1+l.h/2+3,textAnchor:'end',style:{fontSize:10,fill:'var(--text2)'}}, l.o[0]+' '+Math.round(l.o[1]/(prod||1)*100)+'%')); }));
+}
 function ProductionHistoryScreen(ctx){
   var s=useState({loading:true,err:null,rows:[]}); var st=s[0],set=s[1];
+  var lg=useState([]); var league=lg[0],setLeague=lg[1];
   useEffect(function(){ load(); },[ctx.crop]);
   function load(){
-    set({loading:true,err:null,rows:[]});
+    set({loading:true,err:null,rows:[]}); setLeague([]);
     var q=supabase.from('v_farm_production_rollup').select('season_year,metric_code,total_t,area_fed,blocks').eq('scenario','actual');
     if(ctx.crop!=='all') q=q.eq('product_id',ctx.crop);
-    q.then(function(r){ if(r.error) set({loading:false,err:r.error.message,rows:[]}); else set({loading:false,err:null,rows:r.data||[]}); });
+    q.then(function(r){
+      if(r.error){ set({loading:false,err:r.error.message,rows:[]}); return; }
+      var rows=r.data||[]; set({loading:false,err:null,rows:rows});
+      var ys=rows.map(function(x){return x.season_year;}); var latestY=ys.length?Math.max.apply(null,ys):null;
+      if(latestY==null) return;
+      var bq=supabase.from('farm_blocks').select('id,aydi_block_number,operational_block_id,total_area_fed,product_id,varieties(name)').limit(1000);
+      if(ctx.crop!=='all') bq=bq.eq('product_id',ctx.crop);
+      bq.then(function(br){ if(br.error||!br.data) return; var dim={}; br.data.forEach(function(b){dim[b.id]=b;});
+        supabase.from('v_farm_season_wide').select('block_id,bearing_area_fed,metrics').eq('season_year',latestY).eq('scenario','actual').limit(1000).then(function(wr){
+          if(wr.error||!wr.data) return;
+          var out=[];
+          wr.data.forEach(function(w){ var b=dim[w.block_id]; if(!b) return; var m=w.metrics||{};
+            var prod=Number(m.actual_production||0); if(prod<=0) return;
+            var area=Number(w.bearing_area_fed||b.total_area_fed||0); if(area<=0) return;
+            var exp=Number(m.export_total||m.export_packhouse||m.export_carton||0);
+            out.push({op:b.operational_block_id,aydi:b.aydi_block_number,variety:(b.varieties&&b.varieties.name)||'—',area:area,prod:prod,rate:prod/area,expPct:prod>0?exp/prod*100:0}); });
+          out.sort(function(a,b){return b.rate-a.rate;});
+          setLeague({year:latestY,rows:out}); }); }); });
   }
   if(st.loading) return ce(Loading,{rows:6});
   if(st.err) return ce(ErrorState,{msg:st.err,onRetry:load});
@@ -648,42 +735,70 @@ function ProductionHistoryScreen(ctx){
   var maxP=years.reduce(function(m,y){return Math.max(m,byYear[y].codes.actual_production||0);},0)||1;
   function segTotal(y,seg){ var c=byYear[y].codes; for(var i=0;i<seg.codes.length;i++){ if(c[seg.codes[i]]!=null) return c[seg.codes[i]]; } return 0; }
   // for stacked bars use the first present code per segment (export_total supersedes carton etc.)
-  var latest=byYear[years[years.length-1]];
+  var latestYear=years[years.length-1]; var latest=byYear[latestYear];
+  var sExp=segTotal(latestYear,SEG[0]),sLoc=segTotal(latestYear,SEG[1]),sRej=segTotal(latestYear,SEG[2]);
+  var lgRows=(league&&league.rows)?league.rows:null;
+
+  var prodBars=ce('div',{className:'card'},
+    ce('div',{className:'section-title'},ce('span',{className:'section-title-bar'}),'Production by season (t)'),
+    ce('div',{style:{display:'flex',alignItems:'flex-end',gap:8,height:180}},
+      years.map(function(y){ var v=byYear[y].codes.actual_production||0; var h=Math.max(2,Math.round(v/maxP*100));
+        return ce('div',{key:y,title:fmt(v)+' t',style:{flex:1,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'flex-end',height:'100%'}},
+          ce('div',{style:{fontSize:10,fontFamily:'var(--font-mono)',color:'var(--text3)',marginBottom:3}}, v>=1000?Math.round(v/1000)+'k':Math.round(v)),
+          ce('div',{style:{width:'64%',height:h+'%',background:'var(--accent)',borderRadius:'3px 3px 0 0'}}),
+          ce('div',{style:{fontSize:10,color:'var(--text3)',marginTop:4,fontFamily:'var(--font-mono)'}}, y)
+        );
+      })));
+
+  var sankeyPanel=ce('div',{className:'card'},
+    ce('div',{className:'section-title'},ce('span',{className:'section-title-bar'}),'Where the crop went — ',ce('span',{style:{textTransform:'none',letterSpacing:0,fontWeight:400}},latestYear)),
+    (sExp+sLoc+sRej>0)?sankeySVG(latest.codes.actual_production||0,sExp,sLoc,sRej,520)
+      :ce('div',{style:{fontSize:12,color:'var(--text3)',padding:'20px 0'}},'No segment breakdown recorded for '+latestYear+'.'),
+    ce('div',{style:{fontSize:11,color:'var(--text3)',marginTop:6}},'Each flow is a stored metric. Widths are tonnes.'));
+
+  var segPanel=ce('div',{className:'card'},
+    ce('div',{className:'section-title'},ce('span',{className:'section-title-bar'}),'Segment share by season'),
+    ce('div',{style:{display:'flex',gap:14,fontSize:11,color:'var(--text3)',margin:'2px 0 8px'}},
+      SEG.map(function(sg){return ce('span',{key:sg.k},ce('span',{style:{display:'inline-block',width:9,height:9,background:sg.color,borderRadius:2,marginRight:5}}),sg.label);})),
+    ce('div',{style:{display:'flex',alignItems:'flex-end',gap:8,height:170}},
+      years.map(function(y){
+        var parts=SEG.map(function(sg){return {sg:sg,v:segTotal(y,sg)};});
+        var tot=parts.reduce(function(a,p){return a+p.v;},0)||1;
+        var barMax=years.reduce(function(m,yy){return Math.max(m, SEG.reduce(function(a,sg){return a+segTotal(yy,sg);},0));},0)||1;
+        var colH=Math.max(2,Math.round(tot/barMax*100));
+        return ce('div',{key:y,style:{flex:1,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'flex-end',height:'100%'}},
+          ce('div',{style:{width:'64%',height:colH+'%',display:'flex',flexDirection:'column',justifyContent:'flex-end',borderRadius:'3px 3px 0 0',overflow:'hidden'}},
+            parts.map(function(p){return ce('div',{key:p.sg.k,title:p.sg.label+' '+fmt(p.v)+' t',style:{height:(p.v/tot*100)+'%',background:p.sg.color}});})),
+          ce('div',{style:{fontSize:10,color:'var(--text3)',marginTop:4,fontFamily:'var(--font-mono)'}}, y)
+        );
+      })));
+
+  var leaguePanel=ce('div',{className:'card'},
+    ce('div',{className:'section-title'},ce('span',{className:'section-title-bar'}),'Yield league — t/fed, '+latestYear),
+    lgRows==null?ce('div',{style:{fontSize:12,color:'var(--text3)',padding:'12px 0'}},'Loading block yields…')
+      :(lgRows.length===0?ce('div',{style:{fontSize:12,color:'var(--text3)',padding:'12px 0'}},'No per-block production recorded for '+latestYear+'.')
+      :ce('div',{style:{overflowX:'auto'}},
+        ce('table',{style:{width:'100%',fontSize:12,borderCollapse:'collapse'}},
+          ce('thead',null,ce('tr',null,['Block','Variety','Area','Prod.','t/fed','Export %'].map(function(h,i){return ce('th',{key:h,style:{textAlign:i>=2?'right':'left',padding:'5px 8px',borderBottom:'1px solid var(--border)',color:'var(--text3)',fontWeight:500,whiteSpace:'nowrap'}},h);}))),
+          ce('tbody',null, lgRows.slice(0,15).map(function(r){
+            return ce('tr',{key:r.op,style:{borderBottom:'1px solid var(--border)'}},
+              ce('td',{style:{padding:'5px 8px',fontFamily:'var(--font-mono)'}}, r.aydi||r.op),
+              ce('td',{style:{padding:'5px 8px'}}, r.variety),
+              ce('td',{style:{padding:'5px 8px',textAlign:'right',fontFamily:'var(--font-mono)'}}, fmt(Math.round(r.area*10)/10)),
+              ce('td',{style:{padding:'5px 8px',textAlign:'right',fontFamily:'var(--font-mono)'}}, fmt(Math.round(r.prod))),
+              ce('td',{style:{padding:'5px 8px',textAlign:'right',fontFamily:'var(--font-mono)',fontWeight:600}}, fmt(Math.round(r.rate*100)/100)),
+              ce('td',{style:{padding:'5px 8px',textAlign:'right',fontFamily:'var(--font-mono)',color:'var(--text3)'}}, Math.round(r.expPct)+'%'));
+          }))))));
+
   return ce('div',null,
     ce('div',{className:'kpi-grid'},
-      ce('div',{className:'kpi'},ce('div',{className:'kpi-label'},'Latest season'),ce('div',{className:'kpi-val'},years[years.length-1]),ce('div',{className:'kpi-sub'},(ctx.crop==='all'?'all crops':ctx.crop))),
+      ce('div',{className:'kpi'},ce('div',{className:'kpi-label'},'Latest season'),ce('div',{className:'kpi-val'},latestYear),ce('div',{className:'kpi-sub'},(ctx.crop==='all'?'all crops':ctx.crop))),
       ce('div',{className:'kpi'},ce('div',{className:'kpi-label'},'Production'),ce('div',{className:'kpi-val'},fmt(Math.round(latest.codes.actual_production||0))),ce('div',{className:'kpi-sub'},'t')),
       ce('div',{className:'kpi'},ce('div',{className:'kpi-label'},'Bearing area'),ce('div',{className:'kpi-val'},fmt(Math.round(latest.area))),ce('div',{className:'kpi-sub'},'fed · '+latest.blocks+' blocks')),
       ce('div',{className:'kpi'},ce('div',{className:'kpi-label'},'Yield'),ce('div',{className:'kpi-val'},latest.area>0?fmt(Math.round((latest.codes.actual_production||0)/latest.area*100)/100):'—'),ce('div',{className:'kpi-sub'},'t/fed'))
     ),
-    ce('div',{className:'section-title'},ce('span',{className:'section-title-bar'}),'Production by season (t)'),
-    ce('div',{className:'card'},
-      ce('div',{style:{display:'flex',alignItems:'flex-end',gap:8,height:180}},
-        years.map(function(y){ var v=byYear[y].codes.actual_production||0; var h=Math.max(2,Math.round(v/maxP*100));
-          return ce('div',{key:y,title:fmt(v)+' t',style:{flex:1,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'flex-end',height:'100%'}},
-            ce('div',{style:{fontSize:10,fontFamily:'var(--font-mono)',color:'var(--text3)',marginBottom:3}}, v>=1000?Math.round(v/1000)+'k':Math.round(v)),
-            ce('div',{style:{width:'64%',height:h+'%',background:'var(--accent)',borderRadius:'3px 3px 0 0'}}),
-            ce('div',{style:{fontSize:10,color:'var(--text3)',marginTop:4,fontFamily:'var(--font-mono)'}}, y)
-          );
-        }))
-    ),
-    ce('div',{className:'section-title',style:{marginTop:16}},ce('span',{className:'section-title-bar'}),'Segment share by season'),
-    ce('div',{style:{display:'flex',gap:14,fontSize:11,color:'var(--text3)',marginBottom:8}},
-      SEG.map(function(sg){return ce('span',{key:sg.k},ce('span',{style:{display:'inline-block',width:9,height:9,background:sg.color,borderRadius:2,marginRight:5}}),sg.label);})),
-    ce('div',{className:'card'},
-      ce('div',{style:{display:'flex',alignItems:'flex-end',gap:8,height:170}},
-        years.map(function(y){
-          var parts=SEG.map(function(sg){return {sg:sg,v:segTotal(y,sg)};});
-          var tot=parts.reduce(function(a,p){return a+p.v;},0)||1;
-          var barMax=years.reduce(function(m,yy){return Math.max(m, SEG.reduce(function(a,sg){return a+segTotal(yy,sg);},0));},0)||1;
-          var colH=Math.max(2,Math.round(tot/barMax*100));
-          return ce('div',{key:y,style:{flex:1,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'flex-end',height:'100%'}},
-            ce('div',{style:{width:'64%',height:colH+'%',display:'flex',flexDirection:'column',justifyContent:'flex-end',borderRadius:'3px 3px 0 0',overflow:'hidden'}},
-              parts.map(function(p){return ce('div',{key:p.sg.k,title:p.sg.label+' '+fmt(p.v)+' t',style:{height:(p.v/tot*100)+'%',background:p.sg.color}});})),
-            ce('div',{style:{fontSize:10,color:'var(--text3)',marginTop:4,fontFamily:'var(--font-mono)'}}, y)
-          );
-        }))
-    ),
+    ce('div',{className:'grid2',style:{gridTemplateColumns:'1fr 1.3fr',marginBottom:10}}, prodBars, sankeyPanel),
+    ce('div',{className:'grid2'}, segPanel, leaguePanel),
     ce('div',{className:'band',style:{background:'var(--bg2)',borderColor:'var(--border)',color:'var(--text3)'}},
       'Grapes 2017–2025 shown. The 2021 local-sales split and 2024 export unbundling are visible in the segment shares. Rollup refreshes hourly (P5 cron).')
   );
