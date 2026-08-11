@@ -619,10 +619,10 @@ function RegisterScreen(ctx){
               ce('td',{className:'num'}, b.planting_year),
               ce('td',{className:'num'}, fmt(b.total_area_fed)),
               ce('td',{className:'num'}, b.planted_area_fed==null?ce('span',{style:{color:'var(--text3)'}},'—'):fmt(b.planted_area_fed)),
-              ce('td',{className:'num'}, (function(){ var lp=prodMap[b.id]; var t=lp?ce('span',{style:{color:'var(--text3)'}},' · '+fmt(Math.round(lp.t))+' t'):null;
-                if(b.lifecycle==='bearing') return ce('span',null, ce('span',{style:{color:'var(--green)',fontWeight:600}},'On'), t);
-                if(b.last_producing_season!=null) return ce('span',null, String(b.last_producing_season), t);
-                return ce('span',{style:{color:'var(--text3)'}},'—'); })()),
+              ce('td',{className:'num'},
+                b.lifecycle==='bearing' ? ce('span',{style:{color:'var(--green)',fontWeight:600}},'On')
+                : (b.last_producing_season!=null ? String(b.last_producing_season)
+                : ce('span',{style:{color:'var(--text3)'}},'—'))),
               ce('td',{className:'num'}, b.aerobotics_area_ha==null?ce('span',{style:{color:'var(--text3)'}},'—'):fmt(b.aerobotics_area_ha)),
               ce('td',{className:'num',style:b.jde_cost_center_id?null:{color:'var(--amber)'}}, b.jde_cost_center_id||'—'),
               ce('td',null, ce('span',{className:'badge '+(b.lifecycle==='nursery'?'badge-warn':b.lifecycle==='bearing'?'badge-pass':'badge-neutral')}, b.lifecycle))
