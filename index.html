@@ -1055,7 +1055,12 @@ function FarmMapScreen(ctx){
       if(r.error){ set({loading:false,err:r.error.message,feats:[]}); return; }
       var rows=r.data||[]; var features=[];
       rows.forEach(function(row){ if(!row.geojson) return; try{ features.push({type:'Feature',geometry:JSON.parse(row.geojson),properties:row}); }catch(e){} });
-      featRef.current=features; set({loading:false,err:null,feats:rows}); buildLayer(true);
+      // A replanted plot has the retired predecessor AND the current block sharing one aydi/
+      // outline. Render the CURRENT one so clicking the parcel selects the live planting
+      // (and its allocated predecessor). Keep retired only where nothing current is mapped.
+      var byKey={}; features.forEach(function(f){ var k=f.properties.farm_code+'|'+f.properties.aydi_block_number; (byKey[k]=byKey[k]||[]).push(f); });
+      var deduped=[]; Object.keys(byKey).forEach(function(k){ var g=byKey[k]; var cur=g.filter(function(f){return f.properties.lifecycle!=='retired';}); deduped=deduped.concat(cur.length?cur:g); });
+      featRef.current=deduped; set({loading:false,err:null,feats:rows}); buildLayer(true);
     });
     // per-block production series for the hover sparkline + plot history. PostgREST caps
     // unpaginated reads at 1000 rows; v_farm_season_wide holds ~3.5k actual rows, so page it.
