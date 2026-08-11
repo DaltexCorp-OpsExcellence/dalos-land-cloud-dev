@@ -545,6 +545,7 @@ function RegisterScreen(ctx){
   var k=useState({}); var counts=k[0],setCounts=k[1];
   var fl=useState([]); var farms=fl[0],setFarms=fl[1];
   var pm=useState({}); var prodMap=pm[0],setProdMap=pm[1];   // block_id -> {y:last prod year, t:tonnes}
+  var cs=useState({}); var chainSet=cs[0],setChainSet=cs[1];  // block_ids that belong to a replant lineage
 
   useEffect(function(){ setPage(0); }, [ctx.crop, search, chip, farmF]);
   useEffect(function(){ load(); }, [ctx.crop, page, search, chip, farmF]);
@@ -584,6 +585,9 @@ function RegisterScreen(ctx){
     var pq=supabase.from('v_farm_block_current').select('id,latest_prod_year,latest_prod_t').limit(1000);
     if(ctx.crop!=='all') pq=pq.eq('product_id',ctx.crop);
     pq.then(function(r){ if(r.error||!r.data) return; var m={}; r.data.forEach(function(x){ if(x.latest_prod_t!=null) m[x.id]={y:x.latest_prod_year,t:Number(x.latest_prod_t)}; }); setProdMap(m); });
+    // block_ids that are part of a replant lineage -> the "↻ replanted" badge
+    supabase.from('farm_block_lineage').select('parent_block_id,child_block_id').then(function(r){
+      if(r.error||!r.data) return; var s={}; r.data.forEach(function(e){ s[e.parent_block_id]=1; s[e.child_block_id]=1; }); setChainSet(s); });
   }
 
   var chips=[ {k:null,label:'All',n:counts.all}, {k:'no_cc',label:'Missing cost centre',n:counts.no_cc},
@@ -625,7 +629,9 @@ function RegisterScreen(ctx){
                 : ce('span',{style:{color:'var(--text3)'}},'—'))),
               ce('td',{className:'num'}, b.aerobotics_area_ha==null?ce('span',{style:{color:'var(--text3)'}},'—'):fmt(b.aerobotics_area_ha)),
               ce('td',{className:'num',style:b.jde_cost_center_id?null:{color:'var(--amber)'}}, b.jde_cost_center_id||'—'),
-              ce('td',null, ce('span',{className:'badge '+(b.lifecycle==='nursery'?'badge-warn':b.lifecycle==='bearing'?'badge-pass':'badge-neutral')}, b.lifecycle))
+              ce('td',null, ce('span',{style:{display:'inline-flex',alignItems:'center',gap:6,flexWrap:'wrap'}},
+                ce('span',{className:'badge '+(b.lifecycle==='nursery'?'badge-warn':b.lifecycle==='bearing'?'badge-pass':'badge-neutral')}, b.lifecycle),
+                chainSet[b.id]?ce('span',{title:'This plot has a replant lineage — open to see the timeline',style:{fontSize:10,fontWeight:600,color:'var(--accent)',border:'1px solid var(--accent2)',background:'color-mix(in srgb,var(--accent2) 12%,transparent)',borderRadius:20,padding:'1px 7px',whiteSpace:'nowrap'}},'↻ replanted'):null))
             );
           }))
         )
@@ -658,6 +664,7 @@ function BlockDetail(p){
   var aeroFed = b.aerobotics_area_ha==null ? null : Math.round(b.aerobotics_area_ha*2.38095*100)/100;
   var variance = (aeroFed!=null && b.total_area_fed>0) ? Math.round((aeroFed-b.total_area_fed)/b.total_area_fed*1000)/10 : null;
   var h=useState({loading:true,err:null,seasons:[]}); var hist=h[0],setHist=h[1];
+  var ln=useState({loading:true,plantings:[],series:{}}); var lin=ln[0],setLin=ln[1];
   useEffect(function(){ function esc(e){ if(e.key==='Escape') p.onClose(); } window.addEventListener('keydown',esc); return function(){window.removeEventListener('keydown',esc);}; },[]);
   useEffect(function(){
     supabase.from('v_farm_season_wide').select('season_year,scenario,bearing_area_fed,balance_status,metrics')
@@ -666,11 +673,68 @@ function BlockDetail(p){
         else setHist({loading:false,err:null,seasons:r.data||[]});
       });
   },[b.id]);
+  useEffect(function(){   // all plantings on this land (same product/farm/plot) + their production, for the replant timeline
+    setLin({loading:true,plantings:[],series:{}});
+    supabase.from('farm_blocks').select('id,planting_year,lifecycle,varieties(name)')
+      .eq('product_id',b.product_id).eq('farm_code',b.farm_code).eq('aydi_block_number',b.aydi_block_number).then(function(pr){
+        if(pr.error||!pr.data){ setLin({loading:false,plantings:[],series:{}}); return; }
+        var plantings=pr.data.slice().sort(function(a,c){return (a.planting_year||0)-(c.planting_year||0);});
+        var ids=plantings.map(function(x){return x.id;});
+        supabase.from('v_farm_season_wide').select('block_id,season_year,metrics').eq('scenario','actual')
+          .in('block_id',ids.length?ids:['00000000-0000-0000-0000-000000000000']).then(function(sr){
+            var series={}; (sr.data||[]).forEach(function(w){ var v=Number((w.metrics||{}).actual_production||0); (series[w.block_id]=series[w.block_id]||{})[w.season_year]=v; });
+            setLin({loading:false,plantings:plantings,series:series});
+          });
+      });
+  },[b.id]);
   function row(k,v){ return [ce('dt',{key:k+'k'},k), ce('dd',{key:k+'v',className:/[؀-ۿ]/.test(String(v))?'ar':null,dir:'auto'},v)]; }
 
   var seasons=hist.seasons;
   var withProd=seasons.filter(function(s){return s.metrics&&s.metrics.actual_production!=null;});
   var maxP=withProd.reduce(function(m,s){return Math.max(m,s.metrics.actual_production);},0)||1;
+
+  // ── Plot lineage timeline: every planting on this land, bars coloured by variety ──
+  var lineageSection=null;
+  if(!lin.loading && lin.plantings.length>1){
+    var pls=lin.plantings;                       // oldest → newest
+    var VPAL=['#b87820','#6a3d9a','#b03030','#2a5a8a','#7a5a2a'];
+    var colorOf=function(i){ return i===pls.length-1 ? 'var(--accent2)' : VPAL[i%VPAL.length]; };
+    var lname=function(pl){ return (pl.varieties&&pl.varieties.name)||'unknown'; };
+    var prodSum=function(pl){ var s=lin.series[pl.id]||{}; return Object.keys(s).reduce(function(a,y){return a+s[y];},0); };
+    var lastProd=function(pl){ var s=lin.series[pl.id]||{}; var ys=Object.keys(s).filter(function(y){return s[y]>0;}).map(Number); return ys.length?Math.max.apply(null,ys):null; };
+    var yset={}; pls.forEach(function(pl){ var s=lin.series[pl.id]||{}; Object.keys(s).forEach(function(y){ if(s[y]>0) yset[y]=1; }); });
+    var yrs=Object.keys(yset).map(Number);
+    var chart=null;
+    if(yrs.length){
+      var y0=Math.min.apply(null,yrs), y1=Math.max.apply(null,yrs), years=[];
+      for(var yy=y0;yy<=y1;yy++) years.push(yy);
+      var maxV=0; pls.forEach(function(pl){ var s=lin.series[pl.id]||{}; years.forEach(function(y){ if(s[y]>maxV) maxV=s[y]; }); }); maxV=maxV||1;
+      var owner={}; years.forEach(function(y){ pls.forEach(function(pl,i){ var v=(lin.series[pl.id]||{})[y]; if(v>0) owner[y]={i:i,v:v}; }); });
+      var bounds={}; pls.forEach(function(pl,i){ if(i>0 && pl.planting_year>=y0 && pl.planting_year<=y1) bounds[pl.planting_year]=1; });
+      chart=ce('div',{style:{display:'flex',alignItems:'flex-end',gap:0,height:150,padding:'16px 4px 0',border:'1px solid var(--border)',borderRadius:10,background:'var(--bg2)'}},
+        years.map(function(y){ var o=owner[y]; var isB=bounds[y];
+          return ce('div',{key:y,style:{flex:1,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'flex-end',height:'100%',position:'relative',padding:'0 1px',borderLeft:isB?'2px dashed var(--accent2)':'none'}},
+            isB?ce('div',{title:'Replanted '+y,style:{position:'absolute',top:-13,left:-7,fontSize:12,color:'var(--accent)',fontWeight:700}},'↻'):null,
+            ce('div',{style:{fontSize:10,fontFamily:'var(--font-mono)',color:o?'var(--text2)':'var(--text3)',marginBottom:4}}, o?fmt(Math.round(o.v)):'·'),
+            o ? ce('div',{title:fmt(o.v)+' t',style:{width:'66%',maxWidth:26,height:Math.max(3,Math.round(o.v/maxV*104))+'px',background:colorOf(o.i),borderRadius:'3px 3px 0 0'}})
+              : ce('div',{style:{width:'66%',maxWidth:26,height:4,borderRadius:2,border:'1.5px dashed var(--border2)'}}),
+            ce('div',{style:{fontSize:10,fontFamily:'var(--font-mono)',color:'var(--text3)',marginTop:6}}, "'"+String(y).slice(2)));
+        }));
+    }
+    lineageSection=ce('div',null,
+      ce('div',{className:'section-title'},ce('span',{className:'section-title-bar'}),'Plot lineage — '+pls.length+' plantings'),
+      pls.slice().reverse().map(function(pl){ var i=pls.indexOf(pl); var lp=lastProd(pl); var tot=prodSum(pl); var cur=pl.lifecycle==='bearing'||pl.lifecycle==='pre_bearing'||pl.lifecycle==='planned';
+        return ce('div',{key:pl.id,style:{display:'flex',alignItems:'center',gap:11,padding:'8px 10px',border:'1px solid var(--border)',borderRadius:9,marginBottom:7}},
+          ce('span',{style:{width:11,height:11,borderRadius:'50%',background:colorOf(i),flex:'none'}}),
+          ce('div',null, ce('div',{style:{fontWeight:600,fontSize:14}}, lname(pl)),
+            ce('div',{style:{fontSize:11.5,color:'var(--text3)'}}, (pl.planting_year||'?')+'–'+(cur?'now · current':((lp||'?')+' · replaced')))),
+          ce('div',{style:{marginLeft:'auto',textAlign:'right'}}, ce('div',{style:{fontFamily:'var(--font-mono)',fontSize:15}}, tot>0?fmt(Math.round(tot)):'—'),
+            ce('div',{style:{fontSize:9,color:'var(--text3)',letterSpacing:'.03em'}}, tot>0?'t lifetime':'no data')));
+      }),
+      chart,
+      ce('div',{style:{fontSize:11.5,color:'var(--text2)',lineHeight:1.5,marginTop:12,padding:'9px 11px',background:'var(--bg2)',border:'1px solid var(--border)',borderRadius:8}},
+        'Production never carries across a replant — each variety keeps its own tonnes; the colours are never added together.'));
+  }
 
   var historySection;
   if(hist.loading) historySection=ce('div',{className:'skel',style:{height:70,marginTop:8}});
@@ -732,7 +796,8 @@ function BlockDetail(p){
           row('Variance', variance==null?'—':(variance+' %'))
         ),
         (variance!=null && Math.abs(variance)>10) ? ce('div',{className:'band'}, 'Area variance '+variance+'% exceeds ±10% — flag for reconciliation (§6.10).') : null,
-        ce('div',{className:'section-title',style:{marginTop:18}},ce('span',{className:'section-title-bar'}),'Production history'),
+        lineageSection ? ce('div',{style:{marginTop:18}}, lineageSection) : null,
+        ce('div',{className:'section-title',style:{marginTop:18}},ce('span',{className:'section-title-bar'}), lineageSection?'This planting’s seasons':'Production history'),
         historySection
       )
     )
