@@ -289,7 +289,7 @@ var SCREENS = {
   bench:    {title:'Benchmark', phase:'v2', msg:'Like-for-like yield comparison controlling for variety, rootstock and age, with the rootstock × variety matrix. Post-v1 (L2).'},
   entry:    {title:'Season Entry', body:function(ctx){ return ce(SeasonEntryScreen, ctx); }},
   import:   {title:'Bulk Import', phase:'P4', msg:'Upload → map columns (Arabic headers auto-matched on farm_metrics.aliases) → validate → commit, fully reversible per batch.'},
-  recon:    {title:'Reconciliation', phase:'P7', msg:'Cost-centre and area reconciliation for finance — book vs Aerobotics area, JDE cost-centre gaps, lifecycle audit. Aerobotics variance renders "not measured", never 0, for Mango/Pom/Olives/Berries.'},
+  recon:    {title:'Reconciliation', body:function(ctx){ return ce(ReconciliationScreen, ctx); }},
   health:   {title:'Data Health', body:function(ctx){ return ce(DataHealthScreen, ctx); }},
   reference:{title:'Reference Data', phase:'P7', msg:'Metrics, Rootstocks and (read-mostly) Varieties admin. Adding a 2027 metric set is three inserts here — no migration.'}
 };
@@ -649,6 +649,83 @@ function ProductionHistoryScreen(ctx){
     ),
     ce('div',{className:'band',style:{background:'var(--bg2)',borderColor:'var(--border)',color:'var(--text3)'}},
       'Grapes 2017–2025 shown. The 2021 local-sales split and 2024 export unbundling are visible in the segment shares. Rollup refreshes hourly (P5 cron).')
+  );
+}
+
+/* ── Reconciliation (§6.10) — finance: cost centres + book vs Aerobotics area ── */
+var FARM_NUM={BD:'17',HA:'04',KH:'05',NO:'06',ME:'07',SA:'02',LA:'13',BA:'28'};
+function ReconciliationScreen(ctx){
+  var s=useState({loading:true,err:null,blocks:[]}); var st=s[0],set=s[1];
+  var tb=useState('missing'); var tab=tb[0],setTab=tb[1];
+  useEffect(function(){ load(); },[ctx.crop]);
+  function load(){
+    set({loading:true,err:null,blocks:[]});
+    var q=supabase.from('farm_blocks').select('operational_block_id,aydi_block_number,farm_code,product_id,total_area_fed,aerobotics_area_ha,jde_cost_center_id,lifecycle,farms(name)').limit(1000);
+    if(ctx.crop!=='all') q=q.eq('product_id',ctx.crop);
+    q.then(function(r){ if(r.error) set({loading:false,err:r.error.message,blocks:[]}); else set({loading:false,err:null,blocks:r.data||[]}); });
+  }
+  if(st.loading) return ce('div',null, ce('div',{className:'kpi-grid'},[0,1,2,3].map(function(i){return ce('div',{key:i,className:'kpi'}, ce('div',{className:'skel',style:{width:'55%'}}), ce('div',{className:'skel',style:{width:'35%',height:22,marginTop:8}}));})), ce(Loading,{rows:5}));
+  if(st.err) return ce(ErrorState,{msg:st.err,onRetry:load});
+
+  var B=st.blocks;
+  var measured=B.filter(function(b){return b.aerobotics_area_ha!=null;}).map(function(b){
+    var af=Math.round(Number(b.aerobotics_area_ha)*2.38095*100)/100, t=Number(b.total_area_fed);
+    return Object.assign({},b,{af:af, vfed:Math.round((af-t)*100)/100, vpct:t>0?Math.round((af-t)/t*1000)/10:null});
+  });
+  var missing=B.filter(function(b){return !b.jde_cost_center_id;});
+  var mismatch=B.filter(function(b){ if(!b.jde_cost_center_id)return false; var exp=FARM_NUM[b.farm_code]; return exp && String(b.jde_cost_center_id).slice(3,5)!==exp; });
+  var varOver=measured.filter(function(b){return b.vpct!=null && Math.abs(b.vpct)>10;});
+  var notMeasured=B.length-measured.length;
+
+  // coverage by crop
+  var cov={}; B.forEach(function(b){ var c=cov[b.product_id]=cov[b.product_id]||{t:0,m:0}; c.t++; if(b.aerobotics_area_ha!=null)c.m++; });
+
+  var kpi=function(label,val,sub,color){ return ce('div',{className:'kpi'}, ce('div',{className:'kpi-label'},label), ce('div',{className:'kpi-val',style:color?{color:color}:null}, val), ce('div',{className:'kpi-sub'},sub)); };
+  var areaSorted=measured.slice().sort(function(a,b){return Math.abs(b.vpct||0)-Math.abs(a.vpct||0);}).slice(0,50);
+
+  // cost-centre tab body
+  var ccBody;
+  if(tab==='missing') ccBody=ce('table',null, ce('thead',null,ce('tr',null,ce('th',null,'Block'),ce('th',null,'Farm'),ce('th',{className:'num'},'Area fed'))), ce('tbody',null, missing.slice(0,200).map(function(b){return ce('tr',{key:b.operational_block_id},ce('td',null,ce('span',{className:'lot'},b.operational_block_id)),ce('td',null,(b.farms&&b.farms.name)||b.farm_code),ce('td',{className:'num'},fmt(b.total_area_fed)));})));
+  else if(tab==='mismatch') ccBody=ce('table',null, ce('thead',null,ce('tr',null,ce('th',null,'Block'),ce('th',null,'Farm'),ce('th',{className:'num'},'Cost centre'),ce('th',null,'Expected'))), ce('tbody',null, mismatch.length?mismatch.map(function(b){return ce('tr',{key:b.operational_block_id},ce('td',null,ce('span',{className:'lot'},b.operational_block_id)),ce('td',null,(b.farms&&b.farms.name)||b.farm_code),ce('td',{className:'num'},ce('span',{className:'lot',style:{color:'var(--amber)'}},b.jde_cost_center_id)),ce('td',null,'…'+FARM_NUM[b.farm_code]+'…'));}):[ce('tr',{key:0},ce('td',{colSpan:4,style:{color:'var(--text3)'}},'No cost-centre / farm mismatches for this crop.'))]));
+  else { var byCC={}; B.forEach(function(b){ var k=b.jde_cost_center_id||'(none)'; var c=byCC[k]=byCC[k]||{n:0,a:0}; c.n++; c.a+=Number(b.total_area_fed||0); }); ccBody=ce('table',null, ce('thead',null,ce('tr',null,ce('th',null,'Cost centre'),ce('th',{className:'num'},'Blocks'),ce('th',{className:'num'},'Area fed'))), ce('tbody',null, Object.keys(byCC).sort().map(function(k){return ce('tr',{key:k},ce('td',null,ce('span',{className:'lot'},k)),ce('td',{className:'num'},byCC[k].n),ce('td',{className:'num'},fmt(Math.round(byCC[k].a))));}))); }
+
+  return ce('div',null,
+    ce('div',{className:'kpi-grid'},
+      kpi('Missing cost centre', missing.length, 'blocks', missing.length?'var(--amber)':null),
+      kpi('Cost-centre / farm mismatch', mismatch.length, 'wrong farm digits', mismatch.length?'var(--red)':null),
+      kpi('Area variance >10%', varOver.length, 'of '+measured.length+' measured'),
+      kpi('Not measured', notMeasured, 'no Aerobotics area')
+    ),
+    ce('div',{className:'card',style:{marginBottom:10}},
+      ce('div',{className:'section-title'},ce('span',{className:'section-title-bar'}),'Cost-centre coverage'),
+      ce('div',{className:'note',style:{marginBottom:10}},'Finance reconciles blocks to JDE cost centres. The export is generated from this table, not maintained by hand.'),
+      ce('div',{style:{display:'flex',gap:4,marginBottom:10}},
+        [['missing','Missing ('+missing.length+')'],['mismatch','Farm mismatch ('+mismatch.length+')'],['rollup','Rollup by cost centre']].map(function(t){
+          return ce('button',{key:t[0],className:'chip'+(tab===t[0]?' active':''),onClick:function(){setTab(t[0]);}},t[1]);})),
+      ce('div',{className:'table-wrap',style:{maxHeight:300,overflowY:'auto'}}, ccBody)
+    ),
+    ce('div',{className:'grid2'},
+      ce('div',{className:'card'},
+        ce('div',{className:'section-title'},ce('span',{className:'section-title-bar'}),'Area reconciliation — book vs Aerobotics'),
+        ce('div',{className:'note',style:{marginBottom:10}},'Sorted by absolute variance. Crops with no Aerobotics coverage render as ',ce('b',null,'not measured'),', never zero.'),
+        ce('div',{className:'table-wrap',style:{maxHeight:340,overflowY:'auto'}},
+          ce('table',{style:{minWidth:'auto'}},
+            ce('thead',null,ce('tr',null,ce('th',null,'Block'),ce('th',{className:'num'},'Book'),ce('th',{className:'num'},'Aero'),ce('th',{className:'num'},'Δ fed'),ce('th',{className:'num'},'Δ %'))),
+            ce('tbody',null, areaSorted.map(function(b){var over=Math.abs(b.vpct)>10; return ce('tr',{key:b.operational_block_id},
+              ce('td',null,ce('span',{className:'lot'},b.operational_block_id)),
+              ce('td',{className:'num'},fmt(b.total_area_fed)),
+              ce('td',{className:'num'},fmt(b.af)),
+              ce('td',{className:'num'},fmt(b.vfed)),
+              ce('td',{className:'num',style:over?{color:'var(--amber)',fontWeight:600}:null},b.vpct+'%'));})))
+        )),
+      ce('div',{className:'card'},
+        ce('div',{className:'section-title'},ce('span',{className:'section-title-bar'}),'Aerobotics coverage by crop'),
+        ce('div',null, Object.keys(cov).sort().map(function(c){var pc=cov[c].t?Math.round(cov[c].m/cov[c].t*100):0; return ce('div',{key:c,style:{marginBottom:9}},
+          ce('div',{style:{display:'flex',justifyContent:'space-between',fontSize:12,marginBottom:3}}, ce('span',null,ce('span',{style:{display:'inline-block',width:8,height:8,borderRadius:2,background:CROP_COLORS[c]||'#999',marginRight:6}}),c), ce('span',{className:'mono',style:{color:'var(--text3)'}}, cov[c].m+'/'+cov[c].t+' · '+pc+'%')),
+          ce('div',{style:{height:7,background:'var(--bg2)',borderRadius:4,overflow:'hidden'}}, ce('div',{style:{width:pc+'%',height:'100%',background:pc===0?'var(--border2)':'var(--accent)'}})));})),
+        ce('div',{className:'note',style:{marginTop:10}},'0% coverage crops (Mango, Pomegranate, Olives, Berries) show as not measured — polygon import (P6) recovers many of these.')
+      )
+    )
   );
 }
 
