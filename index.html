@@ -176,6 +176,16 @@ thead .stickyc{background:var(--card)}
 .note{font-size:12px;color:var(--text3);background:var(--bg2);border-radius:8px;padding:9px 11px}
 .form-label{font-size:10px;text-transform:uppercase;letter-spacing:.05em;font-weight:600;color:var(--text3);display:block;margin-bottom:4px}
 
+/* Data Health issues (mockup §6.12) */
+.issue{display:flex;gap:11px;align-items:flex-start;padding:11px 2px;border-bottom:1px solid var(--border)}
+.issue:last-child{border-bottom:none}
+.issue .ico{width:26px;height:26px;border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0}
+.issue .t{font-size:13px;font-weight:500;color:var(--text)}
+.issue .d{font-size:12px;color:var(--text2);margin-top:2px;line-height:1.45}
+.issue .act{flex-shrink:0;align-self:center}
+.st-red{color:var(--red)}.st-red .section-title-bar{background:var(--red)}
+.st-amber{color:var(--amber)}.st-amber .section-title-bar{background:var(--amber)}
+
 /* Mobile */
 .sidebar-overlay{display:none}
 .bottom-nav{display:none}
@@ -280,7 +290,7 @@ var SCREENS = {
   entry:    {title:'Season Entry', body:function(ctx){ return ce(SeasonEntryScreen, ctx); }},
   import:   {title:'Bulk Import', phase:'P4', msg:'Upload → map columns (Arabic headers auto-matched on farm_metrics.aliases) → validate → commit, fully reversible per batch.'},
   recon:    {title:'Reconciliation', phase:'P7', msg:'Cost-centre and area reconciliation for finance — book vs Aerobotics area, JDE cost-centre gaps, lifecycle audit. Aerobotics variance renders "not measured", never 0, for Mango/Pom/Olives/Berries.'},
-  health:   {title:'Data Health', phase:'P7', msg:'The live §9 issue list — blocking and warning, each naming the offending records with a deep-link to its fix.'},
+  health:   {title:'Data Health', body:function(ctx){ return ce(DataHealthScreen, ctx); }},
   reference:{title:'Reference Data', phase:'P7', msg:'Metrics, Rootstocks and (read-mostly) Varieties admin. Adding a 2027 metric set is three inserts here — no migration.'}
 };
 
@@ -642,6 +652,72 @@ function ProductionHistoryScreen(ctx){
   );
 }
 
+/* ── Data Health (§6.12) — issues computed live from the data ── */
+function DataHealthScreen(ctx){
+  var s=useState({loading:true,err:null,d:null}); var st=s[0],set=s[1];
+  useEffect(function(){ load(); },[ctx.crop]);
+  function load(){
+    set({loading:true,err:null,d:null});
+    var pid=ctx.crop==='all'?null:ctx.crop;
+    var cnt=function(mod){ var q=supabase.from('farm_blocks').select('id',{count:'exact',head:true}); if(pid)q=q.eq('product_id',pid); return mod?mod(q):q; };
+    var seasonCnt=function(status){ var q=supabase.from('farm_block_seasons').select('id,farm_blocks!inner(product_id)',{count:'exact',head:true}).eq('balance_status',status); if(pid)q=q.eq('farm_blocks.product_id',pid); return q; };
+    var aeroQ=supabase.from('farm_blocks').select('total_area_fed,aerobotics_area_ha').not('aerobotics_area_ha','is',null); if(pid)aeroQ=aeroQ.eq('product_id',pid);
+    Promise.all([
+      cnt(),
+      cnt(function(q){return q.is('jde_cost_center_id',null);}),
+      cnt(function(q){return q.is('aerobotics_area_ha',null);}),
+      cnt(function(q){return q.is('rootstock_id',null);}),
+      seasonCnt('breach'), seasonCnt('balanced'), seasonCnt('residual'),
+      aeroQ,
+      supabase.from('farm_rollup_status').select('last_refresh_at,last_status,last_error').maybeSingle()
+    ]).then(function(r){
+      var err=r.filter(function(x){return x.error;})[0];
+      if(err){ set({loading:false,err:err.error.message,d:null}); return; }
+      var total=r[0].count||0, missCC=r[1].count||0, noAero=r[2].count||0, noRoot=r[3].count||0;
+      var breach=r[4].count||0, balanced=r[5].count||0, residual=r[6].count||0;
+      var varCount=(r[7].data||[]).filter(function(b){ var t=Number(b.total_area_fed), a=Number(b.aerobotics_area_ha)*2.38095; return t>0 && Math.abs(a-t)/t>0.10; }).length;
+      var rs=r[8].data||{};
+      set({loading:false,err:null,d:{total:total,missCC:missCC,noAero:noAero,noRoot:noRoot,breach:breach,balanced:balanced,residual:residual,checked:balanced+breach+residual,varCount:varCount,rs:rs}});
+    });
+  }
+  if(st.loading) return ce('div',null, ce('div',{className:'kpi-grid'},[0,1,2,3].map(function(i){return ce('div',{key:i,className:'kpi'}, ce('div',{className:'skel',style:{width:'55%'}}), ce('div',{className:'skel',style:{width:'35%',height:22,marginTop:8}}));})), ce(Loading,{rows:5}));
+  if(st.err) return ce(ErrorState,{msg:st.err,onRetry:load});
+  var d=st.d;
+
+  var issues=[];
+  var rsAgeH=d.rs.last_refresh_at?((Date.now()-new Date(d.rs.last_refresh_at).getTime())/3600000):999;
+  if(d.rs.last_status==='error'||rsAgeH>3) issues.push({sev:'b',t:'Production rollup is stale',d:'Last refreshed '+(d.rs.last_refresh_at?Math.round(rsAgeH*10)/10+'h ago':'never')+(d.rs.last_status==='error'?' — last run errored: '+(d.rs.last_error||''):'')+'. Totals may be out of date until the hourly refresh recovers.',a:'View'});
+  if(d.missCC>0) issues.push({sev:'w',t:d.missCC+' blocks missing JDE cost centre',d:'Finance rollups drop these until a cost centre is assigned.',a:'Reconcile',go:'recon'});
+  if(d.varCount>0) issues.push({sev:'w',t:d.varCount+' blocks with area variance >10%',d:'Book area diverges from the Aerobotics survey by more than 10% — reconcile before quoting a hectarage.',a:'Reconcile',go:'recon'});
+  if(d.breach>0) issues.push({sev:'w',t:d.breach+' seasons breach the accounting identity',d:'Production doesn’t reconcile to its segments by >0.5 t and >1% (§3.5). Flagged for review, never blocking.',a:'Season Entry',go:'entry'});
+  if(d.noAero>0) issues.push({sev:'w',t:d.noAero+' blocks have no Aerobotics area',d:'Area variance is meaningless for these until flown — 0% coverage on Mango, Pomegranate, Olives and Berries.',a:'Register',go:'register'});
+  if(d.noRoot>0) issues.push({sev:'i',t:d.noRoot+' blocks have no rootstock',d:'Olives and berries load own-rooted / none — expected, but worth confirming against the source.',a:'Register',go:'register'});
+  var blocking=issues.filter(function(i){return i.sev==='b';});
+  var warnings=issues.filter(function(i){return i.sev!=='b';});
+  var coverage=d.total>0?Math.round((d.total-d.noAero)/d.total*100):0;
+
+  var issueRow=function(i,idx){ var b=i.sev==='b'; return ce('div',{key:idx,className:'issue'},
+    ce('div',{className:'ico',style:{background:b?'var(--red-bg)':'var(--amber-bg)',color:b?'var(--red)':'var(--amber)',border:'1px solid '+(b?'var(--red-border)':'var(--amber-border)')}}, b?'✕':'⚠'),
+    ce('div',{style:{flex:1}}, ce('div',{className:'t'},i.t), ce('div',{className:'d'},i.d)),
+    ce('div',{className:'act'}, ce('button',{className:'btn btn-secondary btn-sm',onClick:function(){ if(i.go&&ctx.go)ctx.go(i.go); else load(); }}, i.a))); };
+  var kpi=function(label,val,sub,color){ return ce('div',{className:'kpi'}, ce('div',{className:'kpi-label'},label), ce('div',{className:'kpi-val',style:color?{color:color}:null}, val), ce('div',{className:'kpi-sub'},sub)); };
+
+  return ce('div',null,
+    ce('div',{className:'kpi-grid'},
+      kpi('Blocking', blocking.length, blocking.length?'needs attention':'all clear', blocking.length?'var(--red)':'var(--green)'),
+      kpi('Warnings', warnings.length, 'need a human decision', warnings.length?'var(--amber)':null),
+      kpi('Aerobotics coverage', coverage+'%', (d.total-d.noAero)+' of '+d.total+' blocks'),
+      kpi('Seasons balanced', ce('span',null, d.balanced, d.checked?ce('span',{style:{fontSize:15,color:'var(--text3)'}},'/'+d.checked):null), d.breach+' breach · '+d.residual+' residual')
+    ),
+    ce('div',{className:'card',style:{marginBottom:10}},
+      ce('div',{className:'section-title st-red'},ce('span',{className:'section-title-bar'}),'Blocking'),
+      blocking.length?blocking.map(issueRow):ce('div',{style:{fontSize:12,color:'var(--text3)',padding:'8px 2px'}},'✓ No blocking issues — the register loaded cleanly and the rollup is fresh.')),
+    ce('div',{className:'card'},
+      ce('div',{className:'section-title st-amber'},ce('span',{className:'section-title-bar'}),'Warnings — decide, then act'),
+      warnings.length?warnings.map(issueRow):ce('div',{style:{fontSize:12,color:'var(--text3)',padding:'8px 2px'}},'No warnings for this crop.'))
+  );
+}
+
 /* ── Season Entry (§6.5) — metric-set-driven grid, atomic save via the RPC ── */
 var LOCAL_BRANCHES=['local_sales_combined','raw_to_traders','field_reject_sales','farm_gate_sales','condemned'];
 function SeasonEntryScreen(ctx){
@@ -813,7 +889,7 @@ function App(){
   var isAdmin = ['admin','power_user'].indexOf(role)>=0;
   var canWrite = isAdmin || role==='agronomy_admin';
   var visible = function(it){ if(it.need==='admin') return isAdmin; return true; };
-  var ctx = {crop:crop, season:season, role:role, canWrite:canWrite, isAdmin:isAdmin, products:products};
+  var ctx = {crop:crop, season:season, role:role, canWrite:canWrite, isAdmin:isAdmin, products:products, go:setScreen};
   var scr = SCREENS[screen];
 
   return ce('div',{className:'app'},
