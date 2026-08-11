@@ -1051,10 +1051,10 @@ function FarmMapScreen(ctx){
       series.length?ce('div',{className:'yearbars',style:{height:56,marginTop:10}}, series.map(function(x,i){ return ce('div',{key:i,className:'yb'}, ce('div',{className:'bar',style:{height:Math.max(2,x[1]/mx*40)+'px'},title:x[0]+': '+fmt(x[1])+' t'}), ce('div',{className:'yl'}, String(x[0]).slice(2))); })):null,
       prev.length?ce('div',{style:{marginTop:12}},
         ce('div',{style:{fontSize:10,letterSpacing:'.06em',textTransform:'uppercase',color:'var(--text3)',marginBottom:6}},'Previously on this land'),
-        prev.map(function(q,i){ var pt=(seriesRef.current[q.pid]||[]).reduce(function(a,x){return a+x[1];},0);
+        prev.map(function(q,i){ var ps=seriesRef.current[q.pid]||[]; var pt=ps.reduce(function(a,x){return a+x[1];},0);
           return ce('div',{key:i,className:'plh past'}, ce('span',{className:'sw2'}),
             ce('div',null, ce('div',{className:'nm'}, q.variety), ce('div',{className:'sub'}, (q.from||'?')+'–'+(q.to||'?')+' · '+q.event)),
-            ce('div',{className:'tot'}, ce('b',null, fmt(Math.round(pt))), ce('span',{className:'u'},'t total'))); })):null,
+            ce('div',{className:'tot'}, ce('b',null, ps.length?fmt(Math.round(pt)):'—'), ce('span',{className:'u'}, ps.length?'t total':'not loaded'))); })):null,
       ce('div',{className:'hint',style:{marginTop:8}}, prev.length?('Earlier plantings on the same land. Production never carries across a replant — those tonnes belong to '+prev[0].variety+', not '+(p.variety||'this block')+'.'):(series.length?'Current planting. Production is recorded directly on this block.':'No production recorded yet for this block.')));
   } else plotPanel=ce('div',{className:'hint'},'Click a block to open its plot history.');
 
