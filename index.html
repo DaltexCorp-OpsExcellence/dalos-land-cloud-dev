@@ -557,9 +557,13 @@ function RegisterScreen(ctx){
     if(ctx.crop!=='all') query=query.eq('product_id',ctx.crop);
     if(farmF) query=query.eq('farm_code',farmF);
     if(search.trim()){ var t='%'+search.trim()+'%'; query=query.or('operational_block_id.ilike.'+t+',aydi_block_number.ilike.'+t); }
-    if(chip==='no_cc') query=query.is('jde_cost_center_id',null).in('lifecycle',ACTIVE_LC);
-    if(chip==='no_aero') query=query.is('aerobotics_area_ha',null);
-    if(chip==='no_root') query=query.is('rootstock_id',null);
+    if(chip==='retired'){ query=query.eq('lifecycle','retired'); }
+    else {
+      query=query.neq('lifecycle','retired');                              // retired live in their own list
+      if(chip==='no_cc') query=query.is('jde_cost_center_id',null).in('lifecycle',ACTIVE_LC);
+      if(chip==='no_aero') query=query.is('aerobotics_area_ha',null);
+      if(chip==='no_root') query=query.is('rootstock_id',null);
+    }
     return query;
   }
   function load(){
@@ -572,11 +576,12 @@ function RegisterScreen(ctx){
   function loadMeta(){
     var cropEq=function(qq){ return ctx.crop==='all'?qq:qq.eq('product_id',ctx.crop); };
     Promise.all([
-      cropEq(supabase.from('farm_blocks').select('id',{count:'exact',head:true})),
+      cropEq(supabase.from('farm_blocks').select('id',{count:'exact',head:true})).neq('lifecycle','retired'),
       cropEq(supabase.from('farm_blocks').select('id',{count:'exact',head:true})).is('jde_cost_center_id',null).in('lifecycle',ACTIVE_LC),
-      cropEq(supabase.from('farm_blocks').select('id',{count:'exact',head:true})).is('aerobotics_area_ha',null),
-      cropEq(supabase.from('farm_blocks').select('id',{count:'exact',head:true})).is('rootstock_id',null)
-    ]).then(function(r){ setCounts({all:r[0].count||0,no_cc:r[1].count||0,no_aero:r[2].count||0,no_root:r[3].count||0}); });
+      cropEq(supabase.from('farm_blocks').select('id',{count:'exact',head:true})).is('aerobotics_area_ha',null).neq('lifecycle','retired'),
+      cropEq(supabase.from('farm_blocks').select('id',{count:'exact',head:true})).is('rootstock_id',null).neq('lifecycle','retired'),
+      cropEq(supabase.from('farm_blocks').select('id',{count:'exact',head:true})).eq('lifecycle','retired')
+    ]).then(function(r){ setCounts({all:r[0].count||0,no_cc:r[1].count||0,no_aero:r[2].count||0,no_root:r[3].count||0,retired:r[4].count||0}); });
     supabase.from('farm_blocks').select('farm_code,farms(name)').then(function(r){
       var seen={}; (r.data||[]).forEach(function(x){ if(x.farm_code&&!seen[x.farm_code]) seen[x.farm_code]=(x.farms&&x.farms.name)||x.farm_code; });
       setFarms(Object.keys(seen).sort().map(function(fc){return {code:fc,name:seen[fc]};}));
@@ -593,8 +598,9 @@ function RegisterScreen(ctx){
       var s={}; Object.keys(byLand).forEach(function(k){ var o=byLand[k]; if(o.ret>0&&o.cur>0) o.ids.forEach(function(id){s[id]=1;}); }); setChainSet(s); });
   }
 
-  var chips=[ {k:null,label:'All',n:counts.all}, {k:'no_cc',label:'Missing cost centre',n:counts.no_cc},
-              {k:'no_aero',label:'No Aerobotics',n:counts.no_aero}, {k:'no_root',label:'Rootstock blank',n:counts.no_root} ];
+  var chips=[ {k:null,label:'Current',n:counts.all}, {k:'no_cc',label:'Missing cost centre',n:counts.no_cc},
+              {k:'no_aero',label:'No Aerobotics',n:counts.no_aero}, {k:'no_root',label:'Rootstock blank',n:counts.no_root},
+              {k:'retired',label:'↺ Retired',n:counts.retired} ];
   var pages=Math.max(1,Math.ceil(st.total/PAGE));
 
   return ce('div',null,
