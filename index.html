@@ -550,7 +550,7 @@ function RegisterScreen(ctx){
   useEffect(function(){ loadMeta(); }, [ctx.crop]);
 
   function base(){
-    var sel='id,operational_block_id,aydi_block_number,product_id,farm_code,planting_year,total_area_fed,aerobotics_area_ha,jde_cost_center_id,rootstock_id,lifecycle,farms(name),varieties(name),farm_rootstocks(name)';
+    var sel='id,operational_block_id,aydi_block_number,product_id,farm_code,planting_year,total_area_fed,planted_area_fed,aerobotics_area_ha,jde_cost_center_id,rootstock_id,lifecycle,farms(name),varieties(name),farm_rootstocks(name)';
     var query=supabase.from('farm_blocks').select(sel,{count:'exact'});
     if(ctx.crop!=='all') query=query.eq('product_id',ctx.crop);
     if(farmF) query=query.eq('farm_code',farmF);
@@ -602,7 +602,7 @@ function RegisterScreen(ctx){
     ce('div',null,
       ce('div',{className:'table-wrap'},
         ce('table',null,
-          ce('thead',null,ce('tr',null,['Block ID','Crop','Farm','Aydi','Variety','Rootstock','Planted','Area fed','Aero ha','Cost ctr','Status'].map(function(h){return ce('th',{key:h},h);}))),
+          ce('thead',null,ce('tr',null,['Block ID','Crop','Farm','Aydi','Variety','Rootstock','Planted','Total fed','Bearing fed','Aero ha','Cost ctr','Status'].map(function(h){return ce('th',{key:h},h);}))),
           ce('tbody',null, st.rows.map(function(b){
             return ce('tr',{key:b.id,className:'rowlink',onClick:function(){setSel(b);}},
               ce('td',null, ce('span',{className:'lot'}, b.operational_block_id)),
@@ -613,6 +613,7 @@ function RegisterScreen(ctx){
               ce('td',{className:'ar',dir:'auto'}, (b.farm_rootstocks&&b.farm_rootstocks.name)||'—'),
               ce('td',{className:'num'}, b.planting_year),
               ce('td',{className:'num'}, fmt(b.total_area_fed)),
+              ce('td',{className:'num'}, b.planted_area_fed==null?ce('span',{style:{color:'var(--text3)'}},'—'):fmt(b.planted_area_fed)),
               ce('td',{className:'num'}, b.aerobotics_area_ha==null?ce('span',{style:{color:'var(--text3)'}},'—'):fmt(b.aerobotics_area_ha)),
               ce('td',{className:'num',style:b.jde_cost_center_id?null:{color:'var(--amber)'}}, b.jde_cost_center_id||'—'),
               ce('td',null, ce('span',{className:'badge '+(b.lifecycle==='nursery'?'badge-warn':b.lifecycle==='bearing'?'badge-pass':'badge-neutral')}, b.lifecycle))
@@ -633,7 +634,7 @@ function RegisterScreen(ctx){
 function exportCsv(base){
   base().order('operational_block_id').range(0,9999).then(function(r){
     var rows=r.data||[]; if(!rows.length) return;
-    var cols=['operational_block_id','product_id','farm_code','aydi_block_number','planting_year','total_area_fed','aerobotics_area_ha','jde_cost_center_id','lifecycle'];
+    var cols=['operational_block_id','product_id','farm_code','aydi_block_number','planting_year','total_area_fed','planted_area_fed','aerobotics_area_ha','jde_cost_center_id','lifecycle'];
     var lines=[cols.join(',')].concat(rows.map(function(b){return cols.map(function(c){var v=b[c];return v==null?'':(''+v).indexOf(',')>=0?'"'+v+'"':v;}).join(',');}));
     var blob=new Blob([lines.join('\n')],{type:'text/csv'}); var a=document.createElement('a');
     a.href=URL.createObjectURL(blob); a.download='farm_blocks.csv'; a.click();
@@ -716,6 +717,7 @@ function BlockDetail(p){
         ce('div',{className:'section-title',style:{marginTop:18}},ce('span',{className:'section-title-bar'}),'Area'),
         ce('dl',{className:'kv'},
           row('Book area', fmt(b.total_area_fed)+' fed'),
+          row('Bearing area', b.planted_area_fed==null?'—':(fmt(b.planted_area_fed)+' fed')),
           row('Aerobotics', b.aerobotics_area_ha==null?'not measured':(fmt(b.aerobotics_area_ha)+' ha · '+fmt(aeroFed)+' fed')),
           row('Variance', variance==null?'—':(variance+' %'))
         ),
