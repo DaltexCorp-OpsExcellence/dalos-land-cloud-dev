@@ -896,6 +896,7 @@ function FarmMapScreen(ctx){
   var hv=useState(null); var hover=hv[0],setHover=hv[1];
   var dt=useState(null); var sel=dt[0],setSel=dt[1];
   var pl=useState(null); var plot=pl[0],setPlot=pl[1];
+  var cv=useState(null); var cov=cv[0],setCov=cv[1];
 
   function setBase(map,which){
     baseRef.current.forEach(function(l){ map.removeLayer(l); }); baseRef.current=[];
@@ -943,7 +944,11 @@ function FarmMapScreen(ctx){
   useEffect(function(){
     if(!window.L){ set({loading:false,err:'Map library failed to load.',feats:[]}); return; }
     var map=L.map(boxRef.current,{preferCanvas:false,attributionControl:true}).setView([30.3,30.9],10);
-    mapRef.current=map; setBase(map,'sat'); setSel(null); setPlot(null);
+    mapRef.current=map; setBase(map,'sat'); setSel(null); setPlot(null); setCov(null);
+    // true totals for Coverage (v_farm_block_geom only returns mapped blocks, so it can't see the gap)
+    var cq=supabase.from('farm_blocks').select('farm_code,product_id').limit(2000);
+    if(ctx.crop!=='all') cq=cq.eq('product_id',ctx.crop);
+    cq.then(function(cr){ if(cr.error||!cr.data){ return; } var fs={},cs={}; cr.data.forEach(function(b){ fs[b.farm_code]=1; cs[b.product_id]=1; }); setCov({total:cr.data.length,farms:Object.keys(fs).length,crops:Object.keys(cs)}); });
     var q=supabase.from('v_farm_block_geom').select('*');
     if(ctx.crop!=='all') q=q.eq('product_id',ctx.crop);
     q.then(function(r){
@@ -1006,13 +1011,13 @@ function FarmMapScreen(ctx){
   }
 
   // ── Coverage (crop-scoped) ──
-  var allRows=st.feats; var mapped=featRef.current;
-  var totalBlocks=allRows.length, mappedN=mapped.length;
-  var farmsAll={}; allRows.forEach(function(r){ farmsAll[r.farm_code]=1; });
+  var mapped=featRef.current; var mappedN=mapped.length;
+  var totalBlocks=cov?cov.total:mappedN;
+  var farmsTotal=cov?cov.farms:0;
   var farmsMapped={}; mapped.forEach(function(f){ farmsMapped[f.properties.farm_code]=1; });
   var areaHa=mapped.reduce(function(a,f){return a+haOf(f.properties.total_area_fed);},0);
-  var cropRows={},cropMapped={}; allRows.forEach(function(r){ cropRows[r.product_id]=1; }); mapped.forEach(function(f){ cropMapped[f.properties.product_id]=1; });
-  var noPoly=Object.keys(cropRows).filter(function(c){ return !cropMapped[c]; }).map(fmCrop);
+  var cropMapped={}; mapped.forEach(function(f){ cropMapped[f.properties.product_id]=1; });
+  var noPoly=(cov?cov.crops:[]).filter(function(c){ return !cropMapped[c]; }).map(fmCrop);
 
   var kvItem=function(k,v){ return ce('div',null, ce('div',{className:'k'},k), ce('div',{className:'v m'},v)); };
   var selPanel = sel ? ce('div',null,
@@ -1064,8 +1069,8 @@ function FarmMapScreen(ctx){
           ce('div',{className:'section-title'},ce('span',{className:'section-title-bar'}),'Coverage'),
           ce('div',{className:'kv'},
             kvItem('Mapped', mappedN+' / '+totalBlocks),
-            kvItem('Missing geometry', (totalBlocks-mappedN)),
-            kvItem('Farms delivered', Object.keys(farmsMapped).length+' / '+Object.keys(farmsAll).length),
+            kvItem('Missing geometry', Math.max(0,totalBlocks-mappedN)),
+            kvItem('Farms delivered', Object.keys(farmsMapped).length+' / '+(farmsTotal||Object.keys(farmsMapped).length)),
             kvItem('Area mapped', fmt(Math.round(areaHa))+' ha')),
           noPoly.length?ce('div',{className:'alert alert-warn',style:{marginTop:10}}, ce('span',null,'⚠'), ce('div',null, ce('b',null, noPoly.join(' & ')+(noPoly.length>1?' have':' has')+' no polygons'), ' in any delivered file. Draw them by hand or ask Aerobotics to fly them.')):null)
       )
