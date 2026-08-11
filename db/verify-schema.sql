@@ -12,10 +12,10 @@
 
 with checks as (
 
-  select 1 as n, 'all 18 farm tables exist' as assertion,
+  select 1 as n, 'all 19 farm tables exist' as assertion,   -- 18 original + farm_rollup_status (§4.10 cron observability)
          (select count(*) from information_schema.tables
            where table_schema='public' and table_name like 'farm\_%'
-             and table_type='BASE TABLE') = 18 as ok
+             and table_type='BASE TABLE') = 19 as ok
 
   union all select 2, 'every farm table has RLS enabled',
     not exists (select 1 from pg_class c join pg_namespace n on n.oid=c.relnamespace
