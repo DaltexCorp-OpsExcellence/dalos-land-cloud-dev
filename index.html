@@ -544,6 +544,7 @@ function RegisterScreen(ctx){
   var d=useState(null); var sel=d[0],setSel=d[1];
   var k=useState({}); var counts=k[0],setCounts=k[1];
   var fl=useState([]); var farms=fl[0],setFarms=fl[1];
+  var pm=useState({}); var prodMap=pm[0],setProdMap=pm[1];   // block_id -> {y:last prod year, t:tonnes}
 
   useEffect(function(){ setPage(0); }, [ctx.crop, search, chip, farmF]);
   useEffect(function(){ load(); }, [ctx.crop, page, search, chip, farmF]);
@@ -579,6 +580,10 @@ function RegisterScreen(ctx){
       var seen={}; (r.data||[]).forEach(function(x){ if(x.farm_code&&!seen[x.farm_code]) seen[x.farm_code]=(x.farms&&x.farms.name)||x.farm_code; });
       setFarms(Object.keys(seen).sort().map(function(fc){return {code:fc,name:seen[fc]};}));
     });
+    // last (non-zero) production per block for the "Last prod" column
+    var pq=supabase.from('v_farm_block_current').select('id,latest_prod_year,latest_prod_t').limit(1000);
+    if(ctx.crop!=='all') pq=pq.eq('product_id',ctx.crop);
+    pq.then(function(r){ if(r.error||!r.data) return; var m={}; r.data.forEach(function(x){ if(x.latest_prod_t!=null) m[x.id]={y:x.latest_prod_year,t:Number(x.latest_prod_t)}; }); setProdMap(m); });
   }
 
   var chips=[ {k:null,label:'All',n:counts.all}, {k:'no_cc',label:'Missing cost centre',n:counts.no_cc},
@@ -590,7 +595,7 @@ function RegisterScreen(ctx){
       ce('input',{className:'search',placeholder:'Search block ID or Aydi…',value:search,onChange:function(e){setSearch(e.target.value);}}),
       ce('select',{className:'tb-select',value:farmF,onChange:function(e){setFarmF(e.target.value);}},
         ce('option',{value:''},'All farms'), farms.map(function(fm){return ce('option',{key:fm.code,value:fm.code}, fm.name);})),
-      ce('button',{className:'btn btn-secondary btn-sm',onClick:function(){ exportCsv(base); }},'Export CSV')
+      ce('button',{className:'btn btn-secondary btn-sm',onClick:function(){ exportCsv(base, prodMap); }},'Export CSV')
     ),
     ce('div',{className:'toolbar'}, chips.map(function(ch){
       return ce('button',{key:ch.label,className:'chip'+(chip===ch.k?' active':''),onClick:function(){setChip(ch.k);}},
@@ -602,7 +607,7 @@ function RegisterScreen(ctx){
     ce('div',null,
       ce('div',{className:'table-wrap'},
         ce('table',null,
-          ce('thead',null,ce('tr',null,['Block ID','Crop','Farm','Aydi','Variety','Rootstock','Planted','Total fed','Bearing fed','Aero ha','Cost ctr','Status'].map(function(h){return ce('th',{key:h},h);}))),
+          ce('thead',null,ce('tr',null,['Block ID','Crop','Farm','Aydi','Variety','Rootstock','Planted','Total fed','Bearing fed','Last prod','Aero ha','Cost ctr','Status'].map(function(h){return ce('th',{key:h},h);}))),
           ce('tbody',null, st.rows.map(function(b){
             return ce('tr',{key:b.id,className:'rowlink',onClick:function(){setSel(b);}},
               ce('td',null, ce('span',{className:'lot'}, b.operational_block_id)),
@@ -614,6 +619,7 @@ function RegisterScreen(ctx){
               ce('td',{className:'num'}, b.planting_year),
               ce('td',{className:'num'}, fmt(b.total_area_fed)),
               ce('td',{className:'num'}, b.planted_area_fed==null?ce('span',{style:{color:'var(--text3)'}},'—'):fmt(b.planted_area_fed)),
+              ce('td',{className:'num'}, prodMap[b.id]?(fmt(Math.round(prodMap[b.id].t))+" t · '"+String(prodMap[b.id].y).slice(2)):ce('span',{style:{color:'var(--text3)'}},'—')),
               ce('td',{className:'num'}, b.aerobotics_area_ha==null?ce('span',{style:{color:'var(--text3)'}},'—'):fmt(b.aerobotics_area_ha)),
               ce('td',{className:'num',style:b.jde_cost_center_id?null:{color:'var(--amber)'}}, b.jde_cost_center_id||'—'),
               ce('td',null, ce('span',{className:'badge '+(b.lifecycle==='nursery'?'badge-warn':b.lifecycle==='bearing'?'badge-pass':'badge-neutral')}, b.lifecycle))
@@ -631,11 +637,12 @@ function RegisterScreen(ctx){
   );
 }
 
-function exportCsv(base){
+function exportCsv(base, prodMap){
+  prodMap=prodMap||{};
   base().order('operational_block_id').range(0,9999).then(function(r){
     var rows=r.data||[]; if(!rows.length) return;
-    var cols=['operational_block_id','product_id','farm_code','aydi_block_number','planting_year','total_area_fed','planted_area_fed','aerobotics_area_ha','jde_cost_center_id','lifecycle'];
-    var lines=[cols.join(',')].concat(rows.map(function(b){return cols.map(function(c){var v=b[c];return v==null?'':(''+v).indexOf(',')>=0?'"'+v+'"':v;}).join(',');}));
+    var cols=['operational_block_id','product_id','farm_code','aydi_block_number','planting_year','total_area_fed','planted_area_fed','aerobotics_area_ha','jde_cost_center_id','lifecycle','last_prod_year','last_prod_t'];
+    var lines=[cols.join(',')].concat(rows.map(function(b){var pm=prodMap[b.id]||{};var ext={last_prod_year:pm.y==null?'':pm.y,last_prod_t:pm.t==null?'':pm.t};return cols.map(function(c){var v=(c in ext)?ext[c]:b[c];return v==null?'':(''+v).indexOf(',')>=0?'"'+v+'"':v;}).join(',');}));
     var blob=new Blob([lines.join('\n')],{type:'text/csv'}); var a=document.createElement('a');
     a.href=URL.createObjectURL(blob); a.download='farm_blocks.csv'; a.click();
   });
