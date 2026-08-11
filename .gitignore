@@ -63,3 +63,8 @@ scripts/m2_reference.json
 scripts/m3_*.sql
 scripts/geom_load.sql
 data/polygons.geojson
+
+# History load (non-grapes) — generated SQL + match dumps are commercial, never commit
+scripts/history_*.sql
+scripts/blocks_match.json
+scripts/metrics_live.json
