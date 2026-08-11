@@ -169,6 +169,45 @@ tr.rowlink:hover td{background:var(--bg)}
 .action-row{display:flex;flex-wrap:wrap;gap:8px;margin:4px 0 4px}
 .child-card{border:1px solid var(--border);border-radius:9px;padding:10px 11px;margin-bottom:9px;background:var(--bg2)}
 .ok-band{background:color-mix(in srgb,var(--green) 10%,transparent);border:1px solid color-mix(in srgb,var(--green) 35%,transparent);border-radius:8px;padding:10px 12px;font-size:12px;color:var(--green);margin:12px 0}
+.modal-card.xwide{width:680px}
+.cc-glabel{font-size:9px;text-transform:uppercase;letter-spacing:.09em;color:var(--text3);font-weight:600;display:flex;align-items:center;gap:6px;margin:11px 0 6px}
+.cc-glabel .tick{width:12px;height:2px;background:var(--border2);display:inline-block}
+.area-box{background:#fff;border:1px solid var(--border);border-radius:8px;padding:9px 10px;display:grid;grid-template-columns:1.25fr 1fr .9fr;gap:10px}
+.area-primary{border-left:3px solid var(--accent);padding-left:8px;margin-left:-1px}
+.area-primary .form-label{color:var(--accent)}
+.unit{color:var(--text3);font-size:10px;font-family:var(--font-mono);margin-top:3px}
+.recon-bar{display:flex;justify-content:space-between;align-items:center;font-family:var(--font-mono);font-size:12.5px;padding:9px 11px;border-radius:8px;border:1px solid;margin-top:2px}
+.recon-ok{background:var(--green-bg);border-color:var(--green-border);color:var(--green)}
+.recon-off{background:var(--red-bg);border-color:var(--red-border);color:var(--red)}
+.geo-block{display:flex;gap:12px;align-items:stretch;background:#fff;border:1px solid var(--border);border-radius:8px;padding:10px}
+.geo-thumb{width:104px;height:80px;flex-shrink:0;border-radius:7px;border:1px solid var(--border2);background:#0e1a1a;display:flex;align-items:center;justify-content:center;overflow:hidden}
+.geo-thumb.empty{border-style:dashed;background:var(--bg2);color:var(--text3)}
+.geo-meta{flex:1;display:flex;flex-direction:column;justify-content:center;gap:6px}
+.geo-read{font-family:var(--font-mono);font-size:14px;color:var(--text);font-weight:500}
+.geo-actions{display:flex;gap:7px;margin-top:2px}
+.dedup{background:var(--amber-bg);border:1px solid var(--amber-border);border-radius:7px;padding:7px 10px;font-size:11.5px;color:var(--amber);margin-top:8px;display:flex;gap:7px;align-items:flex-start}
+.seg{display:flex;background:var(--bg2);border:1px solid var(--border);border-radius:9px;padding:3px;gap:3px;margin:4px 0 12px}
+.seg button{flex:1;border:none;background:none;border-radius:6px;padding:8px 6px;font-size:12.5px;font-weight:500;color:var(--text2);line-height:1.25;cursor:pointer}
+.seg button .s{display:block;font-size:10px;font-weight:400;color:var(--text3);margin-top:2px}
+.seg button.on{background:var(--accent);color:#fff}
+.seg button.on .s{color:rgba(255,255,255,.75)}
+.smart-chip{display:inline-flex;align-items:center;gap:6px;background:color-mix(in srgb,var(--accent2) 12%,#fff);border:1px solid color-mix(in srgb,var(--accent2) 45%,var(--border2));color:var(--accent);border-radius:20px;padding:3px 9px 3px 8px;font-size:11.5px;cursor:pointer}
+.smart-chip .dot{width:6px;height:6px;border-radius:50%;background:var(--accent2)}
+.plot-list{border:1px solid var(--border);border-radius:8px;background:#fff;max-height:200px;overflow-y:auto}
+.plot-row{display:flex;align-items:center;gap:10px;padding:9px 11px;border-bottom:1px solid var(--border);cursor:pointer}
+.plot-row:last-child{border-bottom:none}
+.plot-row.on{background:color-mix(in srgb,var(--accent) 7%,#fff)}
+.plot-row .rd{width:15px;height:15px;border-radius:50%;border:2px solid var(--border2);flex-shrink:0}
+.plot-row.on .rd{border-color:var(--accent);background:radial-gradient(var(--accent) 42%,#fff 46%)}
+.readout-strip{display:flex;align-items:center;gap:11px;background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:9px 11px;margin-bottom:12px}
+.readout-strip .geo-thumb{width:70px;height:54px}
+.minimap{border:1px solid var(--border);border-radius:9px;overflow:hidden;background:#0e1a1a}
+.splitmap-legend{display:flex;flex-wrap:wrap;gap:8px;margin-top:9px}
+.leg{display:flex;align-items:center;gap:8px;border:1px solid var(--border);border-radius:8px;padding:5px 8px;font-size:12px;background:#fff}
+.leg .sw{width:15px;height:10px;border-radius:2px;flex-shrink:0;border:1px solid rgba(0,0,0,.15)}
+.leg .ln{font-family:var(--font-mono);font-size:11.5px}
+.child-geo{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-family:var(--font-mono);color:var(--text3);margin-top:9px}
+.child-geo .dotc{width:10px;height:10px;border-radius:2px;flex-shrink:0}
 @media (max-width:700px){
   .drawer{top:auto;left:0;right:0;bottom:0;width:100%;max-width:100%;height:82vh;border-radius:20px 20px 0 0;transform:translateY(100%);animation:sheetin .28s cubic-bezier(.32,.72,0,1) forwards}
   @keyframes sheetin{to{transform:translateY(0)}}
@@ -335,7 +374,7 @@ var ce = React.createElement, useState = React.useState, useEffect = React.useEf
 var DALOS_SUPABASE_URL = 'https://sfyjvgjwvtwkrnqrvqyc.supabase.co';
 var DALOS_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNmeWp2Z2p3dnR3a3JucXJ2cXljIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ4NzIxNjYsImV4cCI6MjA5MDQ0ODE2Nn0.FjA75XZsp0Kx5Xam_rrnYoAHX4JHKey6vEFCH_zlMuQ';
 var supabase = window.supabase.createClient(DALOS_SUPABASE_URL, DALOS_ANON_KEY);
-var BUILD = 'v0.2.0 (2026.08.11)';
+var BUILD = 'v0.3.0 (2026.08.12)';
 
 /* ── Nav model. Screens are scaffolds in this shell; each maps to a PRD phase. ── */
 function icon(paths){ return function(){ return ce('svg',{viewBox:'0 0 24 24',fill:'none',stroke:'currentColor',strokeWidth:2,strokeLinecap:'round',strokeLinejoin:'round'}, paths.map(function(d,i){return ce('path',{key:i,d:d});})); }; }
@@ -1040,6 +1079,15 @@ function FarmMapScreen(ctx){
   var pl=useState(null); var plot=pl[0],setPlot=pl[1];
   var cv=useState(null); var cov=cv[0],setCov=cv[1];
   var dw=useState(false); var drawing=dw[0],setDrawing=dw[1];
+  var ag=useState(null); var assign=ag[0],setAssign=ag[1];
+
+  function refreshGeom(){ var q=supabase.from('v_farm_block_geom').select('*'); if(ctx.crop!=='all') q=q.eq('product_id',ctx.crop);
+    q.then(function(r){ if(r.error||!r.data) return; var features=[]; r.data.forEach(function(row){ if(!row.geojson) return; try{ features.push({type:'Feature',geometry:JSON.parse(row.geojson),properties:row}); }catch(e){} });
+      var byKey={}; features.forEach(function(f){ var k=f.properties.farm_code+'|'+f.properties.aydi_block_number; (byKey[k]=byKey[k]||[]).push(f); });
+      var deduped=[]; Object.keys(byKey).forEach(function(k){ var g=byKey[k]; var cur=g.filter(function(f){return f.properties.lifecycle!=='retired';}); deduped=deduped.concat(cur.length?cur:g); });
+      featRef.current=deduped; set(function(x){return Object.assign({},x,{feats:r.data});}); buildLayer(false); }); }
+  function assignDone(){ try{ drawnRef.current.clearLayers(); }catch(e){} setAssign(null); refreshGeom(); }
+  function assignCancel(){ try{ drawnRef.current.clearLayers(); }catch(e){} setAssign(null); }
 
   function setBase(map,which){
     baseRef.current.forEach(function(l){ map.removeLayer(l); }); baseRef.current=[];
@@ -1099,8 +1147,10 @@ function FarmMapScreen(ctx){
         drawnRef.current.addLayer(e.layer);
         var ll=e.layer.getLatLngs()[0], a=0; for(var i=0,j=ll.length-1;i<ll.length;j=i++){ a+=(ll[j].lng+ll[i].lng)*(ll[j].lat-ll[i].lat); }
         var ha=Math.abs(a/2)*(111320*111320*Math.cos(30.4*Math.PI/180))/1e4;
-        e.layer.bindPopup('<b>Drawn polygon</b><br/>'+ha.toFixed(2)+' ha · '+(ha*2.38095).toFixed(2)+' fed<br/><span style="color:#6a7a79;font-size:11px">geom_source = manual · export to save/match</span>').openPopup();
         drawerRef.current=null; setDrawing(false);
+        if(ctx.canWrite){ var la=0,lo=0; ll.forEach(function(pt){la+=pt.lat;lo+=pt.lng;});
+          setAssign({geojson:ringToGeoJSON(ll),centroid:{lat:la/ll.length,lng:lo/ll.length}}); }
+        else e.layer.bindPopup('<b>Drawn polygon</b><br/>'+ha.toFixed(2)+' ha · '+(ha*2.38095).toFixed(2)+' fed<br/><span style="color:#6a7a79;font-size:11px">geom_source = manual · export to save/match</span>').openPopup();
       }); }
     }catch(e){}
     // true totals for Coverage (v_farm_block_geom only returns mapped blocks, so it can't see the gap)
@@ -1202,6 +1252,8 @@ function FarmMapScreen(ctx){
   var cropMapped={}; mapped.forEach(function(f){ cropMapped[f.properties.product_id]=1; });
   var noPoly=(cov?cov.crops:[]).filter(function(c){ return !cropMapped[c]; }).map(fmCrop);
 
+  var farmCentroids=(function(){ var by={}; featRef.current.forEach(function(f){ var c=centroidOf(f.geometry); if(!c) return; var k=f.properties.farm_code; (by[k]=by[k]||{code:k,name:f.properties.farm_name||k,pts:[]}).pts.push(c); });
+    return Object.keys(by).map(function(k){ var o=by[k],la=0,lo=0; o.pts.forEach(function(p){la+=p.lat;lo+=p.lng;}); return {code:k,name:o.name,lat:la/o.pts.length,lng:lo/o.pts.length}; }); })();
   var kvItem=function(k,v){ return ce('div',null, ce('div',{className:'k'},k), ce('div',{className:'v m'},v)); };
   var selPanel = sel ? ce('div',null,
       ce('div',{className:'kv'},
@@ -1282,7 +1334,7 @@ function FarmMapScreen(ctx){
         st.err?ce('div',{style:{position:'absolute',top:10,left:10,zIndex:600},className:'band'},st.err):null,
         ce('div',{className:'bmsw'}, [['sat','Satellite'],['hybrid','Hybrid'],['road','Roads']].map(function(b){ return ce('button',{key:b[0],className:basemap===b[0]?'on':'',onClick:function(){setBasemap(b[0]);}}, b[1]); })),
         ce('div',{className:'mact'},
-          ce('button',{className:'btn '+(drawing?'btn-primary':'btn-secondary')+' btn-sm',onClick:toggleDraw,title:'Draw a polygon to measure it and include it in the export'}, drawing?'Drawing… click points, double-click to finish':'Draw polygon'),
+          ce('button',{className:'btn '+(drawing?'btn-primary':'btn-secondary')+' btn-sm',onClick:toggleDraw,title:ctx.canWrite?'Draw a plot boundary, then attach it to a plot or create a new one':'Draw a polygon to measure it and include it in the export'}, drawing?'Drawing… click points, double-click to finish':'Draw polygon'),
           ce('button',{className:'btn btn-secondary btn-sm',onClick:exportKML},'Export KML'),
           ce('button',{className:'btn btn-secondary btn-sm',onClick:exportGeoJSON},'GeoJSON')),
         hover?ce('div',{className:'hc',style:{left:hover.x,top:hover.y}},
@@ -1292,6 +1344,7 @@ function FarmMapScreen(ctx){
         ):null
       ),
       ce('div',{className:'mpanel'},
+        assign?ce(AssignPanel,{geojson:assign.geojson,centroid:assign.centroid,farmCentroids:farmCentroids,ctx:ctx,onAttached:assignDone,onCancel:assignCancel}):null,
         ce('div',{className:'card'}, ce('div',{className:'section-title'},ce('span',{className:'section-title-bar'}),'Selected block'), selPanel),
         ce('div',{className:'card'}, ce('div',{className:'section-title'},ce('span',{className:'section-title-bar'}),'Plot history'), plotPanel),
         ce('div',{className:'card'},
@@ -1890,7 +1943,7 @@ function mkObj(k,v){ var o={}; o[k]=v; return o; }
 function Modal(p){
   useEffect(function(){ function esc(e){ if(e.key==='Escape'&&!p.busy) p.onClose(); } window.addEventListener('keydown',esc); return function(){window.removeEventListener('keydown',esc);}; },[p.busy]);
   return ce('div',{className:'modal-scrim',onClick:function(e){ if(e.target===e.currentTarget && !p.busy) p.onClose(); }},
-    ce('div',{className:'modal-card'+(p.wide?' wide':'')},
+    ce('div',{className:'modal-card'+(p.xwide?' xwide':(p.wide?' wide':''))},
       ce('div',{className:'modal-head'},
         ce('div',null, ce('h3',null,p.title), p.sub?ce('div',{className:'sub'},p.sub):null),
         ce('button',{className:'drawer-x','aria-label':'Close',onClick:p.onClose,disabled:p.busy},'×')),
@@ -1914,6 +1967,100 @@ function useRefData(product_id){
 }
 var LIFECYCLES=[['planned','Planned (not yet planted)'],['nursery','Nursery'],['pre_bearing','Pre-bearing'],['bearing','Bearing (producing)'],['fallow','Fallow']];
 
+/* ── Geometry helpers (client draw ↔ GeoJSON ↔ area) ──────────────────── */
+function ringHa(latlngs){ var a=0,n=latlngs.length; for(var i=0,j=n-1;i<n;j=i++){ a+=(latlngs[j].lng+latlngs[i].lng)*(latlngs[j].lat-latlngs[i].lat); }
+  return Math.abs(a/2)*(111320*111320*Math.cos(30.4*Math.PI/180))/1e4; }   // ha
+function ringToGeoJSON(latlngs){ var r=latlngs.map(function(p){return [p.lng,p.lat];}); if(r.length && (r[0][0]!==r[r.length-1][0]||r[0][1]!==r[r.length-1][1])) r.push(r[0]); return {type:'Polygon',coordinates:[r]}; }
+function geomToLatLngs(g){ if(!g||!g.coordinates) return null; var c=g.coordinates; if(g.type==='MultiPolygon') c=c[0]; var ring=c&&c[0]; if(!ring) return null; return ring.map(function(p){return [p[1],p[0]];}); }
+function geojsonHa(g){ var ll=geomToLatLngs(g); if(!ll) return null; return ringHa(ll.map(function(p){return {lat:p[0],lng:p[1]};})); }
+function centroidOf(g){ var ll=geomToLatLngs(g); if(!ll||!ll.length) return null; var la=0,lo=0; ll.forEach(function(p){la+=p[0];lo+=p[1];}); return {lat:la/ll.length,lng:lo/ll.length}; }
+function haversineKm(a,b){ if(!a||!b) return Infinity; var R=6371,dLa=(b.lat-a.lat)*Math.PI/180,dLo=(b.lng-a.lng)*Math.PI/180;
+  var s=Math.sin(dLa/2)*Math.sin(dLa/2)+Math.cos(a.lat*Math.PI/180)*Math.cos(b.lat*Math.PI/180)*Math.sin(dLo/2)*Math.sin(dLo/2); return 2*R*Math.asin(Math.sqrt(s)); }
+
+/* ── Duplicate plot-name check — soft warn; retired names are exempt ──── */
+function padSector(v){ v=nul(v); if(v==null) return null; return /^[0-9]+$/.test(v)?v.padStart(2,'0'):v.toUpperCase(); }
+function useDupCheck(farmCode, sector, plot, add, excludeId){
+  var s=useState({state:'idle',match:null}); var d=s[0],set=s[1];
+  useEffect(function(){
+    if(!farmCode||padSector(sector)==null||padSector(plot)==null){ set({state:'idle',match:null}); return; }
+    var cancelled=false; set(function(x){return {state:'pending',match:x.match};});
+    var t=setTimeout(function(){
+      supabase.from('farm_blocks').select('id,aydi_block_number,block_add,lifecycle,planting_year,varieties(name)')
+        .eq('farm_code',farmCode).eq('sector_code',padSector(sector)).eq('plot_code',padSector(plot)).neq('lifecycle','retired').limit(6)
+        .then(function(r){ if(cancelled) return;
+          var addN=(nul(add)||'').toUpperCase();
+          var m=(r.data||[]).filter(function(x){ return x.id!==excludeId; }).filter(function(x){ return (x.block_add||'').toUpperCase()===addN; })[0];
+          set({state:m?'clash':'clear',match:m||null});
+        });
+    },320);
+    return function(){ cancelled=true; clearTimeout(t); };
+  },[farmCode,sector,plot,add,excludeId]);
+  return d;
+}
+function DupAlert(p){ var d=p.dup, farmName=p.farmName; if(!d||d.state!=='clash'||!d.match) return null;
+  var m=d.match, vn=(m.varieties&&m.varieties.name)?(' · '+m.varieties.name):'';
+  return ce('div',{className:'dedup'}, ce('span',null,'⚠'),
+    ce('div',null, ce('b',null,m.aydi_block_number),' already exists'+(farmName?(' on '+farmName):'')+' — '+m.lifecycle+(m.planting_year?(', planted '+m.planting_year):'')+vn+'. Rename to avoid a duplicate, or tick “keep both”.')); }
+
+/* ── MiniMap — draw/edit plot polygons inside a modal (Leaflet + leaflet-draw)
+   props: seed (GeoJSON reference outline, dashed) · targets [{id,label,color}] ·
+   geoms {id→GeoJSON} · onSet(id, GeoJSON|null) · height. One target = New-plot draw;
+   many = Split children. "From outline" copies the seed into a target to reshape. ── */
+function MiniMap(p){
+  var box=React.useRef(null), mapR=React.useRef(null), fgR=React.useRef(null), drawR=React.useRef(null), editR=React.useRef(null), seedR=React.useRef(null);
+  var a=useState(null); var active=a[0],setActive=a[1];
+  var e=useState(false); var editing=e[0],setEditing=e[1];
+  function fit(){ var m=mapR.current; if(!m) return; try{ var b=null;
+    if(fgR.current&&fgR.current.getLayers().length) b=fgR.current.getBounds();
+    else if(seedR.current) b=seedR.current.getBounds();
+    if(b&&b.isValid()) m.fitBounds(b.pad(0.35)); m.invalidateSize(); }catch(err){} }
+  function drawTarget(t){ var g=(p.geoms||{})[t.id]; if(!g) return; var ll=geomToLatLngs(g); if(!ll) return;
+    var layer=L.polygon(ll,{color:t.color,weight:2.5,fillOpacity:0.28}); layer._tid=t.id; layer.addTo(fgR.current); }
+  useEffect(function(){ if(!box.current||!window.L){ return; }
+    var m=L.map(box.current,{attributionControl:false,zoomControl:true}).setView([30.42,30.6],10);
+    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:19}).addTo(m);
+    mapR.current=m; fgR.current=L.featureGroup().addTo(m);
+    if(p.seed){ var sll=geomToLatLngs(p.seed); if(sll){ seedR.current=L.polygon(sll,{color:'#fff',weight:1.5,opacity:.6,dashArray:'5 5',fill:false,interactive:false}).addTo(m); } }
+    (p.targets||[]).forEach(drawTarget);
+    setTimeout(fit,80);
+    return function(){ try{ m.remove(); }catch(err){} mapR.current=null; };
+  },[]);
+  function stopDraw(){ if(drawR.current){ try{drawR.current.disable();}catch(e){} drawR.current=null; } setActive(null); }
+  function stopEdit(save){ if(editR.current){ try{ if(save) editR.current.save(); editR.current.disable(); }catch(e){} editR.current=null; }
+    setEditing(false);
+    if(save && fgR.current){ fgR.current.eachLayer(function(l){ if(l._tid&&l.getLatLngs){ p.onSet(l._tid, ringToGeoJSON(l.getLatLngs()[0])); } }); } }
+  function startDraw(t){ var m=mapR.current; if(!m||!L.Draw) return; stopEdit(false); stopDraw(); setActive(t.id);
+    drawR.current=new L.Draw.Polygon(m,{allowIntersection:false,shapeOptions:{color:t.color,weight:2.5,fillOpacity:.28}});
+    drawR.current.enable();
+    m.once(L.Draw.Event.CREATED,function(ev){
+      fgR.current.eachLayer(function(l){ if(l._tid===t.id) fgR.current.removeLayer(l); });
+      ev.layer._tid=t.id; try{ev.layer.setStyle({color:t.color,weight:2.5,fillOpacity:.28});}catch(e){}
+      fgR.current.addLayer(ev.layer); drawR.current=null; setActive(null);
+      p.onSet(t.id, ringToGeoJSON(ev.layer.getLatLngs()[0])); }); }
+  function fromSeed(t){ if(!p.seed||!fgR.current) return; var ll=geomToLatLngs(p.seed); if(!ll) return;
+    fgR.current.eachLayer(function(l){ if(l._tid===t.id) fgR.current.removeLayer(l); });
+    var layer=L.polygon(ll,{color:t.color,weight:2.5,fillOpacity:.28}); layer._tid=t.id; fgR.current.addLayer(layer);
+    p.onSet(t.id, ringToGeoJSON(layer.getLatLngs()[0])); setTimeout(fit,40); }
+  function clearTarget(t){ if(fgR.current) fgR.current.eachLayer(function(l){ if(l._tid===t.id) fgR.current.removeLayer(l); }); p.onSet(t.id,null); }
+  function toggleEdit(){ var m=mapR.current; if(!m||!L.EditToolbar) return;
+    if(editing){ stopEdit(true); return; } stopDraw();
+    editR.current=new L.EditToolbar.Edit(m,{featureGroup:fgR.current}); editR.current.enable(); setEditing(true); }
+  var hasAny=(p.targets||[]).some(function(t){ return (p.geoms||{})[t.id]; });
+  return ce('div',null,
+    ce('div',{className:'minimap',ref:box,style:{height:(p.height||210)+'px'}}),
+    ce('div',{className:'splitmap-legend'},
+      p.seed?ce('span',{className:'leg'}, ce('span',{className:'sw',style:{background:'transparent',border:'1.5px dashed #9aa8a7'}}), ce('span',{className:'ln',style:{color:'var(--text3)'}},'Original — history')):null,
+      (p.targets||[]).map(function(t){ var has=(p.geoms||{})[t.id]; var ha=has?geojsonHa(has):null;
+        return ce('span',{key:t.id,className:'leg'},
+          ce('span',{className:'sw',style:{background:t.color+'4d',borderColor:t.color}}),
+          ce('span',{className:'ln'}, t.label+(ha!=null?(' · '+fmt(Math.round(ha*2.38095*100)/100)+' fed'):'')),
+          ce('button',{className:'btn btn-secondary btn-sm',style:{marginLeft:4,padding:'2px 7px'},onClick:function(){ startDraw(t); }}, active===t.id?'Drawing…':(has?'Redraw':'Draw')),
+          p.seed?ce('button',{className:'btn btn-secondary btn-sm',style:{padding:'2px 7px'},onClick:function(){ fromSeed(t); },title:'Start from the original outline'},'From outline'):null,
+          has?ce('button',{className:'drawer-x',style:{width:22,height:22,fontSize:13,padding:0},title:'Clear',onClick:function(){ clearTarget(t); }},'×'):null); })),
+    hasAny?ce('button',{className:'btn '+(editing?'btn-primary':'btn-secondary')+' btn-sm',style:{marginTop:8},onClick:toggleEdit}, editing?'Done editing shape':'Edit vertices'):null,
+    active?ce('div',{className:'form-hint',style:{marginTop:6}},'Click to add points on the map; double-click to finish.'):null);
+}
+
 /* ── Edit identity ────────────────────────────────────────────────────── */
 function EditIdentityModal(p){
   var b=p.block, ref=useRefData(b.product_id);
@@ -1923,11 +2070,11 @@ function EditIdentityModal(p){
   var st=useState({busy:false,err:null}); var s=st[0],setS=st[1];
   useEffect(function(){
     Promise.all([
-      supabase.from('farm_blocks').select('id,variety_id,rootstock_id,planting_year,total_area_fed,planted_area_fed,aerobotics_area_ha,jde_cost_center_id,lifecycle,comments,block_add,sector_code,plot_code').eq('id',b.id).maybeSingle(),
+      supabase.from('farm_blocks').select('id,variety_id,rootstock_id,planting_year,total_area_fed,planted_area_fed,aerobotics_area_ha,tree_count_planted,jde_cost_center_id,lifecycle,comments,block_add,sector_code,plot_code').eq('id',b.id).maybeSingle(),
       supabase.from('farm_block_seasons').select('id',{count:'exact',head:true}).eq('block_id',b.id)
     ]).then(function(r){ var d=r[0].data||{}; setFull(d); setSeasons(r[1].count||0);
       setF({ jde:d.jde_cost_center_id||'', total:d.total_area_fed==null?'':d.total_area_fed, planted:d.planted_area_fed==null?'':d.planted_area_fed,
-             aero:d.aerobotics_area_ha==null?'':d.aerobotics_area_ha, lifecycle:d.lifecycle||'bearing', comments:d.comments||'',
+             aero:d.aerobotics_area_ha==null?'':d.aerobotics_area_ha, trees:d.tree_count_planted==null?'':d.tree_count_planted, lifecycle:d.lifecycle||'bearing', comments:d.comments||'',
              variety_id:d.variety_id||'', rootstock_id:d.rootstock_id||'', planting_year:d.planting_year==null?'':d.planting_year }); });
   },[b.id]);
   function up(k){ return function(v){ setF(Object.assign({},f,mkObj(k,v))); }; }
@@ -1935,7 +2082,7 @@ function EditIdentityModal(p){
   function save(){
     setS({busy:true,err:null});
     var patch={ jde_cost_center_id:nul(f.jde), comments:nul(f.comments), lifecycle:f.lifecycle,
-      total_area_fed:numN(f.total), planted_area_fed:numN(f.planted), aerobotics_area_ha:numN(f.aero) };
+      total_area_fed:numN(f.total), planted_area_fed:numN(f.planted), aerobotics_area_ha:numN(f.aero), tree_count_planted:numN(f.trees) };
     if(patch.total_area_fed==null){ setS({busy:false,err:'Total area is required.'}); return; }
     if(!locked){ patch.variety_id=f.variety_id||full.variety_id; patch.rootstock_id=f.rootstock_id||null;
       var py=numN(f.planting_year); if(py==null){ setS({busy:false,err:'Planting year is required.'}); return; } patch.planting_year=py; }
@@ -1951,8 +2098,9 @@ function EditIdentityModal(p){
     ce('div',{className:'field-row'},
       ce(Field,{label:'Total area (fed)'}, txt(f.total, up('total'), {type:'number',step:'0.01'})),
       ce(Field,{label:'Bearing area (fed)',hint:'المساحة المنزرعة'}, txt(f.planted, up('planted'), {type:'number',step:'0.01'}))),
-    ce('div',{className:'field-row'},
+    ce('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:12}},
       ce(Field,{label:'Aerobotics (ha)'}, txt(f.aero, up('aero'), {type:'number',step:'0.01'})),
+      ce(Field,{label:'Trees count'}, txt(f.trees, up('trees'), {type:'number'})),
       ce(Field,{label:'Lifecycle'}, selx(f.lifecycle, up('lifecycle'), LIFECYCLES.map(function(l){return {v:l[0],l:l[1]};})))),
     ce(Field,{label:'Cost centre (JDE)'}, txt(f.jde, up('jde'), {placeholder:'— not assigned'})),
     ce(Field,{label:'Notes'}, txt(f.comments, up('comments'))),
@@ -2022,55 +2170,110 @@ function ReplantModal(p){
 }
 
 /* ── Split ────────────────────────────────────────────────────────────── */
+var CHILD_COLORS=['#159490','#d68a24','#7d5ba6','#2f6fb0','#1e6b3a','#b03030'];
 function SplitModal(p){
   var b=p.block, ref=useRefData(b.product_id);
   var parts=String(b.aydi_block_number||'').split('-'); var pSec=b.sector_code||parts[0]||'', pPlot=b.plot_code||String(parts[1]||'').replace(/[A-Za-z]+$/,'');
-  function blank(add){ return {sector_code:pSec,plot_code:pPlot,block_add:add,total_area_fed:'',inherits_history:true}; }
+  var px=useState(null); var parent=px[0],setParent=px[1];   // full parent row (variety_id, rootstock_id, planting_year, jde, geom)
+  function blank(add){ return {sector_code:pSec,plot_code:pPlot,block_add:add,total_area_fed:'',planted:'',aero:'',variety_id:'',rootstock_id:'',planting_year:'',trees:'',jde:'',inherits_history:true,geom:null}; }
   var ch=useState([blank('A'),blank('B')]); var kids=ch[0],setKids=ch[1];
   var d=useState(new Date().toISOString().slice(0,10)); var date=d[0],setDate=d[1];
   var n=useState(''); var note=n[0],setNote=n[1];
   var st=useState({busy:false,err:null,res:null}); var s=st[0],setS=st[1];
+  useEffect(function(){
+    supabase.from('farm_blocks').select('variety_id,rootstock_id,planting_year,jde_cost_center_id,total_area_fed').eq('id',b.id).maybeSingle().then(function(r){
+      var d=r.data||{}; setParent(d);
+      setKids(function(cur){ return cur.map(function(c){ return Object.assign({},c,{variety_id:c.variety_id||d.variety_id||'',rootstock_id:c.rootstock_id||d.rootstock_id||'',planting_year:c.planting_year||(d.planting_year==null?'':d.planting_year),jde:c.jde||d.jde_cost_center_id||''}); }); });
+    });
+    supabase.from('v_farm_block_geom').select('geometry').eq('id',b.id).maybeSingle().then(function(r){
+      var g=r.data&&r.data.geometry; if(g) setParent(function(x){ return Object.assign({},x||{},{geom:g}); });
+    });
+  },[b.id]);
   function upk(idx,k){ return function(val){ setKids(kids.map(function(c,i){ return i===idx?Object.assign({},c,mkObj(k,val)):c; })); }; }
+  function setGeom(idx,g){ setKids(function(cur){ return cur.map(function(c,i){ return i===idx?Object.assign({},c,{geom:g}):c; }); }); }
   function togInherit(idx){ return function(e){ var val=e.target.checked; setKids(kids.map(function(c,i){ return i===idx?Object.assign({},c,{inherits_history:val}):c; })); }; }
   var sum=kids.reduce(function(a,c){ return a+(numN(c.total_area_fed)||0); },0);
   var diff=Math.round((sum-Number(b.total_area_fed||0))*100)/100;
   var reconciled=Math.abs(diff)<=0.5;
+  var targets=kids.map(function(c,i){ return {id:String(i),label:'Child '+(i+1)+(nul(c.block_add)?(' · '+padSector(c.sector_code)+'-'+padSector(c.plot_code)+nul(c.block_add).toUpperCase()):''),color:CHILD_COLORS[i%CHILD_COLORS.length]}; });
+  var geomMap={}; kids.forEach(function(c,i){ if(c.geom) geomMap[String(i)]=c.geom; });
   function submit(){
     if(kids.length<2){ setS({busy:false,err:'A split needs at least two children.'}); return; }
-    if(!reconciled){ setS({busy:false,err:'Child areas total '+fmt(Math.round(sum*100)/100)+' fed against a parent of '+fmt(b.total_area_fed)+' fed (limit ±0.5).'}); return; }
-    var payload=kids.map(function(c){ var o={sector_code:nul(c.sector_code),plot_code:nul(c.plot_code),total_area_fed:numN(c.total_area_fed),inherits_history:!!c.inherits_history};
-      if(nul(c.block_add)) o.block_add=nul(c.block_add); return o; });
+    for(var i=0;i<kids.length;i++){ var c=kids[i];
+      if(numN(c.total_area_fed)==null){ setS({busy:false,err:'Child '+(i+1)+': enter its total area.'}); return; }
+      if(!c.variety_id){ setS({busy:false,err:'Child '+(i+1)+': choose a variety.'}); return; }
+      if(numN(c.planting_year)==null){ setS({busy:false,err:'Child '+(i+1)+': enter a planting year.'}); return; }
+      if(numN(c.trees)==null){ setS({busy:false,err:'Child '+(i+1)+': enter the trees count.'}); return; }
+      if(numN(c.planted)!=null && numN(c.planted)>numN(c.total_area_fed)+0.001){ setS({busy:false,err:'Child '+(i+1)+': bearing area can’t exceed its total area.'}); return; }
+    }
+    if(!reconciled){ setS({busy:false,err:'Child total areas sum to '+fmt(Math.round(sum*100)/100)+' fed against a parent of '+fmt(b.total_area_fed)+' fed (limit ±0.5).'}); return; }
+    var payload=kids.map(function(c){ var o={sector_code:nul(c.sector_code),plot_code:nul(c.plot_code),total_area_fed:numN(c.total_area_fed),inherits_history:!!c.inherits_history,variety_id:c.variety_id,planting_year:numN(c.planting_year)};
+      if(nul(c.block_add)) o.block_add=nul(c.block_add); if(c.rootstock_id) o.rootstock_id=c.rootstock_id; return o; });
     setS({busy:true,err:null,res:null});
     supabase.rpc('fn_split_block',{ p_parent_id:b.id, p_children:payload, p_effective_date:date, p_note:nul(note) }).then(function(r){
-      if(r.error){ setS({busy:false,err:r.error.message,res:null}); return; } setS({busy:false,err:null,res:r.data||true}); });
+      if(r.error){ setS({busy:false,err:r.error.message,res:null}); return; }
+      var children=(r.data&&r.data.children)||[];
+      // follow-up: bearing / aero / trees / cost-centre (RPC doesn't take these) + geometry, per child in order
+      var jobs=[];
+      children.forEach(function(cr,i){ var c=kids[i]; if(!c||!cr.block_id) return;
+        var patch={ planted_area_fed:numN(c.planted), aerobotics_area_ha:numN(c.aero), tree_count_planted:numN(c.trees), jde_cost_center_id:nul(c.jde) };
+        jobs.push(supabase.from('farm_blocks').update(patch).eq('id',cr.block_id));
+        if(c.geom) jobs.push(supabase.rpc('fn_set_block_geom',{p_block_id:cr.block_id,p_geojson:c.geom,p_source:'manual'}));
+      });
+      Promise.all(jobs.map(function(j){ return j.then(function(x){return x;},function(x){return {error:x};}); })).then(function(rr){
+        var fails=rr.filter(function(x){ return x&&x.error; }).length;
+        setS({busy:false,err:null,res:{data:r.data,fails:fails}});
+      });
+    });
   }
-  if(s.res){ var warns=(s.res&&s.res.warnings)||[];
+  if(s.res){ var warns=(s.res.data&&s.res.data.warnings)||[];
     return ce(Modal,{title:'Split recorded',sub:b.aydi_block_number,onClose:p.onDone,
       footer:ce('button',{className:'btn btn-primary btn-sm',onClick:p.onDone},'Done')},
-      ce('div',null, ce('div',{className:'ok-band'},'Split recorded. The parent is superseded; each child carries its area-share of the parent’s prior production. History follows the land.'),
-        (warns.length?ce('div',{className:'band'}, warns.join(' ')):null)));
+      ce('div',null, ce('div',{className:'ok-band'},'Split recorded. The parent is superseded; each child carries its area-share of the parent’s prior production and its own details. History follows the land.'),
+        (warns.length?ce('div',{className:'band'}, warns.join(' ')):null),
+        (s.res.fails?ce('div',{className:'band'}, s.res.fails+' follow-up field/boundary write(s) didn’t save (e.g. boundaries need fn_set_block_geom deployed). The split itself committed — finish those from the register.'):null)));
   }
-  return ce(Modal,{title:'Split block',sub:b.aydi_block_number+' · '+fmt(b.total_area_fed)+' fed',wide:true,onClose:p.onClose,busy:s.busy,
-    footer:[ce('button',{key:'a',className:'btn btn-secondary btn-sm',style:{marginRight:'auto'},onClick:function(){ setKids(kids.concat([blank('')])); },disabled:s.busy},'+ Add child'),
+  function areaBox(idx,c){ return ce('div',{className:'area-box'},
+    ce('div',{className:'area-primary'}, ce('label',{className:'form-label'},'Total area'), txt(c.total_area_fed, upk(idx,'total_area_fed'),{type:'number',step:'0.01',className:'form-input mono'}), ce('div',{className:'unit'},'feddan · drives split')),
+    ce('div',null, ce('label',{className:'form-label'},'Bearing'), txt(c.planted, upk(idx,'planted'),{type:'number',step:'0.01',className:'form-input mono'}), ce('div',{className:'unit'},'feddan')),
+    ce('div',null, ce('label',{className:'form-label',style:{color:'var(--text3)'}},'Aerobotics'), txt(c.aero, upk(idx,'aero'),{type:'number',step:'0.01',className:'form-input mono'}), ce('div',{className:'unit'},'ha · optional'))); }
+  return ce(Modal,{title:'Split block',sub:b.aydi_block_number+' · '+fmt(b.total_area_fed)+' fed',wide:true,xwide:true,onClose:p.onClose,busy:s.busy,
+    footer:[ce('button',{key:'a',className:'btn btn-secondary btn-sm',style:{marginRight:'auto'},onClick:function(){ setKids(kids.concat([Object.assign(blank(''),{variety_id:(parent&&parent.variety_id)||'',rootstock_id:(parent&&parent.rootstock_id)||'',planting_year:(parent&&parent.planting_year!=null)?parent.planting_year:'',jde:(parent&&parent.jde_cost_center_id)||''})])); },disabled:s.busy},'+ Add child'),
             ce('button',{key:'c',className:'btn btn-secondary btn-sm',onClick:p.onClose,disabled:s.busy},'Cancel'),
             ce('button',{key:'s',className:'btn btn-primary btn-sm',onClick:submit,disabled:s.busy||!reconciled}, s.busy?'Recording…':'Record split')]},
     ce('div',null,
-      ce('p',{style:{fontSize:12.5,lineHeight:1.5,color:'var(--text3)',marginBottom:10}},'Divide this block into two or more. Areas must add up to the parent (±0.5 fed); each child’s share of prior production is derived from its area. Untick “inherits history” for a child that is genuinely new land.'),
-      kids.map(function(c,idx){ return ce('div',{key:idx,className:'child-card'},
-        ce('div',{style:{display:'flex',alignItems:'center',marginBottom:8}},
+      ce('p',{style:{fontSize:12.5,lineHeight:1.5,color:'var(--text3)',marginBottom:10}},'Divide this block into two or more. Total areas must add up to the parent (±0.5 fed); each child’s share of prior production is derived from its Total area. Fill in each child’s details, and optionally edit the old outline / draw each child’s boundary below.'),
+      kids.map(function(c,idx){ var col=CHILD_COLORS[idx%CHILD_COLORS.length];
+        return ce('div',{key:idx,className:'child-card'},
+        ce('div',{style:{display:'flex',alignItems:'center',marginBottom:2}},
+          ce('span',{style:{width:10,height:10,borderRadius:2,background:col,marginRight:7}}),
           ce('div',{style:{fontWeight:600,fontSize:13}}, 'Child '+(idx+1)),
           kids.length>2?ce('button',{className:'drawer-x',style:{marginLeft:'auto',width:24,height:24,fontSize:14},onClick:function(){ setKids(kids.filter(function(_,i){return i!==idx;})); }},'×'):null),
-        ce('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr 1fr 1fr',gap:8}},
-          ce(Field,{label:'Sector'}, txt(c.sector_code, upk(idx,'sector_code'))),
-          ce(Field,{label:'Plot'}, txt(c.plot_code, upk(idx,'plot_code'))),
-          ce(Field,{label:'Add'}, txt(c.block_add, upk(idx,'block_add'),{placeholder:'A / B'})),
-          ce(Field,{label:'Area (fed)'}, txt(c.total_area_fed, upk(idx,'total_area_fed'),{type:'number',step:'0.01'}))),
-        ce('label',{style:{display:'flex',alignItems:'center',gap:7,fontSize:12,marginTop:8,color:'var(--text2)'}},
+        ce('div',{className:'cc-glabel'},ce('span',{className:'tick'}),'Identity'),
+        ce('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:9}},
+          ce(Field,{label:'Sector'}, txt(c.sector_code, upk(idx,'sector_code'),{className:'form-input mono'})),
+          ce(Field,{label:'Plot'}, txt(c.plot_code, upk(idx,'plot_code'),{className:'form-input mono'})),
+          ce(Field,{label:'Add'}, txt(c.block_add, upk(idx,'block_add'),{placeholder:'A / B',className:'form-input mono'}))),
+        ce('div',{className:'cc-glabel'},ce('span',{className:'tick'}),'Areas'),
+        areaBox(idx,c),
+        ce('div',{className:'cc-glabel'},ce('span',{className:'tick'}),'Agronomy'),
+        ce('div',{className:'field-row',style:{marginBottom:9}},
+          ce(Field,{label:'Variety'}, selx(c.variety_id, upk(idx,'variety_id'), [{v:'',l:'— select —'}].concat((ref.varieties||[]).map(function(x){return {v:x.id,l:x.name+(x.code?' ('+x.code+')':'')};})))),
+          ce(Field,{label:'Rootstock'}, selx(c.rootstock_id, upk(idx,'rootstock_id'), [{v:'',l:'own-rooted / none'}].concat((ref.rootstocks||[]).map(function(x){return {v:x.id,l:x.name+(x.code?' ('+x.code+')':'')};}))))),
+        ce('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:12}},
+          ce(Field,{label:'Planting year'}, txt(c.planting_year, upk(idx,'planting_year'),{type:'number',className:'form-input mono'})),
+          ce(Field,{label:'Trees count'}, txt(c.trees, upk(idx,'trees'),{type:'number',className:'form-input mono'})),
+          ce(Field,{label:'Cost centre'}, txt(c.jde, upk(idx,'jde'),{placeholder:'optional'}))),
+        c.geom?ce('div',{className:'child-geo'}, ce('span',{className:'dotc',style:{background:col}}), 'Outline drawn · '+fmt(Math.round(geojsonHa(c.geom)*2.38095*100)/100)+' fed'):null,
+        ce('label',{style:{display:'flex',alignItems:'center',gap:7,fontSize:12,marginTop:9,color:'var(--text2)'}},
           ce('input',{type:'checkbox',checked:c.inherits_history,onChange:togInherit(idx)}), 'Inherits parent history (share of prior production)')); }),
-      ce('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',fontSize:12.5,padding:'8px 2px',fontFamily:'var(--font-mono)'}},
-        ce('span',{style:{color:'var(--text3)'}},'Σ children'),
-        ce('span',{style:{color:reconciled?'var(--green)':'var(--red)',fontWeight:600}}, fmt(Math.round(sum*100)/100)+' / '+fmt(b.total_area_fed)+' fed'+(reconciled?' ✓':' · off by '+diff))),
-      ce('div',{className:'field-row'},
+      ce('div',{className:'cc-glabel',style:{marginTop:14}},ce('span',{className:'tick'}),'Plot boundaries',ce('span',{style:{textTransform:'none',letterSpacing:0,fontWeight:400,color:'var(--text3)',marginLeft:4}},'— optional: edit the old outline, draw each child’s')),
+      ce(MiniMap,{seed:parent&&parent.geom,targets:targets,geoms:geomMap,height:220,onSet:function(id,g){ setGeom(parseInt(id,10),g); }}),
+      ce('div',{className:'form-hint',style:{marginTop:7}},'The parent’s original outline is kept as history; each child gets its own. Drawn areas are descriptive — the typed Total still governs the split.'),
+      ce('div',{className:'recon-bar '+(reconciled?'recon-ok':'recon-off'),style:{marginTop:12}},
+        ce('span',{style:{color:reconciled?null:'inherit',opacity:.8}},'Σ children TOTAL'),
+        ce('span',{style:{fontWeight:600}}, fmt(Math.round(sum*100)/100)+' / '+fmt(b.total_area_fed)+' fed'+(reconciled?'  ✓':'  · off by '+diff))),
+      ce('div',{className:'field-row',style:{marginTop:12}},
         ce(Field,{label:'Effective date'}, txt(date,setDate,{type:'date'})),
         ce(Field,{label:'Note (optional)'}, txt(note,setNote))),
       s.err?ce('div',{className:'band',style:{color:'var(--red)',borderColor:'var(--red)',background:'var(--red-bg)'}}, s.err):null));
@@ -2082,46 +2285,70 @@ function NewBlockModal(p){
   var c=useState(crop0); var crop=c[0],setCrop=c[1];
   var ref=useRefData(crop);
   var fs=useState([]); var farms=fs[0],setFarms=fs[1];
-  var f=useState({farm_id:'',sector_code:'',plot_code:'',block_add:'',variety_id:'',rootstock_id:'',planting_year:String(new Date().getFullYear()),
-    total_area_fed:'',planted_area_fed:'',aerobotics_area_ha:'',lifecycle:'bearing',jde:'',comments:''}); var v=f[0],setV=f[1];
+  var f=useState({farm_id:p.lockedFarmId||'',sector_code:'',plot_code:'',block_add:'',variety_id:'',rootstock_id:'',planting_year:String(new Date().getFullYear()),
+    total_area_fed:'',planted_area_fed:'',aerobotics_area_ha:'',trees:'',lifecycle:'bearing',jde:'',comments:'',geom:p.seedGeojson||null}); var v=f[0],setV=f[1];
+  var mo=useState(!!p.seedGeojson); var showMap=mo[0],setShowMap=mo[1];
   var st=useState({busy:false,err:null}); var s=st[0],setS=st[1];
-  useEffect(function(){ supabase.from('farms').select('id,name,farm_code').eq('active',true).order('name').then(function(r){ setFarms(r.data||[]); }); },[]);
+  useEffect(function(){ supabase.from('farms').select('id,name,farm_code').eq('active',true).order('name').then(function(r){ setFarms(r.data||[]);
+    if(p.seedGeojson){ var ha=geojsonHa(p.seedGeojson); if(ha!=null) setV(function(x){ return Object.assign({},x,{aerobotics_area_ha:x.aerobotics_area_ha||String(Math.round(ha*100)/100),total_area_fed:x.total_area_fed||String(Math.round(ha*2.38095*100)/100)}); }); }
+  }); },[]);
   function up(k){ return function(val){ setV(Object.assign({},v,mkObj(k,val))); }; }
+  var selFarm=farms.filter(function(x){return x.id===v.farm_id;})[0];
+  var dup=useDupCheck(selFarm&&selFarm.farm_code, v.sector_code, v.plot_code, v.block_add, null);
+  function setGeom(id,g){ setV(function(x){ var patch={geom:g}; if(g){ var ha=geojsonHa(g); if(ha!=null){ if(!nul(x.aerobotics_area_ha)) patch.aerobotics_area_ha=String(Math.round(ha*100)/100); if(!nul(x.total_area_fed)) patch.total_area_fed=String(Math.round(ha*2.38095*100)/100); } } return Object.assign({},x,patch); }); }
   function submit(){
     if(!v.farm_id){ setS({busy:false,err:'Choose a farm.'}); return; }
     if(!nul(v.sector_code)||!nul(v.plot_code)){ setS({busy:false,err:'Sector and plot codes are required.'}); return; }
     if(!v.variety_id){ setS({busy:false,err:'Choose a variety.'}); return; }
-    var py=numN(v.planting_year), ta=numN(v.total_area_fed);
+    var py=numN(v.planting_year), ta=numN(v.total_area_fed), tr=numN(v.trees);
     if(py==null){ setS({busy:false,err:'Planting year is required.'}); return; }
     if(ta==null||ta<=0){ setS({busy:false,err:'Total area must be greater than zero.'}); return; }
+    if(tr==null){ setS({busy:false,err:'Trees count is required.'}); return; }
     setS({busy:true,err:null});
     var row={ product_id:crop, farm_id:v.farm_id, sector_code:nul(v.sector_code), plot_code:nul(v.plot_code), block_add:nul(v.block_add),
-      variety_id:v.variety_id, rootstock_id:v.rootstock_id||null, planting_year:py, total_area_fed:ta,
+      variety_id:v.variety_id, rootstock_id:v.rootstock_id||null, planting_year:py, total_area_fed:ta, tree_count_planted:tr,
       planted_area_fed:numN(v.planted_area_fed), aerobotics_area_ha:numN(v.aerobotics_area_ha), lifecycle:v.lifecycle,
       jde_cost_center_id:nul(v.jde), comments:nul(v.comments) };
-    supabase.from('farm_blocks').insert(row).then(function(r){
-      if(r.error){ setS({busy:false,err:r.error.message}); return; } p.onDone(); });
+    supabase.from('farm_blocks').insert(row).select('id').maybeSingle().then(function(r){
+      if(r.error){ setS({busy:false,err:r.error.message}); return; }
+      var newId=r.data&&r.data.id;
+      if(v.geom&&newId){ supabase.rpc('fn_set_block_geom',{p_block_id:newId,p_geojson:v.geom,p_source:'manual'}).then(function(gr){ p.onDone(); },function(){ p.onDone(); }); }
+      else p.onDone();
+    });
   }
-  return ce(Modal,{title:'New block',wide:true,onClose:p.onClose,busy:s.busy,
+  var mapBlock = showMap
+    ? ce('div',null, ce(MiniMap,{seed:null,targets:[{id:'plot',label:'Plot boundary',color:'#159490'}],geoms:v.geom?{plot:v.geom}:{},height:200,onSet:function(id,g){ setGeom(id,g); }}),
+        ce('div',{className:'form-hint',style:{marginTop:6}},'Drawing fills the area fields above from the measured shape — adjust if needed. '+(v.geom?'':'Click “Draw” on the legend, then click points on the map.')))
+    : ce('div',{className:'geo-block'},
+        ce('div',{className:'geo-thumb empty'}, ce('span',{style:{fontSize:22,color:'var(--text3)'}},'⬡')),
+        ce('div',{className:'geo-meta'},
+          ce('div',{style:{fontSize:13,color:'var(--text3)'}}, v.geom?('Boundary set · '+fmt(Math.round(geojsonHa(v.geom)*2.38095*100)/100)+' fed'):'No boundary drawn'),
+          ce('div',{className:'form-hint',style:{marginTop:0}},'Optional. Draw the plot outline to capture its measured area, or add it later from the Farm Map.'),
+          ce('div',{className:'geo-actions'}, ce('button',{className:'btn btn-primary btn-sm',onClick:function(){ setShowMap(true); }}, v.geom?'Edit on map':'Draw on map'))));
+  return ce(Modal,{title:'New plot',wide:true,onClose:p.onClose,busy:s.busy,
     footer:[ce('button',{key:'c',className:'btn btn-secondary btn-sm',onClick:p.onClose,disabled:s.busy},'Cancel'),
-            ce('button',{key:'s',className:'btn btn-primary btn-sm',onClick:submit,disabled:s.busy}, s.busy?'Creating…':'Create block')]},
+            ce('button',{key:'s',className:'btn btn-primary btn-sm',onClick:submit,disabled:s.busy}, s.busy?'Creating…':'Create plot')]},
     ce('div',null,
       ce('div',{className:'field-row'},
         ce(Field,{label:'Crop'}, selx(crop,function(val){ setCrop(val); setV(Object.assign({},v,{variety_id:'',rootstock_id:''})); }, (p.ctx.products||[]).map(function(pr){return {v:pr.id,l:pr.name};}))),
-        ce(Field,{label:'Farm'}, selx(v.farm_id, up('farm_id'), [{v:'',l:'— select —'}].concat(farms.map(function(x){return {v:x.id,l:x.name+' ('+x.farm_code+')'};}))))),
+        ce(Field,{label:'Farm'}, selx(v.farm_id, up('farm_id'), [{v:'',l:'— select —'}].concat(farms.map(function(x){return {v:x.id,l:x.name+' ('+x.farm_code+')'};})),{disabled:!!p.lockedFarmId}))),
       ce('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:12}},
-        ce(Field,{label:'Sector code'}, txt(v.sector_code, up('sector_code'),{placeholder:'e.g. 09'})),
-        ce(Field,{label:'Plot code'}, txt(v.plot_code, up('plot_code'),{placeholder:'e.g. 04'})),
-        ce(Field,{label:'Block add',hint:'optional (A/B…)'}, txt(v.block_add, up('block_add')))),
-      ce(Field,{label:'Variety'}, selx(v.variety_id, up('variety_id'), [{v:'',l:ref.loading?'loading…':'— select —'}].concat((ref.varieties||[]).map(function(x){return {v:x.id,l:x.name+(x.code?' ('+x.code+')':'')};})))),
-      ce('div',{className:'field-row'},
+        ce(Field,{label:'Sector code'}, txt(v.sector_code, up('sector_code'),{placeholder:'e.g. 09',className:'form-input mono'})),
+        ce(Field,{label:'Plot code'}, txt(v.plot_code, up('plot_code'),{placeholder:'e.g. 04',className:'form-input mono'})),
+        ce(Field,{label:'Block add',hint:'optional (A/B…)'}, txt(v.block_add, up('block_add'),{className:'form-input mono'}))),
+      ce(DupAlert,{dup:dup,farmName:selFarm&&selFarm.name}),
+      ce('div',{style:{marginTop:12}}, ce(Field,{label:'Variety'}, selx(v.variety_id, up('variety_id'), [{v:'',l:ref.loading?'loading…':'— select —'}].concat((ref.varieties||[]).map(function(x){return {v:x.id,l:x.name+(x.code?' ('+x.code+')':'')};}))))),
+      ce('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:12,marginTop:12}},
         ce(Field,{label:'Rootstock'}, selx(v.rootstock_id, up('rootstock_id'), [{v:'',l:'own-rooted / none'}].concat((ref.rootstocks||[]).map(function(x){return {v:x.id,l:x.name+(x.code?' ('+x.code+')':'')};})))),
-        ce(Field,{label:'Planting year'}, txt(v.planting_year, up('planting_year'),{type:'number'}))),
-      ce('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:12}},
-        ce(Field,{label:'Total area (fed)'}, txt(v.total_area_fed, up('total_area_fed'),{type:'number',step:'0.01'})),
-        ce(Field,{label:'Bearing area (fed)'}, txt(v.planted_area_fed, up('planted_area_fed'),{type:'number',step:'0.01'})),
-        ce(Field,{label:'Aerobotics (ha)'}, txt(v.aerobotics_area_ha, up('aerobotics_area_ha'),{type:'number',step:'0.01'}))),
-      ce('div',{className:'field-row'},
+        ce(Field,{label:'Planting year'}, txt(v.planting_year, up('planting_year'),{type:'number',className:'form-input mono'})),
+        ce(Field,{label:'Trees count'}, txt(v.trees, up('trees'),{type:'number',className:'form-input mono'}))),
+      ce('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:12,marginTop:12}},
+        ce(Field,{label:'Total area (fed)'}, txt(v.total_area_fed, up('total_area_fed'),{type:'number',step:'0.01',className:'form-input mono'})),
+        ce(Field,{label:'Bearing area (fed)'}, txt(v.planted_area_fed, up('planted_area_fed'),{type:'number',step:'0.01',className:'form-input mono'})),
+        ce(Field,{label:'Aerobotics (ha)'}, txt(v.aerobotics_area_ha, up('aerobotics_area_ha'),{type:'number',step:'0.01',className:'form-input mono'}))),
+      ce('div',{className:'section-title',style:{marginTop:18}},ce('span',{className:'section-title-bar'}),'Plot boundary'),
+      mapBlock,
+      ce('div',{className:'field-row',style:{marginTop:12}},
         ce(Field,{label:'Lifecycle'}, selx(v.lifecycle, up('lifecycle'), LIFECYCLES.map(function(l){return {v:l[0],l:l[1]};}))),
         ce(Field,{label:'Cost centre (JDE)'}, txt(v.jde, up('jde'),{placeholder:'optional'}))),
       ce(Field,{label:'Notes'}, txt(v.comments, up('comments'))),
@@ -2149,6 +2376,74 @@ function HistoryLogModal(p){
           ce('div',{style:{fontSize:13,fontWeight:600}}, lb[0]+' · '+(e.effective_date||'—')),
           ce('div',{style:{fontSize:11.5,color:'var(--text3)',marginTop:2}}, (isParent?'this block → successor':'predecessor → this block')+(e.ratio!=null?(' · '+Math.round(e.ratio*100)+'% area share'):'')+(e.inherits_history?'':' · no history carried')),
           e.note?ce('div',{style:{fontSize:11.5,color:'var(--text2)',marginTop:3}}, e.note):null)); })));
+}
+
+/* ── Assign a hand-drawn polygon to a plot (Farm Map draw flow) ────────── */
+function AssignPanel(p){
+  var fs=useState([]); var farms=fs[0],setFarms=fs[1];
+  var fc=useState(''); var farmCode=fc[0],setFarmCode=fc[1];
+  var br=useState('attach'); var branch=br[0],setBranch=br[1];
+  var pl=useState({loading:false,rows:[]}); var plots=pl[0],setPlots=pl[1];
+  var se=useState(''); var q=se[0],setQ=se[1];
+  var pk=useState(null); var picked=pk[0],setPicked=pk[1];
+  var nb=useState(false); var newOpen=nb[0],setNewOpen=nb[1];
+  var st=useState({busy:false,err:null}); var s=st[0],setS=st[1];
+  var ha=geojsonHa(p.geojson); var fed=ha!=null?Math.round(ha*2.38095*100)/100:null;
+  var suggest=(function(){ if(!p.centroid||!p.farmCentroids||!p.farmCentroids.length) return null;
+    var best=null; p.farmCentroids.forEach(function(f){ var d=haversineKm(p.centroid,f); if(best==null||d<best.d) best={f:f,d:d}; });
+    return (best&&best.d<8)?best:null; })();
+  useEffect(function(){ supabase.from('farms').select('id,name,farm_code').eq('active',true).order('name').then(function(r){ setFarms(r.data||[]); });
+    if(suggest) setFarmCode(suggest.f.code);
+    else if(p.ctx.map.farm&&p.ctx.map.farm!=='all') setFarmCode(p.ctx.map.farm);
+  },[]);
+  var selFarm=farms.filter(function(x){return x.farm_code===farmCode;})[0];
+  useEffect(function(){ if(!farmCode){ setPlots({loading:false,rows:[]}); return; } setPicked(null); setPlots({loading:true,rows:[]});
+    supabase.from('farm_blocks').select('id,aydi_block_number,product_id,total_area_fed,planting_year,varieties(name)').eq('farm_code',farmCode).is('geom',null).neq('lifecycle','retired').order('aydi_block_number').limit(500)
+      .then(function(r){ setPlots({loading:false,rows:r.data||[]}); }); },[farmCode]);
+  function attach(){ if(!picked){ setS({busy:false,err:'Pick a plot to attach the outline to.'}); return; } setS({busy:true,err:null});
+    supabase.rpc('fn_set_block_geom',{p_block_id:picked.id,p_geojson:p.geojson,p_source:'manual'}).then(function(r){
+      if(r.error){ setS({busy:false,err:r.error.message}); return; } p.onAttached(); }); }
+  var rows=plots.rows.filter(function(x){ var t=q.trim().toLowerCase(); return !t||String(x.aydi_block_number||'').toLowerCase().indexOf(t)>=0; });
+  var variance=null; if(picked&&fed!=null&&Number(picked.total_area_fed)>0){ variance=Math.round((fed-Number(picked.total_area_fed))/Number(picked.total_area_fed)*1000)/10; }
+  return ce('div',{className:'card'},
+    ce('div',{className:'section-title'},ce('span',{className:'section-title-bar'}),'Assign drawn polygon'),
+    ce('div',{className:'readout-strip'},
+      ce('div',{className:'geo-thumb'}, ce('svg',{viewBox:'0 0 70 54',width:70,height:54},
+        ce('rect',{width:70,height:54,fill:'#0e1a1a'}),
+        ce('polygon',{points:'12,40 20,13 50,10 61,30 40,46',fill:'rgba(21,148,144,.28)',stroke:'#159490',strokeWidth:2}))),
+      ce('div',null, ce('div',{className:'geo-read'}, (ha!=null?fmt(Math.round(ha*100)/100):'—')+' ha · '+(fed!=null?fmt(fed):'—')+' fed'),
+        ce('div',{style:{marginTop:4}}, ce('span',{className:'badge badge-neutral'},'geom_source · manual')))),
+    ce('label',{className:'form-label'},'Farm'),
+    selx(farmCode, function(v){ setFarmCode(v); }, [{v:'',l:'— select —'}].concat(farms.map(function(x){return {v:x.farm_code,l:x.name+' ('+x.farm_code+')'};}))),
+    suggest?ce('div',{style:{marginTop:7}}, ce('span',{className:'smart-chip',onClick:function(){ setFarmCode(suggest.f.code); }}, ce('span',{className:'dot'}), 'Suggested: '+suggest.f.name+' — '+(suggest.d<0.5?'nearest':('~'+(Math.round(suggest.d*10)/10)+' km'))+(farmCode===suggest.f.code?' ✓':' · tap'))):null,
+    ce('div',{className:'seg',style:{marginTop:14}},
+      ce('button',{className:branch==='attach'?'on':'',onClick:function(){setBranch('attach');}},'Attach to a plot', ce('span',{className:'s'},'un-mapped plots on this farm')),
+      ce('button',{className:branch==='new'?'on':'',onClick:function(){setBranch('new');}},'Create new plot', ce('span',{className:'s'},'here, with this shape'))),
+    branch==='attach'
+      ? ce('div',null,
+          !farmCode?ce('div',{className:'hint'},'Choose the farm first.'):
+          plots.loading?ce('div',{className:'skel',style:{height:80}}):
+          rows.length===0?ce('div',{className:'plot-list'}, ce('div',{style:{padding:'20px 14px',textAlign:'center',color:'var(--text3)',fontSize:12.5}}, plots.rows.length?'No match.':'Every plot on '+((selFarm&&selFarm.name)||farmCode)+' already has a boundary — switch to Create new plot.')):
+          ce('div',null,
+            ce('input',{className:'form-input',placeholder:'Search un-mapped plots…',value:q,onChange:function(e){setQ(e.target.value);},style:{marginBottom:8}}),
+            ce('div',{className:'plot-list'}, rows.map(function(x){ return ce('div',{key:x.id,className:'plot-row'+(picked&&picked.id===x.id?' on':''),onClick:function(){ setPicked(x); }},
+              ce('span',{className:'rd'}),
+              ce('span',{style:{fontFamily:'var(--font-mono)',fontSize:12.5}}, x.aydi_block_number),
+              ce('span',{style:{fontSize:12,color:'var(--text2)'}}, (x.varieties&&x.varieties.name)||fmCrop(x.product_id)),
+              ce('span',{style:{marginLeft:'auto',fontFamily:'var(--font-mono)',fontSize:12,color:'var(--text3)'}}, fmt(x.total_area_fed)+' fed')); }))),
+          (variance!=null&&Math.abs(variance)>10)?ce('div',{className:'form-hint',style:{marginTop:7}},'Measured '+fmt(fed)+' fed vs book '+fmt(picked.total_area_fed)+' fed on '+picked.aydi_block_number+' — a '+variance+'% variance will flag for reconciliation.'):null,
+          s.err?ce('div',{className:'band',style:{color:'var(--red)',borderColor:'var(--red)',background:'var(--red-bg)',marginTop:8}}, s.err):null,
+          ce('div',{style:{display:'flex',gap:8,justifyContent:'flex-end',marginTop:12}},
+            ce('button',{className:'btn btn-secondary btn-sm',onClick:p.onCancel,disabled:s.busy},'Discard'),
+            ce('button',{className:'btn btn-primary btn-sm',onClick:attach,disabled:s.busy||!picked}, s.busy?'Attaching…':'Attach polygon')))
+      : ce('div',null,
+          ce('div',{style:{background:'var(--bg2)',border:'1px solid var(--border)',borderRadius:8,padding:'11px 12px',fontSize:12.5,color:'var(--text2)'}},
+            'Opens ', ce('b',null,'New plot'), ' pre-seeded with this boundary'+(fed!=null?(' — '+fmt(fed)+' fed'):'')+(selFarm?(', farm '+selFarm.name):'')+'. You confirm sector / plot / variety there.'),
+          !farmCode?ce('div',{className:'dedup',style:{marginTop:8}}, ce('span',null,'⚠'), ce('div',null,'Choose the farm first so the new plot lands in the right place.')):null,
+          ce('div',{style:{display:'flex',gap:8,justifyContent:'flex-end',marginTop:12}},
+            ce('button',{className:'btn btn-secondary btn-sm',onClick:p.onCancel},'Discard'),
+            ce('button',{className:'btn btn-primary btn-sm',onClick:function(){ if(farmCode) setNewOpen(true); },disabled:!farmCode},'Continue → New plot'))),
+    newOpen?ce(NewBlockModal,{ctx:p.ctx,lockedFarmId:selFarm&&selFarm.id,seedGeojson:p.geojson,onClose:function(){setNewOpen(false);},onDone:function(){ setNewOpen(false); p.onAttached(); }}):null);
 }
 
 /* ── Access gate: farm_can_read() decides entry; users.role gates writes. ── */
