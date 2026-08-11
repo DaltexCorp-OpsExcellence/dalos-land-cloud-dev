@@ -155,6 +155,27 @@ tr.rowlink:hover td{background:var(--bg)}
   @keyframes sheetin{to{transform:translateY(0)}}
 }
 
+/* Season entry grid (mockup §6.5) */
+.sgrid table{min-width:1080px}
+.sgrid td{padding:3px 4px}
+.sgrid input{width:100%;border:1px solid transparent;background:transparent;border-radius:4px;padding:5px 6px;font-family:var(--font-mono);font-size:12px;text-align:right;color:var(--text)}
+.sgrid input:hover{border-color:var(--border)}
+.sgrid input:focus{outline:none;border-color:var(--accent);background:#fff}
+.sgrid input.derived{color:var(--text3);background:var(--bg2);border-color:transparent}
+.stickyc{position:sticky;left:0;background:#fff;z-index:1}
+thead .stickyc{background:var(--card)}
+.bal{width:9px;height:9px;border-radius:50%;display:inline-block}
+.bal-ok{background:var(--green)}.bal-off{background:var(--red)}.bal-res{background:var(--amber)}.bal-na{background:var(--border2)}
+.carr{display:block;font-size:9px;color:var(--text3);margin-top:1px}
+.carr.st{color:var(--accent)}
+.alert{display:flex;gap:8px;padding:9px 11px;border-radius:8px;font-size:12px;align-items:flex-start;line-height:1.35}
+.alert b{font-weight:600}
+.alert-ok{background:var(--green-bg);border:1px solid var(--green-border);color:var(--green)}
+.alert-warn{background:var(--amber-bg);border:1px solid var(--amber-border);color:var(--amber)}
+.alert-fail{background:var(--red-bg);border:1px solid var(--red-border);color:var(--red)}
+.note{font-size:12px;color:var(--text3);background:var(--bg2);border-radius:8px;padding:9px 11px}
+.form-label{font-size:10px;text-transform:uppercase;letter-spacing:.05em;font-weight:600;color:var(--text3);display:block;margin-bottom:4px}
+
 /* Mobile */
 .sidebar-overlay{display:none}
 .bottom-nav{display:none}
@@ -207,20 +228,24 @@ var IC = {
   history:   icon(['M3 3v18h18','M7 14l4-4 3 3 5-6']),
   entry:     icon(['M4 4h16v16H4z','M4 9h16','M9 4v16']),
   import:    icon(['M12 3v12','M8 11l4 4 4-4','M4 21h16']),
-  recon:     icon(['M4 7h10','M4 12h16','M4 17h7','M18 5v6','M15 8h6']),
-  health:    icon(['M22 12h-4l-3 8-4-16-3 8H2']),
-  reference: icon(['M4 5a2 2 0 0 1 2-2h13v18H6a2 2 0 0 1-2-2z','M9 7h7','M9 11h7'])
+  recon:     icon(['M3 6h18','M3 12h12','M3 18h7','M18 5v6','M15 8h6']),
+  health:    icon(['M12 2l9 4v6c0 5-3.8 9.3-9 10-5.2-.7-9-5-9-10V6z','M9 12l2 2 4-4']),
+  reference: icon(['M4 5a2 2 0 0 1 2-2h13v18H6a2 2 0 0 1-2-2z','M9 7h7','M9 11h7']),
+  heatmap:   icon(['M3 3h7v7H3z','M14 3h7v7h-7z','M3 14h7v7H3z','M14 14h7v7h-7z']),
+  bench:     icon(['M4 20V10','M10 20V4','M16 20v-7','M22 20H2'])
 };
+/* Nav mirrors the agreed mockup: Explore / Manage, with post-v1 screens badged v2. */
 var NAV = [
-  {sec:'Orchard', items:[
+  {sec:'Explore', items:[
     {k:'structure', label:'Structure',        Icon:IC.structure, phase:'P2'},
     {k:'register',  label:'Block Register',    Icon:IC.register,  phase:'P2'},
-    {k:'map',       label:'Farm Map',          Icon:IC.map,       phase:'P6'} ]},
-  {sec:'Production', items:[
     {k:'history',   label:'Production History', Icon:IC.history,  phase:'P5'},
+    {k:'heatmap',   label:'Yield Heatmap',     Icon:IC.heatmap,  phase:'L1', v2:true},
+    {k:'bench',     label:'Benchmark',         Icon:IC.bench,    phase:'L2', v2:true},
+    {k:'map',       label:'Farm Map',          Icon:IC.map,       phase:'P6'} ]},
+  {sec:'Manage', items:[
     {k:'entry',     label:'Season Entry',       Icon:IC.entry,    phase:'P3'},
-    {k:'import',    label:'Bulk Import',        Icon:IC.import,   phase:'P4'} ]},
-  {sec:'Governance', items:[
+    {k:'import',    label:'Bulk Import',        Icon:IC.import,   phase:'P4'},
     {k:'recon',     label:'Reconciliation',     Icon:IC.recon,    phase:'P7', need:'read'},
     {k:'health',    label:'Data Health',        Icon:IC.health,   phase:'P7'},
     {k:'reference', label:'Reference Data',     Icon:IC.reference,phase:'P7', need:'admin'} ]}
@@ -250,7 +275,9 @@ var SCREENS = {
   register: {title:'Block Register', body:function(ctx){ return ce(RegisterScreen, ctx); }},
   map:      {title:'Farm Map', phase:'P6', msg:'343 Aerobotics polygons on a satellite basemap, choropleth by yield/variety/rootstock, with the "previously on this land" hover card. Needs the PostGIS migration and a basemap-provider decision.'},
   history:  {title:'Production History', body:function(ctx){ return ce(ProductionHistoryScreen, ctx); }},
-  entry:    {title:'Season Entry', phase:'P3', msg:'Spreadsheet-feel grid whose columns come from farm_metric_set_items, with per-row balance dots and atomic save via fn_save_farm_season_full (a MERGE, not a replace).'},
+  heatmap:  {title:'Yield Heatmap', phase:'v2', msg:'Blocks × seasons, each cell a t/fed value on a colour ramp, sortable by trend slope. Post-v1 (L1) — pure UI on the data already loaded.'},
+  bench:    {title:'Benchmark', phase:'v2', msg:'Like-for-like yield comparison controlling for variety, rootstock and age, with the rootstock × variety matrix. Post-v1 (L2).'},
+  entry:    {title:'Season Entry', body:function(ctx){ return ce(SeasonEntryScreen, ctx); }},
   import:   {title:'Bulk Import', phase:'P4', msg:'Upload → map columns (Arabic headers auto-matched on farm_metrics.aliases) → validate → commit, fully reversible per batch.'},
   recon:    {title:'Reconciliation', phase:'P7', msg:'Cost-centre and area reconciliation for finance — book vs Aerobotics area, JDE cost-centre gaps, lifecycle audit. Aerobotics variance renders "not measured", never 0, for Mango/Pom/Olives/Berries.'},
   health:   {title:'Data Health', phase:'P7', msg:'The live §9 issue list — blocking and warning, each naming the offending records with a deep-link to its fix.'},
@@ -615,6 +642,135 @@ function ProductionHistoryScreen(ctx){
   );
 }
 
+/* ── Season Entry (§6.5) — metric-set-driven grid, atomic save via the RPC ── */
+var LOCAL_BRANCHES=['local_sales_combined','raw_to_traders','field_reject_sales','farm_gate_sales','condemned'];
+function SeasonEntryScreen(ctx){
+  var f=useState(''); var farm=f[0],setFarm=f[1];
+  var fl=useState([]); var farms=fl[0],setFarms=fl[1];
+  var d=useState({loading:true,err:null,cols:[],rows:[],setLabel:null}); var st=d[0],set=d[1];
+  var e=useState({}); var edits=e[0],setEdits=e[1];
+  var sv=useState({busy:false,msg:null,kind:null}); var save=sv[0],setSave=sv[1];
+
+  useEffect(function(){ // farm list for the crop
+    if(ctx.crop==='all'){ setFarms([]); return; }
+    supabase.from('farm_blocks').select('farm_code,farms(name)').eq('product_id',ctx.crop).then(function(r){
+      var seen={}; (r.data||[]).forEach(function(x){ if(x.farm_code&&!seen[x.farm_code]) seen[x.farm_code]=(x.farms&&x.farms.name)||x.farm_code; });
+      var list=Object.keys(seen).sort().map(function(c){return {code:c,name:seen[c]};});
+      setFarms(list); if(list.length && !seen[farm]) setFarm(list[0].code);
+    });
+  },[ctx.crop]);
+  useEffect(function(){ if(ctx.crop!=='all'&&farm) load(); },[ctx.crop,ctx.season,farm]);
+
+  function load(){
+    set({loading:true,err:null,cols:[],rows:[],setLabel:null}); setEdits({}); setSave({busy:false,msg:null,kind:null});
+    Promise.all([
+      supabase.from('farm_metric_sets').select('id,notes,farm_metric_set_items(sort_order,required,farm_metrics(code,name_en,role))').eq('product_id',ctx.crop).eq('season_year',ctx.season).eq('scenario','actual').maybeSingle(),
+      supabase.from('farm_blocks').select('id,operational_block_id,aydi_block_number,total_area_fed,lifecycle,varieties(name)').eq('product_id',ctx.crop).eq('farm_code',farm).order('operational_block_id')
+    ]).then(function(r){
+      if(r[0].error||r[1].error){ set({loading:false,err:(r[0].error||r[1].error).message,cols:[],rows:[],setLabel:null}); return; }
+      var setRow=r[0].data;
+      var cols=setRow?(setRow.farm_metric_set_items||[]).map(function(it){return {code:it.farm_metrics.code,label:it.farm_metrics.name_en,role:it.farm_metrics.role,ord:it.sort_order};}).sort(function(a,b){return a.ord-b.ord;}):[];
+      var blocks=r[1].data||[];
+      var ids=blocks.map(function(b){return b.id;});
+      supabase.from('v_farm_season_wide').select('block_id,bearing_area_fed,bearing_area_source,balance_status,updated_at,metrics').eq('season_year',ctx.season).eq('scenario','actual').in('block_id',ids.length?ids:['00000000-0000-0000-0000-000000000000']).then(function(sr){
+        var byId={}; (sr.data||[]).forEach(function(s){byId[s.block_id]=s;});
+        var rows=blocks.map(function(b){ var s=byId[b.id]||{}; return {block:b, season:s}; });
+        set({loading:false,err:null,cols:cols,rows:rows,setLabel:setRow?(setRow.notes||(ctx.crop+' '+ctx.season)):null});
+      });
+    });
+  }
+
+  // current cell value: edited > season data
+  function bearingVal(row){ var ed=edits[row.block.id]; if(ed&&ed.bearing!==undefined) return ed.bearing; var s=row.season; return s.bearing_area_fed!=null?String(s.bearing_area_fed):''; }
+  function bearingSrc(row){ var ed=edits[row.block.id]; if(ed&&ed.bearing!==undefined) return 'stated'; return (row.season.bearing_area_source)||null; }
+  function metricVal(row,code){ var ed=edits[row.block.id]; if(ed&&ed.values&&ed.values[code]!==undefined) return ed.values[code]; var m=row.season.metrics||{}; return m[code]!=null?String(m[code]):''; }
+  function editBearing(row,v){ setEdits(function(p){ var n=Object.assign({},p); n[row.block.id]=Object.assign({},n[row.block.id],{bearing:v}); return n; }); }
+  function editMetric(row,code,v){ setEdits(function(p){ var n=Object.assign({},p); var r=Object.assign({},n[row.block.id]); r.values=Object.assign({},r.values); r.values[code]=v; n[row.block.id]=r; return n; }); }
+
+  // live per-row status
+  function rowStatus(row){
+    var bearing=parseFloat(bearingVal(row)); var total=Number(row.block.total_area_fed);
+    if(isFinite(bearing)&&bearing>total+0.001) return 'blocked';
+    var actual=parseFloat(metricVal(row,'actual_production'));
+    if(!isFinite(actual)) return 'na';
+    var raw=parseFloat(metricVal(row,'raw_to_packhouse')); var sum=isFinite(raw)?raw:0, kids=isFinite(raw)?1:0;
+    LOCAL_BRANCHES.forEach(function(c){ var v=parseFloat(metricVal(row,c)); if(isFinite(v)){sum+=v;kids++;} });
+    if(kids<2) return 'na';
+    var res=Math.abs(actual-sum); return (res<=0.5||res<=0.01*actual)?'ok':'off';
+  }
+
+  if(ctx.crop==='all') return ce('div',{className:'card'},ce(EmptyState,{title:'Pick a crop',msg:'Season Entry works one crop + farm + season at a time. Choose a crop in the top bar.'}));
+  if(st.loading) return ce(Loading,{rows:8});
+  if(st.err) return ce(ErrorState,{msg:st.err,onRetry:load});
+  if(!st.cols.length) return ce('div',{className:'card'},ce(EmptyState,{title:'No metric set',msg:'No metric set defined for '+ctx.crop+' '+ctx.season+'. Define one in Reference Data (§6.11) first.'}));
+
+  var editedIds=Object.keys(edits).filter(function(id){var ed=edits[id];return (ed.bearing!==undefined)||(ed.values&&Object.keys(ed.values).length);});
+  var counts=st.rows.reduce(function(a,r){ var s=rowStatus(r); a[s]=(a[s]||0)+1; return a; },{});
+
+  function doSave(){
+    setSave({busy:true,msg:null,kind:null});
+    var rows=editedIds.map(function(id){
+      var ed=edits[id]; var s=(st.rows.filter(function(r){return r.block.id===id;})[0]||{}).season||{};
+      var row={block_id:id, expected_updated_at:s.updated_at||null};
+      if(ed.bearing!==undefined) row.bearing_area_fed = ed.bearing===''?null:Number(ed.bearing);
+      if(ed.values){ var v={}; Object.keys(ed.values).forEach(function(c){ v[c]=ed.values[c]===''?null:Number(ed.values[c]); }); row.values=v; }
+      return row;
+    });
+    supabase.rpc('fn_save_farm_season_full',{p_payload:{product_id:ctx.crop,season_year:ctx.season,scenario:'actual',rows:rows}}).then(function(r){
+      if(r.error){ var m=r.error.message||''; setSave({busy:false,kind:'err',msg:/conflict_stale_season/.test(m)?'Someone else changed a row since you loaded — reload to see their edits.':('Save failed: '+m)}); return; }
+      setSave({busy:false,kind:'ok',msg:'Saved '+(r.data&&r.data.saved||rows.length)+' rows.'}); load();
+    });
+  }
+
+  var bal={ok:'bal-ok',off:'bal-off',blocked:'bal-off',na:'bal-na'};
+  return ce('div',null,
+    ce('div',{className:'card',style:{marginBottom:10}},
+      ce('div',{style:{display:'flex',gap:10,alignItems:'flex-end',flexWrap:'wrap'}},
+        ce('div',null, ce('label',{className:'form-label'},'Farm'),
+          ce('select',{className:'tb-select',value:farm,onChange:function(ev){setFarm(ev.target.value);}}, farms.map(function(fm){return ce('option',{key:fm.code,value:fm.code},fm.name);}))),
+        ce('div',null, ce('label',{className:'form-label'},'Metric set'), ce('div',{style:{fontSize:13,padding:'5px 0',fontFamily:'var(--font-mono)'}}, (st.setLabel||'—')+' · '+st.cols.length+' metrics')),
+        ce('div',{style:{marginLeft:'auto',display:'flex',gap:8}},
+          ce('button',{className:'btn btn-secondary btn-sm',disabled:!editedIds.length||save.busy,onClick:function(){setEdits({});}},'Discard'),
+          ctx.canWrite?ce('button',{className:'btn btn-primary btn-sm',disabled:!editedIds.length||save.busy||counts.blocked,onClick:doSave}, save.busy?'Saving…':('Save '+editedIds.length+' rows')):ce('span',{style:{fontSize:11,color:'var(--text3)'}},'read-only role'))
+      ),
+      ce('div',{style:{display:'flex',gap:8,marginTop:10,flexWrap:'wrap'}},
+        ce('div',{className:'alert alert-ok',style:{flex:1,minWidth:180}},ce('span',null,'✓'),ce('div',null,ce('b',null,(counts.ok||0)+' rows balance'),' · production = packhouse + local branches')),
+        ce('div',{className:'alert alert-warn',style:{flex:1,minWidth:180}},ce('span',null,'⚠'),ce('div',null,ce('b',null,(counts.off||0)+' off by >0.5 t'),' · residual flagged, not blocked')),
+        ce('div',{className:'alert alert-fail',style:{flex:1,minWidth:180}},ce('span',null,'✕'),ce('div',null,ce('b',null,(counts.blocked||0)+' blocked'),' · bearing area exceeds total'))
+      ),
+      save.msg?ce('div',{className:'alert '+(save.kind==='ok'?'alert-ok':'alert-fail'),style:{marginTop:8}},ce('span',null,save.kind==='ok'?'✓':'✕'),ce('div',null,save.msg)):null
+    ),
+    ce('div',{className:'card'},
+      ce('div',{className:'section-title'},ce('span',{className:'section-title-bar'}),(farms.filter(function(x){return x.code===farm;})[0]||{}).name+' · '+ctx.crop+' · season '+ctx.season+' — '+st.rows.length+' blocks'),
+      ce('div',{className:'table-wrap sgrid'},
+        ce('table',null,
+          ce('thead',null,ce('tr',null,
+            ce('th',{className:'stickyc'},'Block'),
+            ce('th',{className:'num'},'Total area'),ce('th',{className:'num'},'Bearing'),ce('th',{style:{textAlign:'center'}},'Bearing?'),
+            st.cols.map(function(c){return ce('th',{key:c.code,className:'num',title:c.code},c.label);}),
+            ce('th',{className:'num'},'t/fed'),ce('th',{style:{width:34,textAlign:'center'}},'Bal'))),
+          ce('tbody',null, st.rows.map(function(row){
+            var b=row.block; var status=rowStatus(row); var blocked=status==='blocked';
+            var bv=bearingVal(row); var src=bearingSrc(row);
+            var actual=parseFloat(metricVal(row,'actual_production')); var bn=parseFloat(bv);
+            var tfed=(isFinite(actual)&&isFinite(bn)&&bn>0)?(actual/bn).toFixed(2):'';
+            return ce('tr',{key:b.id},
+              ce('td',{className:'stickyc'}, ce('span',{className:'lot'},b.operational_block_id), ce('div',{className:'ar',dir:'auto',style:{fontSize:10,color:'var(--text3)',marginTop:1}}, (b.varieties&&b.varieties.name)||'')),
+              ce('td',null, ce('input',{className:'derived',readOnly:true,value:Number(b.total_area_fed).toFixed(2),title:'total_area_fed — lives on the block'})),
+              ce('td',null, ce('input',{value:bv,disabled:!ctx.canWrite,style:blocked?{borderColor:'var(--red)',background:'var(--red-bg)'}:null,onChange:function(ev){editBearing(row,ev.target.value);}}),
+                src?ce('span',{className:'carr'+(src==='stated'?' st':'')}, src):null),
+              ce('td',{style:{textAlign:'center'}}, ce('span',{className:'badge '+(bn>0?'badge-pass':'badge-neutral'),style:{fontSize:10}}, bn>0?'P':'NP')),
+              st.cols.map(function(c){ return ce('td',{key:c.code}, ce('input',{value:metricVal(row,c.code),disabled:!ctx.canWrite,style:c.role==='total'?{fontWeight:600}:null,onChange:function(ev){editMetric(row,c.code,ev.target.value);}})); }),
+              ce('td',null, ce('input',{className:'derived',readOnly:true,value:tfed})),
+              ce('td',{style:{textAlign:'center'}}, ce('span',{className:'bal '+(bal[status]||'bal-na'),title:status})));
+          }))
+        )),
+      ce('div',{className:'note',style:{marginTop:10}}, ce('b',null,'Bearing area is carried, not re-typed.'),' Each cell pre-fills from the last season it was stated (shown below the value). Touch one and it becomes ',ce('span',{className:'lot'},'stated'),' from this season on. Total area is grey — it lives on the block, not the season.'),
+      ce('div',{className:'note',style:{marginTop:8}}, ce('b',null,'Columns come from the metric set,'),' not hard-coded — adding a 2027 segment is one row in ',ce('span',{className:'lot'},'farm_metric_set_items'),', no migration. Grey cells are derived and never stored.')
+    )
+  );
+}
+
 /* ── Access gate: farm_can_read() decides entry; users.role gates writes. ── */
 function App(){
   var a=useState({phase:'boot',session:null,role:null,canRead:false}); var auth=a[0], setAuth=a[1];
@@ -665,13 +821,14 @@ function App(){
     ce('div',{className:'sidebar'+(menuOpen?' open':'')},
       ce('div',{className:'logo'},
         ce('div',{className:'logo-name'}, 'DalOS'),
-        ce('div',{className:'logo-sub'}, ce('span',{className:'logo-dot'}), 'Land Cloud')),
+        ce('div',{className:'logo-sub'}, ce('span',{className:'logo-dot'}), 'Farm Structure')),
       ce('div',{className:'nav'}, NAV.map(function(g){
         return ce('div',{key:g.sec},
           ce('div',{className:'nav-section'}, g.sec),
           g.items.filter(visible).map(function(it){
             return ce('button',{key:it.k,className:'nav-item'+(screen===it.k?' active':''),onClick:function(){setScreen(it.k);setMenu(false);}},
-              ce(it.Icon,null), ce('span',null, it.label));
+              ce(it.Icon,null), ce('span',null, it.label),
+              it.v2?ce('span',{style:{marginLeft:'auto',fontSize:9,opacity:.6}},'v2'):null);
           }));
       })),
       ce('div',{className:'side-foot'},
