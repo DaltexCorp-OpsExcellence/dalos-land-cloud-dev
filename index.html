@@ -409,7 +409,7 @@ var ce = React.createElement, useState = React.useState, useEffect = React.useEf
 var DALOS_SUPABASE_URL = 'https://sfyjvgjwvtwkrnqrvqyc.supabase.co';
 var DALOS_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNmeWp2Z2p3dnR3a3JucXJ2cXljIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ4NzIxNjYsImV4cCI6MjA5MDQ0ODE2Nn0.FjA75XZsp0Kx5Xam_rrnYoAHX4JHKey6vEFCH_zlMuQ';
 var supabase = window.supabase.createClient(DALOS_SUPABASE_URL, DALOS_ANON_KEY);
-var BUILD = 'v0.6.0 (2026.08.12)';
+var BUILD = 'v0.6.1 (2026.08.12)';
 
 /* ── Nav model. Screens are scaffolds in this shell; each maps to a PRD phase. ── */
 function icon(paths){ return function(){ return ce('svg',{viewBox:'0 0 24 24',fill:'none',stroke:'currentColor',strokeWidth:2,strokeLinecap:'round',strokeLinejoin:'round'}, paths.map(function(d,i){return ce('path',{key:i,d:d});})); }; }
@@ -2546,7 +2546,7 @@ function AssignPanel(p){
 function useYieldData(crop){
   var s=useState({loading:true,blocks:[],dim:{},rows:[]}); var d=s[0],set=s[1];
   useEffect(function(){ var cancel=false; set({loading:true,blocks:[],dim:{},rows:[]});
-    var bq=supabase.from('farm_blocks').select('id,aydi_block_number,variety_code,rootstock_code,planting_year,lifecycle,last_producing_season,total_area_fed,product_id,farm_code,varieties(name),farm_rootstocks(name)').limit(3000);
+    var bq=supabase.from('farm_blocks').select('id,aydi_block_number,variety_code,rootstock_code,planting_year,lifecycle,last_producing_season,total_area_fed,product_id,farm_code,farms(name),varieties(name),farm_rootstocks(name)').limit(3000);
     if(crop!=='all') bq=bq.eq('product_id',crop);
     bq.then(function(br){ if(cancel)return; var blocks=br.data||[]; var dim={}; blocks.forEach(function(b){dim[b.id]=b;});
       var rows=[],PAGE=1000;
@@ -2574,6 +2574,8 @@ function HeatmapScreen(ctx){
   var mt=useState('yield'); var metric=mt[0],setMetric=mt[1];
   var scl=useState('cohort'); var scale=scl[0],setScale=scl[1];
   var srt=useState('latest'); var sortBy=srt[0],setSortBy=srt[1];
+  var ff=useState(''); var farmF=ff[0],setFarmF=ff[1];
+  var yf=useState(''); var yearF=yf[0],setYearF=yf[1];
   if(y.loading) return vLoad();
   function metricVal(mm,bearing,tot){ mm=mm||{}; var prod=Number(mm.actual_production||0);
     if(metric==='prod') return prod>0?prod:null;
@@ -2593,7 +2595,9 @@ function HeatmapScreen(ctx){
   var cohMed={},cohN={}; Object.keys(cohV).forEach(function(k){ cohMed[k]=medianOf(cohV[k]); cohN[k]=cohV[k].length; });
   var fmtCell=function(v){ return metric==='prod'?fmt(Math.round(v)):(metric==='export'?String(v):fmt(v)); };
   var unit=metric==='yield'?'t/fed':(metric==='prod'?'t':'export %');
-  var rowBlocks=y.blocks.filter(function(b){ return cells[b.id]||b.lifecycle!=='retired'; });
+  var farmList=(function(){ var m={}; y.blocks.forEach(function(b){ if(b.farm_code) m[b.farm_code]=(b.farms&&b.farms.name)||b.farm_code; }); return Object.keys(m).sort(function(a,b){return m[a]<m[b]?-1:1;}).map(function(c){return {code:c,name:m[c]};}); })();
+  var yearList=(function(){ var s={}; y.blocks.forEach(function(b){ if(b.planting_year) s[b.planting_year]=1; }); return Object.keys(s).map(Number).sort(function(a,b){return b-a;}); })();
+  var rowBlocks=y.blocks.filter(function(b){ return (cells[b.id]||b.lifecycle!=='retired') && (!farmF||b.farm_code===farmF) && (!yearF||String(b.planting_year)===yearF); });
   function latestVal(b){ var c=cells[b.id]; if(c) for(var i=yrs.length-1;i>=0;i--){ if(c[yrs[i]]!=null) return c[yrs[i]]; } return -1; }
   rowBlocks.sort(function(a,b){
     if(sortBy==='variety'){ var va=(a.varieties&&a.varieties.name)||'',vb=(b.varieties&&b.varieties.name)||''; if(va!==vb) return va<vb?-1:1; return (a.planting_year||9999)-(b.planting_year||9999); }
@@ -2628,6 +2632,8 @@ function HeatmapScreen(ctx){
       ce('div',{className:'toolbar',style:{gap:16,flexWrap:'wrap'}},
         ce(Field,{label:'Metric'}, selx(metric,setMetric,[{v:'yield',l:'Yield (t/fed)'},{v:'prod',l:'Production (t)'},{v:'export',l:'Export %'}])),
         ce(Field,{label:'Scale'}, selx(scale,setScale,[{v:'cohort',l:'vs peers (variety + age)'},{v:'own',l:'Per block (own history)'},{v:'abs',l:'Absolute (all blocks)'}])),
+        ce(Field,{label:'Farm'}, selx(farmF,setFarmF,[{v:'',l:'All farms'}].concat(farmList.map(function(f){return {v:f.code,l:f.name};})))),
+        ce(Field,{label:'Planting year'}, selx(yearF,setYearF,[{v:'',l:'All years'}].concat(yearList.map(function(yy){return {v:String(yy),l:String(yy)};})))),
         ce(Field,{label:'Sort'}, selx(sortBy,setSortBy,[{v:'latest',l:'Latest yield'},{v:'variety',l:'Variety, then age'},{v:'py',l:'Planting year'}]))),
       ce('div',{style:{display:'flex',gap:18,flexWrap:'wrap',alignItems:'center',marginTop:10}},
         legend,
@@ -2643,7 +2649,9 @@ function HeatmapScreen(ctx){
           ce('thead',null,ce('tr',null, ce('th',null,''), yrs.map(function(yy){return ce('th',{key:yy}, String(yy).slice(2));}))),
           ce('tbody',null, rowBlocks.map(function(b){
             return ce('tr',{key:b.id},
-              ce('td',{className:'rowlbl'}, ce('div',{className:'hm-lbl'}, b.aydi_block_number), ce('div',{style:{fontSize:10,color:'var(--text3)',whiteSpace:'nowrap'}}, (b.varieties&&b.varieties.name)||b.variety_code)),
+              ce('td',{className:'rowlbl'},
+                ce('div',{className:'hm-lbl'}, b.aydi_block_number, ce('span',{style:{color:'var(--text3)',fontFamily:'var(--font-body)',fontSize:10,marginLeft:6}}, (b.farms&&b.farms.name)||b.farm_code)),
+                ce('div',{style:{fontSize:10,color:'var(--text3)',whiteSpace:'nowrap'}}, ((b.varieties&&b.varieties.name)||b.variety_code)+(b.planting_year?(' · planted '+b.planting_year):''))),
               yrs.map(function(yy){ var stt=cellState(b,yy);
                 if(stt==='val'){ var v=cells[b.id][yy]; var info=cellInfo(b,yy);
                   return ce('td',{key:yy}, ce('span',{className:'hm-cell',style:{background:info.col,color:info.text},title:info.title}, fmtCell(v))); }
