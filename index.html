@@ -409,7 +409,7 @@ var ce = React.createElement, useState = React.useState, useEffect = React.useEf
 var DALOS_SUPABASE_URL = 'https://sfyjvgjwvtwkrnqrvqyc.supabase.co';
 var DALOS_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNmeWp2Z2p3dnR3a3JucXJ2cXljIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ4NzIxNjYsImV4cCI6MjA5MDQ0ODE2Nn0.FjA75XZsp0Kx5Xam_rrnYoAHX4JHKey6vEFCH_zlMuQ';
 var supabase = window.supabase.createClient(DALOS_SUPABASE_URL, DALOS_ANON_KEY);
-var BUILD = 'v0.5.2 (2026.08.12)';
+var BUILD = 'v0.6.0 (2026.08.12)';
 
 /* ── Nav model. Screens are scaffolds in this shell; each maps to a PRD phase. ── */
 function icon(paths){ return function(){ return ce('svg',{viewBox:'0 0 24 24',fill:'none',stroke:'currentColor',strokeWidth:2,strokeLinecap:'round',strokeLinejoin:'round'}, paths.map(function(d,i){return ce('path',{key:i,d:d});})); }; }
@@ -2563,12 +2563,16 @@ function useYieldData(crop){
 function medianOf(a){ if(!a.length)return null; var s=a.slice().sort(function(x,y){return x-y;}); var n=s.length; return n%2?s[(n-1)/2]:(s[n/2-1]+s[n/2])/2; }
 function ageBracket(a){ return a<=3?'0–3 yr':(a<=7?'4–7 yr':(a<=12?'8–12 yr':'13+ yr')); }
 function rampDark(col){ return YELLOW_GREEN.indexOf(col)>=4; }
+// diverging ramp for the "vs peers" heatmap scale: amber (below) → neutral → green (above)
+var DIVERGE=['#b06f1e','#cf9a52','#e7c893','#eef1f0','#a9d0b4','#57a374','#1e6b3a'];
+function hmText(col){ var i=YELLOW_GREEN.indexOf(col); if(i>=0) return i>=4?'#fff':'var(--text2)';
+  var j=DIVERGE.indexOf(col); if(j>=0) return (j<=1||j>=5)?'#fff':'var(--text)'; return 'var(--text3)'; }
 function vLoad(){ return ce('div',null, ce('div',{className:'kpi-grid'},[0,1,2,3].map(function(i){return ce('div',{key:i,className:'kpi'}, ce('div',{className:'skel',style:{width:'55%'}}), ce('div',{className:'skel',style:{width:'35%',height:22,marginTop:8}}));})), ce('div',{className:'skel',style:{height:360,marginTop:12}})); }
 
 function HeatmapScreen(ctx){
   var y=useYieldData(ctx.crop);
   var mt=useState('yield'); var metric=mt[0],setMetric=mt[1];
-  var scl=useState('abs'); var scale=scl[0],setScale=scl[1];
+  var scl=useState('cohort'); var scale=scl[0],setScale=scl[1];
   var srt=useState('latest'); var sortBy=srt[0],setSortBy=srt[1];
   if(y.loading) return vLoad();
   function metricVal(mm,bearing,tot){ mm=mm||{}; var prod=Number(mm.actual_production||0);
@@ -2581,36 +2585,55 @@ function HeatmapScreen(ctx){
     if(v!=null){ yearsSet[w.season_year]=1; (varVals[b.variety_code]=varVals[b.variety_code]||[]).push(v); } });
   var yrs=Object.keys(yearsSet).map(Number).sort(function(a,b){return a-b;});
   if(!yrs.length) return ce('div',{className:'card'},ce(EmptyState,{title:'No production to map',msg:'This crop has no recorded seasons yet.'}));
-  var varMean={}; Object.keys(varVals).forEach(function(k){ var a=varVals[k]; varMean[k]=a.reduce(function(s,x){return s+x;},0)/a.length; });
   var allV=[]; Object.keys(cells).forEach(function(id){ var c=cells[id]; Object.keys(c).forEach(function(yy){ if(c[yy]!=null) allV.push(c[yy]); }); });
   var vmin=Math.min.apply(null,allV), vmax=Math.max.apply(null,allV);
+  // per-block range (row-level scale) + peer cohorts (variety + age bracket, pooled across seasons)
+  var blockRange={}; Object.keys(cells).forEach(function(id){ var c=cells[id],vv=[]; Object.keys(c).forEach(function(yy){ if(c[yy]!=null) vv.push(c[yy]); }); if(vv.length) blockRange[id]={min:Math.min.apply(null,vv),max:Math.max.apply(null,vv)}; });
+  var cohV={}; Object.keys(cells).forEach(function(id){ var b=y.dim[id]; if(!b)return; var c=cells[id]; Object.keys(c).forEach(function(yy){ var v=c[yy]; if(v==null)return; var age=(+yy)-(b.planting_year||+yy); (cohV[b.variety_code+'|'+ageBracket(age)]=cohV[b.variety_code+'|'+ageBracket(age)]||[]).push(v); }); });
+  var cohMed={},cohN={}; Object.keys(cohV).forEach(function(k){ cohMed[k]=medianOf(cohV[k]); cohN[k]=cohV[k].length; });
+  var fmtCell=function(v){ return metric==='prod'?fmt(Math.round(v)):(metric==='export'?String(v):fmt(v)); };
+  var unit=metric==='yield'?'t/fed':(metric==='prod'?'t':'export %');
   var rowBlocks=y.blocks.filter(function(b){ return cells[b.id]||b.lifecycle!=='retired'; });
   function latestVal(b){ var c=cells[b.id]; if(c) for(var i=yrs.length-1;i>=0;i--){ if(c[yrs[i]]!=null) return c[yrs[i]]; } return -1; }
   rowBlocks.sort(function(a,b){
-    if(sortBy==='variety'){ var va=(a.varieties&&a.varieties.name)||'',vb=(b.varieties&&b.varieties.name)||''; return va<vb?-1:(va>vb?1:latestVal(b)-latestVal(a)); }
+    if(sortBy==='variety'){ var va=(a.varieties&&a.varieties.name)||'',vb=(b.varieties&&b.varieties.name)||''; if(va!==vb) return va<vb?-1:1; return (a.planting_year||9999)-(b.planting_year||9999); }
     if(sortBy==='py') return (a.planting_year||9999)-(b.planting_year||9999);
     return latestVal(b)-latestVal(a); });
-  function cellColor(b,yy){ var v=(cells[b.id]||{})[yy]; if(v==null)return null;
-    if(scale==='dev'){ var mean=varMean[b.variety_code]||v; var ratio=mean>0?v/mean:1; var t=Math.max(0,Math.min(1,(ratio-0.6)/0.8)); return YELLOW_GREEN[Math.round(t*(YELLOW_GREEN.length-1))]; }
-    return rampColor(v,vmin,vmax); }
+  // colour + text + tooltip per cell, honouring the active scale
+  function cellInfo(b,yy){ var v=(cells[b.id]||{})[yy]; if(v==null) return null; var base=b.aydi_block_number+' · '+yy+' · '+fmtCell(v)+' '+unit;
+    if(scale==='own'){ var r=blockRange[b.id]; var col=(!r||r.max<=r.min)?YELLOW_GREEN[3]:rampColor(v,r.min,r.max);
+      return {col:col,text:hmText(col),title:base+(r?(' · block range '+fmt(Math.round(r.min*100)/100)+'–'+fmt(Math.round(r.max*100)/100)):'')}; }
+    if(scale==='cohort'){ var age=(+yy)-(b.planting_year||+yy); var k=b.variety_code+'|'+ageBracket(age); var med=cohMed[k],n=cohN[k]||0;
+      if(n<3||!med) return {col:'var(--bg2)',text:'var(--text3)',title:base+' · <3 peers — not comparable'};
+      var dev=(v-med)/med, pct=Math.round(dev*100), t=Math.max(0,Math.min(1,(dev+0.4)/0.8)), col=DIVERGE[Math.round(t*(DIVERGE.length-1))];
+      return {col:col,text:hmText(col),title:base+' · '+(pct>=0?'+':'')+pct+'% vs '+ageBracket(age)+' '+((b.varieties&&b.varieties.name)||b.variety_code)+' peers (n='+n+')'}; }
+    var ac=rampColor(v,vmin,vmax); return {col:ac,text:hmText(ac),title:base}; }
   function cellState(b,yy){ if(yy<(b.planting_year||0)) return 'pre'; var v=(cells[b.id]||{})[yy]; if(v!=null)return 'val';
     if((b.lifecycle==='retired'||b.lifecycle==='superseded')&&b.last_producing_season&&yy>b.last_producing_season) return 'grub'; return 'nodata'; }
-  var fmtCell=function(v){ return metric==='prod'?fmt(Math.round(v)):(metric==='export'?String(v):fmt(v)); };
   var totalCells=rowBlocks.length*yrs.length, captured=allV.length;
   var swatch=function(cls,label){ return ce('div',{style:{display:'flex',alignItems:'center',gap:6,fontSize:11,color:'var(--text2)'}}, ce('span',{className:'hm-cell '+cls,style:{minWidth:16,width:16,height:12,borderRadius:2}}), label); };
-  var unit=metric==='yield'?'t/fed':(metric==='prod'?'t':'export %');
+  var diverging=scale==='cohort';
+  var scaleNote={abs:'Colour is calibrated across ALL blocks of this crop — good for the outright best and worst, but a young or small-variety block reads low because it is judged against mature ones.',
+    own:'Each ROW is scaled to its own history (min→max) — shows whether a block is trending up or down against itself, independent of how it compares to others.',
+    cohort:'Each cell is compared only to its PEERS — same variety and age bracket — for a like-for-like read that controls for genetics and age. Green = above the peer median, amber = below; cells with fewer than 3 peers keep their number but stay grey.'}[scale];
+  var legend = diverging
+    ? ce('div',{style:{display:'flex',alignItems:'center',gap:7}}, ce('span',{style:{fontSize:10,textTransform:'uppercase',letterSpacing:'.06em',color:'var(--text3)'}},'Below peers'),
+        ce('div',{style:{display:'flex',height:11,borderRadius:3,overflow:'hidden',width:150}}, DIVERGE.map(function(c,i){return ce('div',{key:i,style:{flex:1,background:c}});})),
+        ce('span',{style:{fontSize:10,textTransform:'uppercase',letterSpacing:'.06em',color:'var(--text3)'}},'Above peers'))
+    : ce('div',{style:{display:'flex',alignItems:'center',gap:7}}, ce('span',{style:{fontSize:10,textTransform:'uppercase',letterSpacing:'.06em',color:'var(--text3)'}},'Low'),
+        ce('div',{style:{display:'flex',height:11,borderRadius:3,overflow:'hidden',width:150}}, YELLOW_GREEN.map(function(c,i){return ce('div',{key:i,style:{flex:1,background:c}});})),
+        ce('span',{style:{fontSize:10,textTransform:'uppercase',letterSpacing:'.06em',color:'var(--text3)'}},(scale==='own'?'High · own range':'High · '+unit)));
   return ce('div',null,
     ce('div',{className:'card'},
       ce('div',{className:'toolbar',style:{gap:16,flexWrap:'wrap'}},
         ce(Field,{label:'Metric'}, selx(metric,setMetric,[{v:'yield',l:'Yield (t/fed)'},{v:'prod',l:'Production (t)'},{v:'export',l:'Export %'}])),
-        ce(Field,{label:'Scale'}, selx(scale,setScale,[{v:'abs',l:'Absolute'},{v:'dev',l:'Deviation from variety mean'}])),
-        ce(Field,{label:'Sort'}, selx(sortBy,setSortBy,[{v:'latest',l:'Latest yield'},{v:'variety',l:'Variety'},{v:'py',l:'Planting year'}]))),
+        ce(Field,{label:'Scale'}, selx(scale,setScale,[{v:'cohort',l:'vs peers (variety + age)'},{v:'own',l:'Per block (own history)'},{v:'abs',l:'Absolute (all blocks)'}])),
+        ce(Field,{label:'Sort'}, selx(sortBy,setSortBy,[{v:'latest',l:'Latest yield'},{v:'variety',l:'Variety, then age'},{v:'py',l:'Planting year'}]))),
       ce('div',{style:{display:'flex',gap:18,flexWrap:'wrap',alignItems:'center',marginTop:10}},
-        ce('div',{style:{display:'flex',alignItems:'center',gap:7}},
-          ce('span',{style:{fontSize:10,textTransform:'uppercase',letterSpacing:'.06em',color:'var(--text3)'}},'Low'),
-          ce('div',{style:{display:'flex',height:11,borderRadius:3,overflow:'hidden',width:150}}, YELLOW_GREEN.map(function(c,i){return ce('div',{key:i,style:{flex:1,background:c}});})),
-          ce('span',{style:{fontSize:10,textTransform:'uppercase',letterSpacing:'.06em',color:'var(--text3)'}},'High · '+unit)),
-        swatch('hm-pre','Pre-bearing'), swatch('hm-grub','Grubbed up'), swatch('hm-nodata','Never captured'))),
+        legend,
+        diverging?swatch('hm-nodata','<3 peers'):null,
+        swatch('hm-pre','Pre-bearing'), swatch('hm-grub','Grubbed up'), swatch('hm-nodata','Never captured')),
+      ce('div',{style:{fontSize:11.5,color:'var(--text2)',marginTop:9,lineHeight:1.5}}, scaleNote)),
     ce('div',{className:'card'},
       ce('div',{style:{display:'flex',alignItems:'center',marginBottom:8}},
         ce('div',{className:'section-title',style:{margin:0}},ce('span',{className:'section-title-bar'}),'Blocks × seasons — '+(ctx.crop==='all'?'all crops':ctx.crop)),
@@ -2621,11 +2644,11 @@ function HeatmapScreen(ctx){
           ce('tbody',null, rowBlocks.map(function(b){
             return ce('tr',{key:b.id},
               ce('td',{className:'rowlbl'}, ce('div',{className:'hm-lbl'}, b.aydi_block_number), ce('div',{style:{fontSize:10,color:'var(--text3)',whiteSpace:'nowrap'}}, (b.varieties&&b.varieties.name)||b.variety_code)),
-              yrs.map(function(yy){ var st=cellState(b,yy);
-                if(st==='val'){ var v=cells[b.id][yy]; var col=cellColor(b,yy);
-                  return ce('td',{key:yy}, ce('span',{className:'hm-cell',style:{background:col,color:rampDark(col)?'#fff':'var(--text2)'},title:b.aydi_block_number+' · '+yy+' · '+fmtCell(v)+' '+unit}, fmtCell(v))); }
-                if(st==='pre') return ce('td',{key:yy}, ce('span',{className:'hm-cell hm-pre',title:'Pre-bearing — planted '+b.planting_year}));
-                if(st==='grub') return ce('td',{key:yy}, ce('span',{className:'hm-cell hm-grub',title:'Grubbed up after '+b.last_producing_season}));
+              yrs.map(function(yy){ var stt=cellState(b,yy);
+                if(stt==='val'){ var v=cells[b.id][yy]; var info=cellInfo(b,yy);
+                  return ce('td',{key:yy}, ce('span',{className:'hm-cell',style:{background:info.col,color:info.text},title:info.title}, fmtCell(v))); }
+                if(stt==='pre') return ce('td',{key:yy}, ce('span',{className:'hm-cell hm-pre',title:'Pre-bearing — planted '+b.planting_year}));
+                if(stt==='grub') return ce('td',{key:yy}, ce('span',{className:'hm-cell hm-grub',title:'Grubbed up after '+b.last_producing_season}));
                 return ce('td',{key:yy}, ce('span',{className:'hm-cell hm-nodata',title:'Never captured'},'·')); })); }))) ),
       ce('div',{style:{fontSize:11.5,color:'var(--text2)',marginTop:10,lineHeight:1.5}}, ce('b',null, fmt(captured)+' of '+fmt(totalCells)),' block-seasons captured. The three empty states are deliberately different — a plot not yet planted, one grubbed up, and a season nobody recorded must not look alike.')));
 }
