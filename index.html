@@ -409,7 +409,7 @@ var ce = React.createElement, useState = React.useState, useEffect = React.useEf
 var DALOS_SUPABASE_URL = 'https://sfyjvgjwvtwkrnqrvqyc.supabase.co';
 var DALOS_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNmeWp2Z2p3dnR3a3JucXJ2cXljIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ4NzIxNjYsImV4cCI6MjA5MDQ0ODE2Nn0.FjA75XZsp0Kx5Xam_rrnYoAHX4JHKey6vEFCH_zlMuQ';
 var supabase = window.supabase.createClient(DALOS_SUPABASE_URL, DALOS_ANON_KEY);
-var BUILD = 'v0.5.0 (2026.08.12)';
+var BUILD = 'v0.5.1 (2026.08.12)';
 
 /* ── Nav model. Screens are scaffolds in this shell; each maps to a PRD phase. ── */
 function icon(paths){ return function(){ return ce('svg',{viewBox:'0 0 24 24',fill:'none',stroke:'currentColor',strokeWidth:2,strokeLinecap:'round',strokeLinejoin:'round'}, paths.map(function(d,i){return ce('path',{key:i,d:d});})); }; }
@@ -687,12 +687,17 @@ function RegisterScreen(ctx){
     var pq=supabase.from('v_farm_block_current').select('id,latest_prod_year,latest_prod_t').limit(1000);
     if(ctx.crop!=='all') pq=pq.eq('product_id',ctx.crop);
     pq.then(function(r){ if(r.error||!r.data) return; var m={}; r.data.forEach(function(x){ if(x.latest_prod_t!=null) m[x.id]={y:x.latest_prod_year,t:Number(x.latest_prod_t)}; }); setProdMap(m); });
-    // "↻ replanted" badge: blocks on a land (product/farm/sector/plot) that holds BOTH a
-    // retired predecessor and a current planting — i.e. the plot was replanted or split.
+    // "↻ replanted" badge: (a) a land (product/farm/sector/plot) holding BOTH a retired
+    // predecessor and a current planting, OR (b) any block on a recorded farm_block_lineage
+    // edge — the latter catches IN-PROGRESS replants where the old planting is still bearing
+    // and the successor is only planned (e.g. SA 00-06A: Prime '13 → Sweet Celebration '26).
     supabase.from('farm_blocks').select('id,product_id,farm_code,sector_code,plot_code,lifecycle').then(function(r){
       if(r.error||!r.data) return; var byLand={};
       r.data.forEach(function(x){ var k=x.product_id+'|'+x.farm_code+'|'+x.sector_code+'|'+x.plot_code; var o=byLand[k]=byLand[k]||{ids:[],ret:0,cur:0}; o.ids.push(x.id); if(x.lifecycle==='retired')o.ret++; else o.cur++; });
-      var s={}; Object.keys(byLand).forEach(function(k){ var o=byLand[k]; if(o.ret>0&&o.cur>0) o.ids.forEach(function(id){s[id]=1;}); }); setChainSet(s); });
+      var s={}; Object.keys(byLand).forEach(function(k){ var o=byLand[k]; if(o.ret>0&&o.cur>0) o.ids.forEach(function(id){s[id]=1;}); });
+      supabase.from('farm_block_lineage').select('parent_block_id,child_block_id').then(function(lr){
+        if(lr.data) lr.data.forEach(function(e){ if(e.parent_block_id)s[e.parent_block_id]=1; if(e.child_block_id)s[e.child_block_id]=1; });
+        setChainSet(s); }); });
   }
 
   var chips=[ {k:null,label:'Current',n:counts.all}, {k:'no_cc',label:'Missing cost centre',n:counts.no_cc},
@@ -866,6 +871,22 @@ function BlockDetail(p){
     }
   }
 
+  // ── In-progress replant note: >1 planting on the land but no retired predecessor to
+  //    allocate (e.g. the old planting still bearing + a planned successor). Lists them. ──
+  var replantNote=null;
+  if(!lin.loading && !lineageSection && lin.plantings.length>1){
+    var lname3=function(pl){ return (pl.varieties&&pl.varieties.name)||'unknown'; };
+    var LCB={planned:['Planned','var(--text3)'],pre_bearing:['Pre-bearing','var(--amber)'],nursery:['Nursery','var(--amber)'],bearing:['Bearing','var(--green)'],retired:['Retired','var(--text3)'],superseded:['Superseded','var(--text3)'],fallow:['Fallow','var(--text3)']};
+    replantNote=ce('div',{style:{marginTop:18}},
+      ce('div',{className:'section-title'},ce('span',{className:'section-title-bar'}),'Replant lineage'),
+      ce('div',{style:{fontSize:11.5,color:'var(--text2)',lineHeight:1.5,marginBottom:9}}, 'This land carries '+lin.plantings.length+' plantings on the same plot — a replant. Production never carries across the replant; each variety keeps its own record.'),
+      lin.plantings.map(function(pl){ var isB=pl.id===b.id; var rel=isB?'this plot':(pl.planting_year<(b.planting_year||0)?'predecessor':(pl.planting_year>(b.planting_year||0)?'successor':'same year')); var lc=LCB[pl.lifecycle]||[pl.lifecycle,'var(--text3)'];
+        return ce('div',{key:pl.id,style:{display:'flex',alignItems:'center',gap:10,padding:'8px 10px',border:'1px solid '+(isB?'var(--accent2)':'var(--border)'),borderRadius:9,marginBottom:7,background:isB?'color-mix(in srgb,var(--accent2) 8%,transparent)':'var(--card)'}},
+          ce('span',{style:{fontSize:13,color:'var(--accent)',flex:'none'}}, isB?'●':'↻'),
+          ce('div',{className:'ar',dir:'auto'}, ce('div',{style:{fontWeight:600,fontSize:14}}, lname3(pl)), ce('div',{style:{fontSize:11.5,color:'var(--text3)'}}, 'planted '+(pl.planting_year||'?')+' · '+rel)),
+          ce('span',{style:{marginLeft:'auto',fontSize:11,fontWeight:600,color:lc[1],flex:'none'}}, lc[0])); }));
+  }
+
   var historySection;
   if(hist.loading) historySection=ce('div',{className:'skel',style:{height:70,marginTop:8}});
   else if(hist.err) historySection=ce('div',{className:'band'},'Could not load history: '+hist.err);
@@ -935,7 +956,8 @@ function BlockDetail(p){
         ) : (canWrite ? ce('div',{className:'action-row',style:{marginTop:16}},
           ce('button',{className:'btn btn-secondary btn-sm',onClick:function(){setAction('history');}},'History log')) : null),
         lineageSection ? ce('div',{style:{marginTop:18}}, lineageSection) : null,
-        ce('div',{className:'section-title',style:{marginTop:18}},ce('span',{className:'section-title-bar'}), lineageSection?'This planting’s seasons':'Production history'),
+        replantNote,
+        ce('div',{className:'section-title',style:{marginTop:18}},ce('span',{className:'section-title-bar'}), (lineageSection||replantNote)?'This planting’s seasons':'Production history'),
         historySection,
         segFlow
       )
