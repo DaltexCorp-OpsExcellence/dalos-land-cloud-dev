@@ -429,7 +429,7 @@ var ce = React.createElement, useState = React.useState, useEffect = React.useEf
 var DALOS_SUPABASE_URL = 'https://sfyjvgjwvtwkrnqrvqyc.supabase.co';
 var DALOS_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNmeWp2Z2p3dnR3a3JucXJ2cXljIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ4NzIxNjYsImV4cCI6MjA5MDQ0ODE2Nn0.FjA75XZsp0Kx5Xam_rrnYoAHX4JHKey6vEFCH_zlMuQ';
 var supabase = window.supabase.createClient(DALOS_SUPABASE_URL, DALOS_ANON_KEY);
-var BUILD = 'v0.7.5 (2026.08.12)';
+var BUILD = 'v0.7.6 (2026.08.12)';
 
 /* ── Nav model. Screens are scaffolds in this shell; each maps to a PRD phase. ── */
 function icon(paths){ return function(){ return ce('svg',{viewBox:'0 0 24 24',fill:'none',stroke:'currentColor',strokeWidth:2,strokeLinecap:'round',strokeLinejoin:'round'}, paths.map(function(d,i){return ce('path',{key:i,d:d});})); }; }
@@ -1939,16 +1939,20 @@ var LOCAL_BRANCHES=['local_sales_combined','raw_to_traders','field_reject_sales'
 function SeasonEntryScreen(ctx){
   var f=useState(''); var farm=f[0],setFarm=f[1];
   var fl=useState([]); var farms=fl[0],setFarms=fl[1];
+  var av=useState(null); var avail=av[0],setAvail=av[1];   // seasons that have a metric set for this crop
   var d=useState({loading:true,err:null,cols:[],rows:[],setLabel:null}); var st=d[0],set=d[1];
   var e=useState({}); var edits=e[0],setEdits=e[1];
   var sv=useState({busy:false,msg:null,kind:null}); var save=sv[0],setSave=sv[1];
 
-  useEffect(function(){ // farm list for the crop
-    if(ctx.crop==='all'){ setFarms([]); return; }
+  useEffect(function(){ // farm list + seasons-with-a-metric-set, for the crop
+    if(ctx.crop==='all'){ setFarms([]); setAvail(null); return; }
     supabase.from('farm_blocks').select('farm_code,farms(name)').eq('product_id',ctx.crop).then(function(r){
       var seen={}; (r.data||[]).forEach(function(x){ if(x.farm_code&&!seen[x.farm_code]) seen[x.farm_code]=(x.farms&&x.farms.name)||x.farm_code; });
       var list=Object.keys(seen).sort().map(function(c){return {code:c,name:seen[c]};});
       setFarms(list); if(list.length && !seen[farm]) setFarm(list[0].code);
+    });
+    supabase.from('farm_metric_sets').select('season_year').eq('product_id',ctx.crop).eq('scenario','actual').then(function(r){
+      var ys={}; (r.data||[]).forEach(function(x){ ys[x.season_year]=1; }); setAvail(Object.keys(ys).map(Number).sort(function(a,b){return a-b;}));
     });
   },[ctx.crop]);
   useEffect(function(){ if(ctx.crop!=='all'&&farm) load(); },[ctx.crop,ctx.season,farm]);
@@ -1994,7 +1998,11 @@ function SeasonEntryScreen(ctx){
   if(ctx.crop==='all') return ce('div',{className:'card'},ce(EmptyState,{title:'Pick a crop',msg:'Season Entry works one crop + farm + season at a time. Choose a crop in the top bar.'}));
   if(st.loading) return ce(Loading,{rows:8});
   if(st.err) return ce(ErrorState,{msg:st.err,onRetry:load});
-  if(!st.cols.length) return ce('div',{className:'card'},ce(EmptyState,{title:'No metric set',msg:'No metric set defined for '+ctx.crop+' '+ctx.season+'. Define one in Reference Data (§6.11) first.'}));
+  if(!st.cols.length) return ce('div',{className:'card'},
+    ce(EmptyState,{title:'No metric set for '+ctx.crop+' '+ctx.season,
+      msg:(avail&&avail.length)
+        ? (ctx.crop.charAt(0).toUpperCase()+ctx.crop.slice(1)+' has metric sets for '+avail.join(', ')+'. Change the Season (top-right) to one of those — or clone one into '+ctx.season+' from Reference Data → Metrics.')
+        : ('No metric set exists for '+ctx.crop+' in any season yet. Create one in Reference Data → Metrics before entering '+ctx.crop+' seasons.')}));
 
   var editedIds=Object.keys(edits).filter(function(id){var ed=edits[id];return (ed.bearing!==undefined)||(ed.values&&Object.keys(ed.values).length);});
   var counts=st.rows.reduce(function(a,r){ var s=rowStatus(r); a[s]=(a[s]||0)+1; return a; },{});
