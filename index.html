@@ -211,6 +211,27 @@ tr.rowlink:hover td{background:var(--bg)}
 .leg .ln{font-family:var(--font-mono);font-size:11.5px}
 .child-geo{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-family:var(--font-mono);color:var(--text3);margin-top:9px}
 .child-geo .dotc{width:10px;height:10px;border-radius:2px;flex-shrink:0}
+/* Yield Heatmap + Benchmark (v2) */
+.hm-table{border-collapse:separate;border-spacing:3px}
+.hm-table th{font-size:10px;color:var(--text3);font-weight:500;font-family:var(--font-mono);padding:1px 4px;text-align:center;white-space:nowrap}
+.hm-table td{padding:0}
+.hm-table td.rowlbl{padding-right:8px;position:sticky;left:0;background:var(--card);z-index:1}
+.hm-cell{display:block;min-width:30px;height:22px;border-radius:3px;font-family:var(--font-mono);font-size:10.5px;line-height:22px;text-align:center}
+.hm-pre{background:repeating-linear-gradient(45deg,#e4e0d6,#e4e0d6 3px,#dbd6ca 3px,#dbd6ca 6px)}
+.hm-grub{background:var(--bg3)}
+.hm-nodata{background:#fff;border:1px dashed var(--border2);line-height:20px;color:var(--border2)}
+.hm-lbl{font-family:var(--font-mono);font-size:11px;color:var(--text)}
+.bt-tabs{display:flex;gap:4px;margin-bottom:12px;flex-wrap:wrap}
+.bt-tab{border:1px solid var(--border2);background:#fff;color:var(--text2);border-radius:20px;padding:5px 13px;font-size:12px;cursor:pointer}
+.bt-tab.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+.mx-cell{font-family:var(--font-mono);font-size:12px;text-align:center;padding:7px 6px;border-radius:4px;white-space:nowrap}
+.devrow{display:flex;align-items:center;gap:8px;font-size:11.5px;padding:3px 0;border-bottom:1px solid var(--border)}
+.devrow .nm{width:150px;flex:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.devrow .track{flex:1;height:16px;position:relative;background:var(--bg2);border-radius:3px}
+.devrow .mid{position:absolute;left:50%;top:-2px;bottom:-2px;width:1px;background:var(--border2)}
+.devrow .fillp{position:absolute;left:50%;top:2px;bottom:2px;border-radius:0 3px 3px 0}
+.devrow .filln{position:absolute;right:50%;top:2px;bottom:2px;border-radius:3px 0 0 3px}
+.devrow .pct{width:56px;flex:none;text-align:right;font-family:var(--font-mono)}
 @media (max-width:700px){
   .drawer{top:auto;left:0;right:0;bottom:0;width:100%;max-width:100%;height:82vh;border-radius:20px 20px 0 0;transform:translateY(100%);animation:sheetin .28s cubic-bezier(.32,.72,0,1) forwards}
   @keyframes sheetin{to{transform:translateY(0)}}
@@ -353,6 +374,17 @@ thead .stickyc{background:var(--card)}
 </head>
 <body>
 <div id="root"></div>
+<!-- pre-mount splash: shows instantly while React/fonts/supabase load, faded out on mount -->
+<div id="lc-splash" style="position:fixed;inset:0;z-index:9999;background:#0e3a3d;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;transition:opacity .45s ease">
+  <svg width="60" height="60" viewBox="0 0 64 64" fill="none" aria-label="DalOS Land Cloud">
+    <path d="M8 22 L27 6 L52 13 L58 36 L39 56 L14 48 Z" stroke="#5fc9c4" stroke-width="2.4" stroke-linejoin="round" stroke-dasharray="6.5 5" opacity=".9"/>
+    <path d="M19 25 L30 17 L45 21 L48 34 L36 45 L22 40 Z" fill="#8fe0ad"/>
+    <g fill="#5fc9c4"><circle cx="8" cy="22" r="2.9"/><circle cx="27" cy="6" r="2.9"/><circle cx="52" cy="13" r="2.9"/><circle cx="58" cy="36" r="2.9"/><circle cx="39" cy="56" r="2.9"/><circle cx="14" cy="48" r="2.9"/></g>
+    <animateTransform attributeName="transform" attributeType="XML" type="scale" values="1;1.04;1" dur="2.4s" repeatCount="indefinite" additive="sum"/>
+  </svg>
+  <div style="font-family:'DM Serif Display',Georgia,serif;font-size:22px"><span style="color:#f4f1e8">Dal</span><span style="color:#5fc9c4">OS</span><span style="color:#f4f1e8"> Land Cloud</span></div>
+  <div style="font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#5f8583;font-family:'Instrument Sans',system-ui,sans-serif">Loading…</div>
+</div>
 
 <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
@@ -377,7 +409,7 @@ var ce = React.createElement, useState = React.useState, useEffect = React.useEf
 var DALOS_SUPABASE_URL = 'https://sfyjvgjwvtwkrnqrvqyc.supabase.co';
 var DALOS_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNmeWp2Z2p3dnR3a3JucXJ2cXljIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ4NzIxNjYsImV4cCI6MjA5MDQ0ODE2Nn0.FjA75XZsp0Kx5Xam_rrnYoAHX4JHKey6vEFCH_zlMuQ';
 var supabase = window.supabase.createClient(DALOS_SUPABASE_URL, DALOS_ANON_KEY);
-var BUILD = 'v0.4.1 (2026.08.12)';
+var BUILD = 'v0.5.0 (2026.08.12)';
 
 /* ── Nav model. Screens are scaffolds in this shell; each maps to a PRD phase. ── */
 function icon(paths){ return function(){ return ce('svg',{viewBox:'0 0 24 24',fill:'none',stroke:'currentColor',strokeWidth:2,strokeLinecap:'round',strokeLinejoin:'round'}, paths.map(function(d,i){return ce('path',{key:i,d:d});})); }; }
@@ -400,8 +432,8 @@ var NAV = [
     {k:'structure', label:'Structure',        Icon:IC.structure, phase:'P2'},
     {k:'register',  label:'Block Register',    Icon:IC.register,  phase:'P2'},
     {k:'history',   label:'Production History', Icon:IC.history,  phase:'P5'},
-    {k:'heatmap',   label:'Yield Heatmap',     Icon:IC.heatmap,  phase:'L1', v2:true},
-    {k:'bench',     label:'Benchmark',         Icon:IC.bench,    phase:'L2', v2:true},
+    {k:'heatmap',   label:'Yield Heatmap',     Icon:IC.heatmap,  phase:'L1'},
+    {k:'bench',     label:'Benchmark',         Icon:IC.bench,    phase:'L2'},
     {k:'map',       label:'Farm Map',          Icon:IC.map,       phase:'P6'} ]},
   {sec:'Manage', items:[
     {k:'entry',     label:'Season Entry',       Icon:IC.entry,    phase:'P3'},
@@ -435,8 +467,8 @@ var SCREENS = {
   register: {title:'Block Register', body:function(ctx){ return ce(RegisterScreen, ctx); }},
   map:      {title:'Farm Map', body:function(ctx){ return ce(FarmMapScreen, ctx); }},
   history:  {title:'Production History', body:function(ctx){ return ce(ProductionHistoryScreen, ctx); }},
-  heatmap:  {title:'Yield Heatmap', phase:'v2', msg:'Blocks × seasons, each cell a t/fed value on a colour ramp, sortable by trend slope. Post-v1 (L1) — pure UI on the data already loaded.'},
-  bench:    {title:'Benchmark', phase:'v2', msg:'Like-for-like yield comparison controlling for variety, rootstock and age, with the rootstock × variety matrix. Post-v1 (L2).'},
+  heatmap:  {title:'Yield Heatmap', body:function(ctx){ return ce(HeatmapScreen, ctx); }},
+  bench:    {title:'Benchmark', body:function(ctx){ return ce(BenchmarkScreen, ctx); }},
   entry:    {title:'Season Entry', body:function(ctx){ return ce(SeasonEntryScreen, ctx); }},
   import:   {title:'Bulk Import', body:function(ctx){ return ce(BulkImportScreen, ctx); }},
   recon:    {title:'Reconciliation', body:function(ctx){ return ce(ReconciliationScreen, ctx); }},
@@ -2482,6 +2514,215 @@ function AssignPanel(p){
     newOpen?ce(NewBlockModal,{ctx:p.ctx,lockedFarmId:selFarm&&selFarm.id,seedGeojson:p.geojson,onClose:function(){setNewOpen(false);},onDone:function(){ setNewOpen(false); p.onAttached(); }}):null);
 }
 
+/* ══════════ Yield Heatmap + Benchmark (v2 — pure UI on loaded season data) ══════════ */
+function useYieldData(crop){
+  var s=useState({loading:true,blocks:[],dim:{},rows:[]}); var d=s[0],set=s[1];
+  useEffect(function(){ var cancel=false; set({loading:true,blocks:[],dim:{},rows:[]});
+    var bq=supabase.from('farm_blocks').select('id,aydi_block_number,variety_code,rootstock_code,planting_year,lifecycle,last_producing_season,total_area_fed,product_id,farm_code,varieties(name),farm_rootstocks(name)').limit(3000);
+    if(crop!=='all') bq=bq.eq('product_id',crop);
+    bq.then(function(br){ if(cancel)return; var blocks=br.data||[]; var dim={}; blocks.forEach(function(b){dim[b.id]=b;});
+      var rows=[],PAGE=1000;
+      function page(from){ supabase.from('v_farm_season_wide').select('block_id,season_year,bearing_area_fed,metrics').eq('scenario','actual').order('block_id').order('season_year').range(from,from+PAGE-1).then(function(sr){
+        if(cancel)return; if(sr.error||!sr.data){ set({loading:false,blocks:blocks,dim:dim,rows:rows}); return; }
+        sr.data.forEach(function(w){ if(dim[w.block_id]) rows.push(w); });
+        if(sr.data.length===PAGE) page(from+PAGE); else set({loading:false,blocks:blocks,dim:dim,rows:rows}); }); }
+      page(0);
+    });
+    return function(){cancel=true;};
+  },[crop]);
+  return d;
+}
+function medianOf(a){ if(!a.length)return null; var s=a.slice().sort(function(x,y){return x-y;}); var n=s.length; return n%2?s[(n-1)/2]:(s[n/2-1]+s[n/2])/2; }
+function ageBracket(a){ return a<=3?'0–3 yr':(a<=7?'4–7 yr':(a<=12?'8–12 yr':'13+ yr')); }
+function rampDark(col){ return YELLOW_GREEN.indexOf(col)>=4; }
+function vLoad(){ return ce('div',null, ce('div',{className:'kpi-grid'},[0,1,2,3].map(function(i){return ce('div',{key:i,className:'kpi'}, ce('div',{className:'skel',style:{width:'55%'}}), ce('div',{className:'skel',style:{width:'35%',height:22,marginTop:8}}));})), ce('div',{className:'skel',style:{height:360,marginTop:12}})); }
+
+function HeatmapScreen(ctx){
+  var y=useYieldData(ctx.crop);
+  var mt=useState('yield'); var metric=mt[0],setMetric=mt[1];
+  var scl=useState('abs'); var scale=scl[0],setScale=scl[1];
+  var srt=useState('latest'); var sortBy=srt[0],setSortBy=srt[1];
+  if(y.loading) return vLoad();
+  function metricVal(mm,bearing,tot){ mm=mm||{}; var prod=Number(mm.actual_production||0);
+    if(metric==='prod') return prod>0?prod:null;
+    if(metric==='export'){ var e=Number(mm.export_total||mm.export_packhouse||mm.export_carton||0); return prod>0?Math.round(e/prod*100):null; }
+    var a=Number(bearing||0)||Number(tot||0); return (prod>0&&a>0)?Math.round(prod/a*100)/100:null; }
+  var cells={},yearsSet={},varVals={};
+  y.rows.forEach(function(w){ var b=y.dim[w.block_id]; if(!b)return; var v=metricVal(w.metrics,w.bearing_area_fed,b.total_area_fed);
+    (cells[w.block_id]=cells[w.block_id]||{})[w.season_year]=v;
+    if(v!=null){ yearsSet[w.season_year]=1; (varVals[b.variety_code]=varVals[b.variety_code]||[]).push(v); } });
+  var yrs=Object.keys(yearsSet).map(Number).sort(function(a,b){return a-b;});
+  if(!yrs.length) return ce('div',{className:'card'},ce(EmptyState,{title:'No production to map',msg:'This crop has no recorded seasons yet.'}));
+  var varMean={}; Object.keys(varVals).forEach(function(k){ var a=varVals[k]; varMean[k]=a.reduce(function(s,x){return s+x;},0)/a.length; });
+  var allV=[]; Object.keys(cells).forEach(function(id){ var c=cells[id]; Object.keys(c).forEach(function(yy){ if(c[yy]!=null) allV.push(c[yy]); }); });
+  var vmin=Math.min.apply(null,allV), vmax=Math.max.apply(null,allV);
+  var rowBlocks=y.blocks.filter(function(b){ return cells[b.id]||b.lifecycle!=='retired'; });
+  function latestVal(b){ var c=cells[b.id]; if(c) for(var i=yrs.length-1;i>=0;i--){ if(c[yrs[i]]!=null) return c[yrs[i]]; } return -1; }
+  rowBlocks.sort(function(a,b){
+    if(sortBy==='variety'){ var va=(a.varieties&&a.varieties.name)||'',vb=(b.varieties&&b.varieties.name)||''; return va<vb?-1:(va>vb?1:latestVal(b)-latestVal(a)); }
+    if(sortBy==='py') return (a.planting_year||9999)-(b.planting_year||9999);
+    return latestVal(b)-latestVal(a); });
+  function cellColor(b,yy){ var v=(cells[b.id]||{})[yy]; if(v==null)return null;
+    if(scale==='dev'){ var mean=varMean[b.variety_code]||v; var ratio=mean>0?v/mean:1; var t=Math.max(0,Math.min(1,(ratio-0.6)/0.8)); return YELLOW_GREEN[Math.round(t*(YELLOW_GREEN.length-1))]; }
+    return rampColor(v,vmin,vmax); }
+  function cellState(b,yy){ if(yy<(b.planting_year||0)) return 'pre'; var v=(cells[b.id]||{})[yy]; if(v!=null)return 'val';
+    if((b.lifecycle==='retired'||b.lifecycle==='superseded')&&b.last_producing_season&&yy>b.last_producing_season) return 'grub'; return 'nodata'; }
+  var fmtCell=function(v){ return metric==='prod'?fmt(Math.round(v)):(metric==='export'?String(v):fmt(v)); };
+  var totalCells=rowBlocks.length*yrs.length, captured=allV.length;
+  var swatch=function(cls,label){ return ce('div',{style:{display:'flex',alignItems:'center',gap:6,fontSize:11,color:'var(--text2)'}}, ce('span',{className:'hm-cell '+cls,style:{minWidth:16,width:16,height:12,borderRadius:2}}), label); };
+  var unit=metric==='yield'?'t/fed':(metric==='prod'?'t':'export %');
+  return ce('div',null,
+    ce('div',{className:'card'},
+      ce('div',{className:'toolbar',style:{gap:16,flexWrap:'wrap'}},
+        ce(Field,{label:'Metric'}, selx(metric,setMetric,[{v:'yield',l:'Yield (t/fed)'},{v:'prod',l:'Production (t)'},{v:'export',l:'Export %'}])),
+        ce(Field,{label:'Scale'}, selx(scale,setScale,[{v:'abs',l:'Absolute'},{v:'dev',l:'Deviation from variety mean'}])),
+        ce(Field,{label:'Sort'}, selx(sortBy,setSortBy,[{v:'latest',l:'Latest yield'},{v:'variety',l:'Variety'},{v:'py',l:'Planting year'}]))),
+      ce('div',{style:{display:'flex',gap:18,flexWrap:'wrap',alignItems:'center',marginTop:10}},
+        ce('div',{style:{display:'flex',alignItems:'center',gap:7}},
+          ce('span',{style:{fontSize:10,textTransform:'uppercase',letterSpacing:'.06em',color:'var(--text3)'}},'Low'),
+          ce('div',{style:{display:'flex',height:11,borderRadius:3,overflow:'hidden',width:150}}, YELLOW_GREEN.map(function(c,i){return ce('div',{key:i,style:{flex:1,background:c}});})),
+          ce('span',{style:{fontSize:10,textTransform:'uppercase',letterSpacing:'.06em',color:'var(--text3)'}},'High · '+unit)),
+        swatch('hm-pre','Pre-bearing'), swatch('hm-grub','Grubbed up'), swatch('hm-nodata','Never captured'))),
+    ce('div',{className:'card'},
+      ce('div',{style:{display:'flex',alignItems:'center',marginBottom:8}},
+        ce('div',{className:'section-title',style:{margin:0}},ce('span',{className:'section-title-bar'}),'Blocks × seasons — '+(ctx.crop==='all'?'all crops':ctx.crop)),
+        ce('div',{style:{marginLeft:'auto',fontSize:11,color:'var(--text3)'}}, rowBlocks.length+' blocks · '+yrs.length+' seasons')),
+      ce('div',{className:'table-wrap',style:{maxHeight:560,overflowY:'auto'}},
+        ce('table',{className:'hm-table'},
+          ce('thead',null,ce('tr',null, ce('th',null,''), yrs.map(function(yy){return ce('th',{key:yy}, String(yy).slice(2));}))),
+          ce('tbody',null, rowBlocks.map(function(b){
+            return ce('tr',{key:b.id},
+              ce('td',{className:'rowlbl'}, ce('div',{className:'hm-lbl'}, b.aydi_block_number), ce('div',{style:{fontSize:10,color:'var(--text3)',whiteSpace:'nowrap'}}, (b.varieties&&b.varieties.name)||b.variety_code)),
+              yrs.map(function(yy){ var st=cellState(b,yy);
+                if(st==='val'){ var v=cells[b.id][yy]; var col=cellColor(b,yy);
+                  return ce('td',{key:yy}, ce('span',{className:'hm-cell',style:{background:col,color:rampDark(col)?'#fff':'var(--text2)'},title:b.aydi_block_number+' · '+yy+' · '+fmtCell(v)+' '+unit}, fmtCell(v))); }
+                if(st==='pre') return ce('td',{key:yy}, ce('span',{className:'hm-cell hm-pre',title:'Pre-bearing — planted '+b.planting_year}));
+                if(st==='grub') return ce('td',{key:yy}, ce('span',{className:'hm-cell hm-grub',title:'Grubbed up after '+b.last_producing_season}));
+                return ce('td',{key:yy}, ce('span',{className:'hm-cell hm-nodata',title:'Never captured'},'·')); })); }))) ),
+      ce('div',{style:{fontSize:11.5,color:'var(--text2)',marginTop:10,lineHeight:1.5}}, ce('b',null, fmt(captured)+' of '+fmt(totalCells)),' block-seasons captured. The three empty states are deliberately different — a plot not yet planted, one grubbed up, and a season nobody recorded must not look alike.')));
+}
+
+function BenchmarkScreen(ctx){
+  var y=useYieldData(ctx.crop);
+  var tb=useState('cohort'); var tab=tb[0],setTab=tb[1];
+  var pl=useState({loading:true,map:{}}); var plan=pl[0],setPlan=pl[1];
+  useEffect(function(){ var cancel=false; setPlan({loading:true,map:{}});
+    var mp={},PAGE=1000;
+    function page(from){ var q=supabase.from('v_farm_season_wide').select('block_id,season_year,metrics').eq('scenario','plan').order('block_id').order('season_year').range(from,from+PAGE-1);
+      q.then(function(sr){ if(cancel)return; if(sr.error||!sr.data){ setPlan({loading:false,map:mp}); return; }
+        sr.data.forEach(function(w){ var pv=Number((w.metrics||{}).planned_production||0); if(pv>0) mp[w.block_id+'|'+w.season_year]=pv; });
+        if(sr.data.length===PAGE) page(from+PAGE); else setPlan({loading:false,map:mp}); }); }
+    page(0); return function(){cancel=true;};
+  },[ctx.crop]);
+  if(y.loading) return vLoad();
+  // per-block latest producing season yield + age; and full age series
+  var perBlock={};
+  y.rows.forEach(function(w){ var b=y.dim[w.block_id]; if(!b)return; var prod=Number((w.metrics||{}).actual_production||0); var a=Number(w.bearing_area_fed||0)||Number(b.total_area_fed||0);
+    if(prod>0&&a>0){ (perBlock[w.block_id]=perBlock[w.block_id]||[]).push({year:w.season_year,yld:prod/a,prod:prod}); } });
+  Object.keys(perBlock).forEach(function(id){ perBlock[id].sort(function(a,b){return a.year-b.year;}); });
+  function latest(id){ var a=perBlock[id]; return a&&a.length?a[a.length-1]:null; }
+  var live=y.blocks.filter(function(b){ return b.lifecycle!=='retired'&&b.lifecycle!=='superseded'; });
+  var vname=function(b){ return (b.varieties&&b.varieties.name)||b.variety_code; };
+  var rname=function(b){ var n=(b.farm_rootstocks&&b.farm_rootstocks.name); return (!n||n==='No')?'own-rooted':n; };
+  var tabBtn=function(k,label){ return ce('button',{key:k,className:'bt-tab'+(tab===k?' on':''),onClick:function(){setTab(k);}}, label); };
+
+  var body;
+  if(tab==='cohort'){
+    var items=live.map(function(b){ var l=latest(b.id); if(!l)return null; return {b:b,y:l.yld,age:l.year-(b.planting_year||l.year),yr:l.year}; }).filter(Boolean);
+    var groups={}; items.forEach(function(it){ var k=it.b.variety_code+'|'+ageBracket(it.age); (groups[k]=groups[k]||[]).push(it.y); });
+    var med={},ns={}; Object.keys(groups).forEach(function(k){ med[k]=medianOf(groups[k]); ns[k]=groups[k].length; });
+    items.forEach(function(it){ var k=it.b.variety_code+'|'+ageBracket(it.age); it.med=med[k]; it.n=ns[k]; it.dev=(it.med>0)?(it.y-it.med)/it.med:0; });
+    items.sort(function(a,b){return b.dev-a.dev;});
+    var show=items.length>28?items.slice(0,14).concat(items.slice(-14)):items;
+    body=ce('div',null,
+      ce('div',{className:'band'}, ce('b',null,'Raw ranking lies.'), ' Each block is compared only against its own cohort — same variety, same age bracket. A deviation computed against fewer than 3 peers is greyed as noise.'),
+      ce('div',{className:'card'},
+        ce('div',{className:'section-title'},ce('span',{className:'section-title-bar'}),'Deviation from cohort median — latest season'),
+        show.length===0?ce('div',{style:{fontSize:12,color:'var(--text3)',padding:'12px 0'}},'No producing blocks for this crop.'):
+        ce('div',null, show.map(function(it,i){ var weak=it.n<3; var pct=Math.round(it.dev*100); var w=Math.min(Math.abs(it.dev),0.8)/0.8*50;
+          return ce('div',{key:i,className:'devrow',style:weak?{opacity:.45}:null},
+            ce('div',{className:'nm'}, ce('span',{className:'mono',style:{fontSize:11}}, it.b.aydi_block_number),' ',ce('span',{style:{color:'var(--text3)'}}, vname(it.b))),
+            ce('div',{style:{width:78,flex:'none',fontSize:10.5,color:'var(--text3)'}}, ageBracket(it.age)+' · n='+it.n),
+            ce('div',{className:'track'}, ce('span',{className:'mid'}),
+              it.dev>=0?ce('span',{className:'fillp',style:{width:w+'%',background:'var(--green)'}}):ce('span',{className:'filln',style:{width:w+'%',background:'var(--amber)'}})),
+            ce('div',{className:'pct',style:{color:it.dev>=0?'var(--green)':'var(--amber)'}}, (pct>=0?'+':'')+pct+'%')); }))));
+  } else if(tab==='matrix'){
+    var items2=live.map(function(b){ var l=latest(b.id); return l?{b:b,y:l.yld}:null; }).filter(Boolean);
+    var mx={},rset={},vset={}; items2.forEach(function(it){ var r=rname(it.b),v=vname(it.b); rset[r]=1; vset[v]=1; (mx[r+'|||'+v]=mx[r+'|||'+v]||[]).push(it.y); });
+    var rlist=Object.keys(rset).sort(), vlist=Object.keys(vset).sort();
+    var flat=[]; Object.keys(mx).forEach(function(k){ if(mx[k].length>=3){ flat.push(medianOf(mx[k])); } });
+    var lo=flat.length?Math.min.apply(null,flat):0, hi=flat.length?Math.max.apply(null,flat):1;
+    body=ce('div',{className:'card'},
+      ce('div',{className:'section-title'},ce('span',{className:'section-title-bar'}),'Median yield t/fed — rootstock × variety, latest season'),
+      vlist.length===0?ce('div',{style:{fontSize:12,color:'var(--text3)',padding:'12px 0'}},'No producing blocks for this crop.'):
+      ce('div',{className:'table-wrap'},
+        ce('table',{style:{borderCollapse:'separate',borderSpacing:3,minWidth:Math.min(1000,140+vlist.length*70)}},
+          ce('thead',null,ce('tr',null, ce('th',{style:{textAlign:'left',fontSize:10,color:'var(--text3)',padding:'2px 6px'}},'Rootstock ╲ Variety'), vlist.map(function(v){return ce('th',{key:v,style:{fontSize:10,color:'var(--text3)',fontWeight:500,padding:'2px 4px',writingMode:'vertical-rl',whiteSpace:'nowrap',maxHeight:90}}, v);}))),
+          ce('tbody',null, rlist.map(function(r){ return ce('tr',{key:r},
+            ce('td',{style:{fontSize:11.5,color:'var(--text)',whiteSpace:'nowrap',paddingRight:8}}, r),
+            vlist.map(function(v){ var a=mx[r+'|||'+v]||[]; if(!a.length) return ce('td',{key:v}, ce('div',{className:'mx-cell',style:{color:'var(--border2)'}},'·'));
+              var m=medianOf(a); var weak=a.length<3; var col=weak?'var(--bg2)':rampColor(m,lo,hi);
+              return ce('td',{key:v}, ce('div',{className:'mx-cell',style:{background:col,color:weak?'var(--text3)':(rampDark(col)?'#fff':'var(--text2)')},title:r+' × '+v+' · n='+a.length}, fmt(Math.round(m*100)/100))); })); })))),
+      ce('div',{className:'form-hint',style:{marginTop:8}},'Cells with fewer than 3 blocks are greyed — a median of two is not a finding.'));
+  } else if(tab==='age'){
+    var ageData={}; y.rows.forEach(function(w){ var b=y.dim[w.block_id]; if(!b||!b.planting_year)return; var prod=Number((w.metrics||{}).actual_production||0); var a=Number(w.bearing_area_fed||0)||Number(b.total_area_fed||0); if(!(prod>0&&a>0))return; var age=w.season_year-b.planting_year; if(age<0||age>25)return; var v=vname(b); ((ageData[v]=ageData[v]||{})[age]=ageData[v][age]||[]).push(prod/a); });
+    var vstats=Object.keys(ageData).map(function(v){ var pts=0; Object.keys(ageData[v]).forEach(function(ag){pts+=ageData[v][ag].length;}); return {v:v,pts:pts}; }).sort(function(a,b){return b.pts-a.pts;}).slice(0,6);
+    var maxAge=0,maxY=0; vstats.forEach(function(vs){ Object.keys(ageData[vs.v]).forEach(function(ag){ maxAge=Math.max(maxAge,+ag); maxY=Math.max(maxY,medianOf(ageData[vs.v][ag])); }); }); maxAge=Math.max(maxAge,8); maxY=maxY||1;
+    var W=640,H=300,pad=36; var xf=function(ag){return pad+ag/maxAge*(W-2*pad);}; var yf=function(v){return H-pad-v/maxY*(H-2*pad);};
+    var pal=['#0d6a68','#b87820','#159490','#7d5ba6','#2f6fb0','#1e6b3a'];
+    body=ce('div',{className:'card'},
+      ce('div',{className:'section-title'},ce('span',{className:'section-title-bar'}),'Yield against years since planting'),
+      vstats.length===0?ce('div',{style:{fontSize:12,color:'var(--text3)',padding:'12px 0'}},'Not enough dated production to build an age curve.'):
+      ce('div',null,
+        ce('svg',{viewBox:'0 0 '+W+' '+H,style:{width:'100%',height:'auto'}},
+          [0,0.25,0.5,0.75,1].map(function(t,i){ var yy=yf(maxY*t); return ce('g',{key:i}, ce('line',{x1:pad,y1:yy,x2:W-pad,y2:yy,stroke:'var(--border)',strokeWidth:1}), ce('text',{x:pad-5,y:yy+3,textAnchor:'end',style:{fontSize:9,fill:'var(--text3)'}}, fmt(Math.round(maxY*t*10)/10))); }),
+          Array.from({length:maxAge+1}).map(function(_,ag){ if(ag%2)return null; return ce('text',{key:ag,x:xf(ag),y:H-pad+13,textAnchor:'middle',style:{fontSize:9,fill:'var(--text3)'}}, ag); }),
+          vstats.map(function(vs,vi){ var ags=Object.keys(ageData[vs.v]).map(Number).sort(function(a,b){return a-b;});
+            var pts=ags.map(function(ag){return [xf(ag),yf(medianOf(ageData[vs.v][ag]))];});
+            var dpath=pts.map(function(p,i){return (i?'L':'M')+p[0]+','+p[1];}).join(' ');
+            return ce('g',{key:vi}, ce('path',{d:dpath,fill:'none',stroke:pal[vi%pal.length],strokeWidth:2}), pts.map(function(p,i){return ce('circle',{key:i,cx:p[0],cy:p[1],r:2.5,fill:pal[vi%pal.length]});})); })),
+        ce('div',{style:{display:'flex',gap:14,flexWrap:'wrap',marginTop:8}}, vstats.map(function(vs,vi){ return ce('span',{key:vi,style:{display:'flex',alignItems:'center',gap:6,fontSize:11.5}}, ce('span',{style:{width:14,height:3,background:pal[vi%pal.length],borderRadius:2}}), vs.v); }))),
+      ce('div',{className:'form-hint',style:{marginTop:8}},'One line per variety (top 6 by data volume). Median t/fed at each age — a young block is judged against where its age should be, not a mature one.'));
+  } else {
+    // plan vs actual
+    if(plan.loading) body=ce('div',{className:'card'}, ce('div',{className:'skel',style:{height:120}}));
+    else {
+      var rowsP=live.map(function(b){ var l=latest(b.id); if(!l)return null; var pv=plan.map[b.id+'|'+l.year]; if(pv==null)return null; return {b:b,year:l.year,actual:l.prod,plan:pv}; }).filter(Boolean);
+      if(rowsP.length===0){ body=ce('div',{className:'card'}, ce(EmptyState,{title:'No plan data for '+(ctx.crop==='all'?'this selection':ctx.crop), msg:'Only crops with مخطط figures (grapes, and partial citrus/pom) show a plan-vs-actual. Others carry no plan in any season.'})); }
+      else {
+        rowsP.sort(function(a,b){return (b.actual-b.plan)-(a.actual-a.plan);});
+        var tPlan=rowsP.reduce(function(s,r){return s+r.plan;},0), tAct=rowsP.reduce(function(s,r){return s+r.actual;},0);
+        var dv=tAct-tPlan, dpct=tPlan>0?Math.round(dv/tPlan*100):0; var mx2=Math.max(tPlan,tAct)||1;
+        body=ce('div',null,
+          ce('div',{className:'card',style:{marginBottom:10}},
+            ce('div',{className:'section-title'},ce('span',{className:'section-title-bar'}),'Plan → actual — '+(ctx.crop==='all'?'all crops':ctx.crop)),
+            ce('div',{style:{display:'flex',gap:20,alignItems:'flex-end',height:150,padding:'8px 4px'}},
+              [['Plan',tPlan,'var(--text3)'],['Actual',tAct,dv>=0?'var(--green)':'var(--amber)']].map(function(o,i){ return ce('div',{key:i,style:{flex:'0 0 90px',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'flex-end',height:'100%'}},
+                ce('div',{style:{fontFamily:'var(--font-mono)',fontSize:12,marginBottom:4}}, fmt(Math.round(o[1]))+' t'),
+                ce('div',{style:{width:60,height:Math.max(3,o[1]/mx2*110)+'px',background:o[2],borderRadius:'3px 3px 0 0'}}),
+                ce('div',{style:{fontSize:11,color:'var(--text3)',marginTop:5}}, o[0])); }),
+              ce('div',{style:{alignSelf:'center',paddingLeft:10}}, ce('div',{style:{fontSize:22,fontFamily:'var(--font-display)',color:dv>=0?'var(--green)':'var(--amber)'}}, (dv>=0?'+':'')+fmt(Math.round(dv))+' t'), ce('div',{style:{fontSize:12,color:'var(--text3)'}}, (dpct>=0?'+':'')+dpct+'% vs plan · '+rowsP.length+' blocks')))),
+          ce('div',{className:'card'},
+            ce('div',{className:'section-title'},ce('span',{className:'section-title-bar'}),'Variance by block'),
+            ce('div',{className:'table-wrap',style:{maxHeight:400,overflowY:'auto'}},
+              ce('table',{style:{width:'100%',fontSize:12,borderCollapse:'collapse'}},
+                ce('thead',null,ce('tr',null,['Block','Variety','Plan','Actual','Δ','Δ%'].map(function(h,i){return ce('th',{key:h,style:{textAlign:i>=2?'right':'left',padding:'5px 8px',borderBottom:'1px solid var(--border)',color:'var(--text3)',fontWeight:500}},h);}))),
+                ce('tbody',null, rowsP.map(function(r){ var d=r.actual-r.plan, dp=r.plan>0?Math.round(d/r.plan*100):0;
+                  return ce('tr',{key:r.b.id,style:{borderBottom:'1px solid var(--border)'}},
+                    ce('td',{style:{padding:'5px 8px',fontFamily:'var(--font-mono)'}}, r.b.aydi_block_number),
+                    ce('td',{style:{padding:'5px 8px'}}, vname(r.b)),
+                    ce('td',{style:{padding:'5px 8px',textAlign:'right',fontFamily:'var(--font-mono)'}}, fmt(Math.round(r.plan))),
+                    ce('td',{style:{padding:'5px 8px',textAlign:'right',fontFamily:'var(--font-mono)'}}, fmt(Math.round(r.actual))),
+                    ce('td',{style:{padding:'5px 8px',textAlign:'right',fontFamily:'var(--font-mono)',color:d>=0?'var(--green)':'var(--amber)'}}, (d>=0?'+':'')+fmt(Math.round(d))),
+                    ce('td',{style:{padding:'5px 8px',textAlign:'right',fontFamily:'var(--font-mono)',color:d>=0?'var(--green)':'var(--amber)'}}, (dp>=0?'+':'')+dp+'%')); }))))));
+      }
+    }
+  }
+  return ce('div',null,
+    ce('div',{className:'bt-tabs'}, tabBtn('cohort','Cohort comparison'), tabBtn('matrix','Rootstock × variety'), tabBtn('age','Age curve'), tabBtn('plan','Plan vs actual')),
+    body);
+}
+
 /* ── Land Cloud mark (surveyed parcel): dashed boundary = total area, solid mint
    interior = bearing area. light=true → Teal & Sand (on white); else dark-bg mint. ── */
 function lcMark(size,light){
@@ -2626,6 +2867,7 @@ function NoAccess(p){
 }
 
 ReactDOM.createRoot(document.getElementById('root')).render(ce(App));
+setTimeout(function(){ var sp=document.getElementById('lc-splash'); if(sp){ sp.style.opacity='0'; setTimeout(function(){ if(sp.parentNode) sp.parentNode.removeChild(sp); },480); } },300);
 </script>
 </body>
 </html>
