@@ -4,6 +4,9 @@
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"/>
 <title>DalOS Land Cloud</title>
+<meta name="theme-color" content="#0e3a3d"/>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='13' fill='%230e3a3d'/><path d='M17 25 L30 15 L46 20 L50 34 L36 47 L20 41 Z' fill='%238fe0ad'/><g fill='%235fc9c4'><circle cx='10' cy='22' r='4'/><circle cx='27' cy='7' r='4'/><circle cx='51' cy='14' r='4'/><circle cx='56' cy='36' r='4'/><circle cx='39' cy='55' r='4'/><circle cx='15' cy='47' r='4'/></g></svg>"/>
+<link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='13' fill='%230e3a3d'/><path d='M17 25 L30 15 L46 20 L50 34 L36 47 L20 41 Z' fill='%238fe0ad'/><g fill='%235fc9c4'><circle cx='10' cy='22' r='4'/><circle cx='27' cy='7' r='4'/><circle cx='51' cy='14' r='4'/><circle cx='56' cy='36' r='4'/><circle cx='39' cy='55' r='4'/><circle cx='15' cy='47' r='4'/></g></svg>"/>
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
 <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Mono:wght@400;500&family=Instrument+Sans:wght@400;500;600&family=Noto+Sans+Arabic:wght@400;500;600&display=swap" rel="stylesheet"/>
@@ -374,7 +377,7 @@ var ce = React.createElement, useState = React.useState, useEffect = React.useEf
 var DALOS_SUPABASE_URL = 'https://sfyjvgjwvtwkrnqrvqyc.supabase.co';
 var DALOS_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNmeWp2Z2p3dnR3a3JucXJ2cXljIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ4NzIxNjYsImV4cCI6MjA5MDQ0ODE2Nn0.FjA75XZsp0Kx5Xam_rrnYoAHX4JHKey6vEFCH_zlMuQ';
 var supabase = window.supabase.createClient(DALOS_SUPABASE_URL, DALOS_ANON_KEY);
-var BUILD = 'v0.3.1 (2026.08.12)';
+var BUILD = 'v0.4.0 (2026.08.12)';
 
 /* ── Nav model. Screens are scaffolds in this shell; each maps to a PRD phase. ── */
 function icon(paths){ return function(){ return ce('svg',{viewBox:'0 0 24 24',fill:'none',stroke:'currentColor',strokeWidth:2,strokeLinecap:'round',strokeLinejoin:'round'}, paths.map(function(d,i){return ce('path',{key:i,d:d});})); }; }
@@ -2479,6 +2482,16 @@ function AssignPanel(p){
     newOpen?ce(NewBlockModal,{ctx:p.ctx,lockedFarmId:selFarm&&selFarm.id,seedGeojson:p.geojson,onClose:function(){setNewOpen(false);},onDone:function(){ setNewOpen(false); p.onAttached(); }}):null);
 }
 
+/* ── Land Cloud mark (surveyed parcel): dashed boundary = total area, solid mint
+   interior = bearing area. light=true → Teal & Sand (on white); else dark-bg mint. ── */
+function lcMark(size,light){
+  var bd=light?'#159490':'#5fc9c4', pl=light?'#0d6a68':'#8fe0ad';
+  return ce('svg',{width:size,height:size,viewBox:'0 0 64 64',fill:'none','aria-hidden':'true',style:{flex:'none',display:'block'}},
+    ce('path',{d:'M8 22 L27 6 L52 13 L58 36 L39 56 L14 48 Z',stroke:bd,strokeWidth:2.4,strokeLinejoin:'round',strokeDasharray:'6.5 5',opacity:0.9}),
+    ce('path',{d:'M19 25 L30 17 L45 21 L48 34 L36 45 L22 40 Z',fill:pl}),
+    ce('g',{fill:bd}, [[8,22],[27,6],[52,13],[58,36],[39,56],[14,48]].map(function(pt,i){ return ce('circle',{key:i,cx:pt[0],cy:pt[1],r:2.9}); })));
+}
+
 /* ── Access gate: farm_can_read() decides entry; users.role gates writes. ── */
 function App(){
   var a=useState({phase:'boot',session:null,role:null,canRead:false}); var auth=a[0], setAuth=a[1];
@@ -2518,7 +2531,7 @@ function App(){
     });
   }, [auth.phase]);
 
-  if(auth.phase==='boot') return ce('div',{className:'login-wrap'}, ce('div',{style:{color:'#fff',fontFamily:'var(--font-display)',fontSize:22}},'DalOS Land Cloud'));
+  if(auth.phase==='boot') return ce('div',{className:'login-wrap'}, ce('div',{style:{display:'flex',flexDirection:'column',alignItems:'center',gap:14}}, lcMark(52,false), ce('div',{style:{color:'#f4f1e8',fontFamily:'var(--font-display)',fontSize:22}},'DalOS Land Cloud')));
   if(auth.phase==='login') return ce(Login,null);
   if(auth.phase==='noaccess') return ce(NoAccess,{email:(auth.session&&auth.session.user.email)});
 
@@ -2534,8 +2547,11 @@ function App(){
     ce('div',{className:'sidebar-overlay'+(menuOpen?' on':''),onClick:function(){setMenu(false);}}),
     ce('div',{className:'sidebar'+(menuOpen?' open':'')},
       ce('div',{className:'logo'},
-        ce('div',{className:'logo-name'}, 'DalOS'),
-        ce('div',{className:'logo-sub'}, ce('span',{className:'logo-dot'}), 'Farm Structure')),
+        ce('div',{style:{display:'flex',alignItems:'center',gap:10}},
+          lcMark(30,false),
+          ce('div',null,
+            ce('div',{style:{fontSize:8.5,letterSpacing:'.2em',fontWeight:600,color:'var(--sidebar-muted)'}},'DALOS'),
+            ce('div',{className:'logo-name',style:{fontSize:17,marginTop:1}},'Land Cloud')))),
       ce('div',{className:'nav'}, NAV.map(function(g){
         return ce('div',{key:g.sec},
           ce('div',{className:'nav-section'}, g.sec),
@@ -2589,8 +2605,9 @@ function Login(){
     }); }
   return ce('div',{className:'login-wrap'},
     ce('form',{className:'login-card',onSubmit:submit},
+      ce('div',{style:{display:'flex',justifyContent:'center',marginBottom:14}}, lcMark(44,true)),
       ce('div',{className:'login-title'},'DalOS Land Cloud'),
-      ce('div',{className:'login-sub'},'Farm Structure Cloud'),
+      ce('div',{className:'login-sub'},'Orchard block register & production history'),
       ce('label',{className:'form-label'},'Email'),
       ce('input',{className:'form-input',type:'email',value:email,onChange:function(e){setEmail(e.target.value);},autoComplete:'username'}),
       ce('label',{className:'form-label'},'Password'),
@@ -2604,7 +2621,7 @@ function NoAccess(p){
     ce('div',{className:'login-card'},
       ce('div',{className:'login-title',style:{fontSize:20}},'No access'),
       ce('div',{style:{fontSize:13,color:'var(--text2)',textAlign:'center',marginTop:12,lineHeight:1.6}},
-        'Your account'+(p.email?(' ('+p.email+')'):'')+' is not granted to Farm Structure Cloud. Ask an admin for the agronomy or commercial role.'),
+        'Your account'+(p.email?(' ('+p.email+')'):'')+' is not granted to Land Cloud. Ask an admin for the agronomy or commercial role.'),
       ce('button',{className:'btn btn-secondary',style:{width:'100%',marginTop:20},onClick:function(){ supabase.auth.signOut(); }}, 'Sign out')));
 }
 
