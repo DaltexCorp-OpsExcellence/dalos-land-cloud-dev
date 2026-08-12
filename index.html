@@ -80,6 +80,13 @@ button{cursor:pointer}
 /* Filters in topbar */
 .tb-select{font-size:12px;padding:5px 8px;border:1px solid var(--border2);border-radius:6px;background:#fff;color:var(--text2)}
 .tb-label{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--text3);font-weight:600}
+/* Crop chooser bar — always-visible crop options */
+.crop-bar{display:flex;align-items:center;gap:8px;padding:9px 16px;background:var(--bg);border-bottom:1px solid var(--border);overflow-x:auto;flex-shrink:0}
+.crop-bar .cb-lbl{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--text3);font-weight:600;flex-shrink:0;margin-right:2px}
+.crop-chip{display:inline-flex;align-items:center;gap:7px;padding:6px 13px;border-radius:20px;border:1px solid var(--border2);background:#fff;color:var(--text2);font-size:12.5px;font-weight:500;cursor:pointer;white-space:nowrap;flex-shrink:0;transition:.12s}
+.crop-chip:hover{background:var(--bg2)}
+.crop-chip.on{background:var(--accent);color:#fff;border-color:var(--accent);font-weight:600}
+.crop-chip .dot{width:9px;height:9px;border-radius:50%;flex-shrink:0}
 
 /* Cards / grids */
 .card{background:var(--card);border:1px solid var(--border);border-radius:var(--r2);padding:14px 16px}
@@ -429,7 +436,7 @@ var ce = React.createElement, useState = React.useState, useEffect = React.useEf
 var DALOS_SUPABASE_URL = 'https://sfyjvgjwvtwkrnqrvqyc.supabase.co';
 var DALOS_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNmeWp2Z2p3dnR3a3JucXJ2cXljIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ4NzIxNjYsImV4cCI6MjA5MDQ0ODE2Nn0.FjA75XZsp0Kx5Xam_rrnYoAHX4JHKey6vEFCH_zlMuQ';
 var supabase = window.supabase.createClient(DALOS_SUPABASE_URL, DALOS_ANON_KEY);
-var BUILD = 'v0.7.6 (2026.08.12)';
+var BUILD = 'v0.7.7 (2026.08.12)';
 
 /* ── Nav model. Screens are scaffolds in this shell; each maps to a PRD phase. ── */
 function icon(paths){ return function(){ return ce('svg',{viewBox:'0 0 24 24',fill:'none',stroke:'currentColor',strokeWidth:2,strokeLinecap:'round',strokeLinejoin:'round'}, paths.map(function(d,i){return ce('path',{key:i,d:d});})); }; }
@@ -2944,16 +2951,18 @@ function App(){
         ce('button',{className:'menu-btn',onClick:function(){setMenu(!menuOpen);}}, '☰'),
         ce('h1',null, scr.title),
         ce('div',{className:'topbar-spacer'}),
-        ce('span',{className:'tb-label'},'Crop'),
-        ce('select',{className:'tb-select',value:crop,onChange:function(e){setCrop(e.target.value);}},
-          ce('option',{value:'all'},'All crops'),
-          products.map(function(pr){ return ce('option',{key:pr.id,value:pr.id}, pr.name); })),
         ce('span',{className:'tb-label'},'Season'),
         ce('select',{className:'tb-select',value:season,onChange:function(e){setSeason(+e.target.value);}},
           [2025,2024,2023,2022,2021,2020,2019,2018,2017].map(function(yy){ return ce('option',{key:yy,value:yy}, yy); })),
         ce('span',{className:'staging-badge'+(location.pathname.indexOf('-dev/')>=0?' on':''),title:'Staging environment'},
           ce('span',{className:'staging-dot'}), 'Staging')
       ),
+      ce('div',{className:'crop-bar'},
+        ce('span',{className:'cb-lbl'},'Crop'),
+        ce('button',{className:'crop-chip'+(crop==='all'?' on':''),onClick:function(){setCrop('all');}},
+          ce('span',{className:'dot',style:{background:'conic-gradient(from 0deg,#e08a1e,#6a3d9a,#d94f2a,#b03060,#5a6b2a,#2a5a8a,#e08a1e)'}}), 'All crops'),
+        products.map(function(pr){ return ce('button',{key:pr.id,className:'crop-chip'+(crop===pr.id?' on':''),onClick:function(){setCrop(pr.id);}},
+          ce('span',{className:'dot',style:{background:CROP_COLORS[pr.id]||'#999'}}), pr.name); })),
       ce('div',{className:'page'},
         scr.body ? scr.body(ctx) : ce(Scaffold,{title:scr.title,phase:scr.phase,msg:scr.msg})
       )
