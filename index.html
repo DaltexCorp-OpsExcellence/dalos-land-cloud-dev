@@ -410,7 +410,7 @@ var ce = React.createElement, useState = React.useState, useEffect = React.useEf
 var DALOS_SUPABASE_URL = 'https://sfyjvgjwvtwkrnqrvqyc.supabase.co';
 var DALOS_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNmeWp2Z2p3dnR3a3JucXJ2cXljIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ4NzIxNjYsImV4cCI6MjA5MDQ0ODE2Nn0.FjA75XZsp0Kx5Xam_rrnYoAHX4JHKey6vEFCH_zlMuQ';
 var supabase = window.supabase.createClient(DALOS_SUPABASE_URL, DALOS_ANON_KEY);
-var BUILD = 'v0.7.2 (2026.08.12)';
+var BUILD = 'v0.7.3 (2026.08.12)';
 
 /* ── Nav model. Screens are scaffolds in this shell; each maps to a PRD phase. ── */
 function icon(paths){ return function(){ return ce('svg',{viewBox:'0 0 24 24',fill:'none',stroke:'currentColor',strokeWidth:2,strokeLinecap:'round',strokeLinejoin:'round'}, paths.map(function(d,i){return ce('path',{key:i,d:d});})); }; }
@@ -1083,9 +1083,9 @@ function ProductionHistoryScreen(ctx){
   var sExp=segTotal(latestYear,SEG[0]),sLoc=segTotal(latestYear,SEG[1]),sRej=segTotal(latestYear,SEG[2]);
   var lgRows=(league&&league.rows)?league.rows:null;
 
-  var prodBars=ce('div',{className:'card'},
+  var prodBars=ce('div',{className:'card',style:{display:'flex',flexDirection:'column'}},
     ce('div',{className:'section-title'},ce('span',{className:'section-title-bar'}),'Production by season (t)'),
-    ce('div',{style:{display:'flex',alignItems:'flex-end',gap:8,height:180}},
+    ce('div',{style:{display:'flex',alignItems:'flex-end',gap:8,flex:1,minHeight:190,paddingTop:6}},
       years.map(function(y){ var v=byYear[y].codes.actual_production||0; var h=Math.max(2,Math.round(v/maxP*100));
         return ce('div',{key:y,title:fmt(v)+' t',style:{flex:1,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'flex-end',height:'100%'}},
           ce('div',{style:{fontSize:10,fontFamily:'var(--font-mono)',color:'var(--text3)',marginBottom:3}}, v>=1000?Math.round(v/1000)+'k':Math.round(v)),
@@ -1101,11 +1101,11 @@ function ProductionHistoryScreen(ctx){
       :ce('div',{style:{fontSize:12,color:'var(--text3)',padding:'20px 0'}},'No segment breakdown recorded for '+latestYear+'.'),
     ce('div',{style:{fontSize:11,color:'var(--text3)',marginTop:6}},'Every node is a stored metric. Widths are tonnes. Missing years simply have fewer nodes — the model never breaks.'));
 
-  var segPanel=ce('div',{className:'card'},
+  var segPanel=ce('div',{className:'card',style:{display:'flex',flexDirection:'column'}},
     ce('div',{className:'section-title'},ce('span',{className:'section-title-bar'}),'Segment share by season'),
     ce('div',{style:{display:'flex',gap:14,fontSize:11,color:'var(--text3)',margin:'2px 0 8px'}},
       SEG.map(function(sg){return ce('span',{key:sg.k},ce('span',{style:{display:'inline-block',width:9,height:9,background:sg.color,borderRadius:2,marginRight:5}}),sg.label);})),
-    ce('div',{style:{display:'flex',alignItems:'flex-end',gap:8,height:170}},
+    ce('div',{style:{display:'flex',alignItems:'flex-end',gap:8,flex:1,minHeight:190,paddingTop:6}},
       years.map(function(y){
         var parts=SEG.map(function(sg){return {sg:sg,v:segTotal(y,sg)};});
         var tot=parts.reduce(function(a,p){return a+p.v;},0)||1;
@@ -1123,7 +1123,7 @@ function ProductionHistoryScreen(ctx){
     ce('div',{className:'section-title'},ce('span',{className:'section-title-bar'}),'Yield league — t/fed, '+latestYear),
     lgRows==null?ce('div',{style:{fontSize:12,color:'var(--text3)',padding:'12px 0'}},'Loading block yields…')
       :(lgRows.length===0?ce('div',{style:{fontSize:12,color:'var(--text3)',padding:'12px 0'}},'No per-block production recorded for '+latestYear+'.')
-      :ce('div',{style:{overflowX:'auto'}},
+      :ce('div',{style:{overflowX:'auto',overflowY:'auto',maxHeight:420}},
         ce('table',{style:{width:'100%',fontSize:12,borderCollapse:'collapse'}},
           ce('thead',null,ce('tr',null,['Block','Variety','Area','Prod.','t/fed','Export %'].map(function(h,i){return ce('th',{key:h,style:{textAlign:i>=2?'right':'left',padding:'5px 8px',borderBottom:'1px solid var(--border)',color:'var(--text3)',fontWeight:500,whiteSpace:'nowrap'}},h);}))),
           ce('tbody',null, lgRows.slice(0,15).map(function(r){
