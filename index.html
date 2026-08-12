@@ -410,7 +410,7 @@ var ce = React.createElement, useState = React.useState, useEffect = React.useEf
 var DALOS_SUPABASE_URL = 'https://sfyjvgjwvtwkrnqrvqyc.supabase.co';
 var DALOS_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNmeWp2Z2p3dnR3a3JucXJ2cXljIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ4NzIxNjYsImV4cCI6MjA5MDQ0ODE2Nn0.FjA75XZsp0Kx5Xam_rrnYoAHX4JHKey6vEFCH_zlMuQ';
 var supabase = window.supabase.createClient(DALOS_SUPABASE_URL, DALOS_ANON_KEY);
-var BUILD = 'v0.7.1 (2026.08.12)';
+var BUILD = 'v0.7.2 (2026.08.12)';
 
 /* ── Nav model. Screens are scaffolds in this shell; each maps to a PRD phase. ── */
 function icon(paths){ return function(){ return ce('svg',{viewBox:'0 0 24 24',fill:'none',stroke:'currentColor',strokeWidth:2,strokeLinecap:'round',strokeLinejoin:'round'}, paths.map(function(d,i){return ce('path',{key:i,d:d});})); }; }
@@ -1026,8 +1026,16 @@ function sankeySVG(prod,exp,rej,trd,fld,W){
   lp.forEach(function(l){ kids.push(bar(x2,l.y,l.h,l.c)); });
   kids.push(lbl(x0+barW+6,nProd.y+12,'Actual production',prod,'start'));
   kids.push(lbl(x1+barW+6,nPk.y+12,'To packhouse',pk,'start'));
-  kids.push(lbl(x1+barW+6,nLoc.y+12,'Local branch',local,'start'));
-  lp.forEach(function(l){ kids.push(lbl(x2-6,l.y+11,l.n,l.v,'end')); });
+  if(local>0) kids.push(lbl(x1+barW+6,nLoc.y+nLoc.h/2-1,'Local branch',local,'start'));
+  // leaf labels (right side): skip empty leaves, then de-collide vertically with leader lines
+  var visL=lp.filter(function(l){ return l.v>0; });
+  var LBLH=21, topB=pad+2, botB=H-13;
+  var lys=visL.map(function(l){ return Math.max(topB, l.y+l.h/2-5); });
+  for(var qi=1;qi<lys.length;qi++){ if(lys[qi]<lys[qi-1]+LBLH) lys[qi]=lys[qi-1]+LBLH; }
+  for(var qj=lys.length-1;qj>=0;qj--){ var lim=(qj===lys.length-1)?botB:(lys[qj+1]-LBLH); if(lys[qj]>lim) lys[qj]=lim; }
+  visL.forEach(function(l,i){ var cy=l.y+l.h/2, ty=lys[i];
+    if(Math.abs(cy-(ty+3))>3) kids.push(ce('line',{key:'CL'+(K++),x1:x2,y1:cy,x2:x2-6,y2:ty+3,stroke:l.c,strokeWidth:1,opacity:0.55}));
+    kids.push(lbl(x2-8,ty,l.n,l.v,'end')); });
   return ce('svg',{viewBox:'0 0 '+W+' '+H,style:{width:'100%',height:'auto',display:'block'}}, kids);
 }
 function ProductionHistoryScreen(ctx){
@@ -1089,7 +1097,7 @@ function ProductionHistoryScreen(ctx){
   var sankeyP=sankeyParts(latest.codes);
   var sankeyPanel=ce('div',{className:'card'},
     ce('div',{className:'section-title'},ce('span',{className:'section-title-bar'}),'Where the crop went — ',ce('span',{style:{textTransform:'none',letterSpacing:0,fontWeight:400}},latestYear)),
-    (sankeyP.exp+sankeyP.rej+sankeyP.trd+sankeyP.fld>0)?sankeySVG(latest.codes.actual_production||0,sankeyP.exp,sankeyP.rej,sankeyP.trd,sankeyP.fld,560)
+    (sankeyP.exp+sankeyP.rej+sankeyP.trd+sankeyP.fld>0)?sankeySVG(latest.codes.actual_production||0,sankeyP.exp,sankeyP.rej,sankeyP.trd,sankeyP.fld,620)
       :ce('div',{style:{fontSize:12,color:'var(--text3)',padding:'20px 0'}},'No segment breakdown recorded for '+latestYear+'.'),
     ce('div',{style:{fontSize:11,color:'var(--text3)',marginTop:6}},'Every node is a stored metric. Widths are tonnes. Missing years simply have fewer nodes — the model never breaks.'));
 
