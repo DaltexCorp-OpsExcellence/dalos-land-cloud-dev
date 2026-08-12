@@ -436,7 +436,7 @@ var ce = React.createElement, useState = React.useState, useEffect = React.useEf
 var DALOS_SUPABASE_URL = 'https://sfyjvgjwvtwkrnqrvqyc.supabase.co';
 var DALOS_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNmeWp2Z2p3dnR3a3JucXJ2cXljIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ4NzIxNjYsImV4cCI6MjA5MDQ0ODE2Nn0.FjA75XZsp0Kx5Xam_rrnYoAHX4JHKey6vEFCH_zlMuQ';
 var supabase = window.supabase.createClient(DALOS_SUPABASE_URL, DALOS_ANON_KEY);
-var BUILD = 'v0.8.0 (2026.08.12)';
+var BUILD = 'v0.8.1 (2026.08.12)';
 
 /* ── Nav model. Screens are scaffolds in this shell; each maps to a PRD phase. ── */
 function icon(paths){ return function(){ return ce('svg',{viewBox:'0 0 24 24',fill:'none',stroke:'currentColor',strokeWidth:2,strokeLinecap:'round',strokeLinejoin:'round'}, paths.map(function(d,i){return ce('path',{key:i,d:d});})); }; }
@@ -552,12 +552,15 @@ function StructureScreen(ctx){
   // build tiles at current level
   var level=path.length; var tiles;
   function dominantCrop(list){ var c={}; list.forEach(function(b){c[b.product_id]=(c[b.product_id]||0)+1;}); return Object.keys(c).sort(function(a,b){return c[b]-c[a];})[0]; }
+  // dominant crop BY AREA + its share, so a tile only takes a crop colour when that crop
+  // really dominates; genuinely mixed tiles render neutral instead of implying monoculture.
+  function cropStats(list){ var c={},tot=0; list.forEach(function(b){ var a=Number(b.total_area_fed||0); c[b.product_id]=(c[b.product_id]||0)+a; tot+=a; }); var dom=Object.keys(c).sort(function(a,b){return c[b]-c[a];})[0]; return {crop:dom, share:(tot>0?c[dom]/tot:1), nCrops:Object.keys(c).length}; }
   if(level<3){
     var keyF = level===0?function(b){return b.farm_code;} : level===1?function(b){return b.sector_code;} : function(b){return b.plot_code;};
     var labF = level===0?function(b){return (b.farms&&b.farms.name)||b.farm_code;} : level===1?function(b){return 'S'+b.sector_code;} : function(b){return 'P'+b.plot_code;};
     var groups={};
     scope.forEach(function(b){ var k=keyF(b); (groups[k]=groups[k]||{k:k,label:labF(b),list:[]}).list.push(b); });
-    tiles=Object.keys(groups).map(function(k){ var g=groups[k]; return {k:k,label:g.label,value:g.list.reduce(function(a,b){return a+Number(b.total_area_fed||0);},0),count:g.list.length,crop:dominantCrop(g.list),leaf:false}; });
+    tiles=Object.keys(groups).map(function(k){ var g=groups[k]; var cs=cropStats(g.list); return {k:k,label:g.label,value:g.list.reduce(function(a,b){return a+Number(b.total_area_fed||0);},0),count:g.list.length,crop:cs.crop,mixed:(cs.nCrops>1&&cs.share<0.7),domShare:Math.round(cs.share*100),leaf:false}; });
   } else {
     tiles=scope.map(function(b){ return {k:b.operational_block_id,label:b.aydi_block_number,value:Number(b.total_area_fed||0),crop:b.product_id,leaf:true,block:b}; });
   }
@@ -638,15 +641,15 @@ function StructureScreen(ctx){
       ce('div',{className:'card',style:{padding:6}},
         ce('div',{style:{position:'relative',width:'100%',aspectRatio:'1000 / '+H,minHeight:360,background:'var(--bg2)',borderRadius:6,overflow:'hidden'}},
           laid.map(function(t){
-            var col=CROP_COLORS[t.crop]||'#888';
+            var col=t.mixed?'#78857f':(CROP_COLORS[t.crop]||'#888');   // neutral slate for mixed-crop tiles
             var pct=function(v,d){return v/d*100+'%';};
             var big=(t.w/1000*100)>6 && (t.h/H*100)>7;   // hide labels on slivers (they'd just clip)
             return ce('div',{key:t.k,className:'tm-tile',onClick:function(){onTile(t);},
-              title:t.label+(t.leaf?'':' · '+t.count+' blk · '+fmt(Math.round(t.value))+' fed'),
+              title:t.label+(t.leaf?'':' · '+t.count+' blk · '+fmt(Math.round(t.value))+' fed'+(t.mixed?' · mixed crops ('+t.domShare+'% '+cropName(t.crop)+')':'')),
               style:{left:pct(t.x,1000),top:pct(t.y,H),width:pct(t.w,1000),height:pct(t.h,H),background:col,opacity:t.leaf?0.86:1}},
               big?ce('div',{className:'tm-nm',style:{fontSize:t.leaf?11:13.5,fontFamily:t.leaf?'var(--font-mono)':'var(--font-body)'}}, t.label):null,
-              (big&&!t.leaf)?ce('div',{className:'tm-sub'}, t.count+' blk · '+fmt(Math.round(t.value))+' fed'):null); })),
-        ce('div',{style:{fontSize:11,color:'var(--text3)',marginTop:8,padding:'0 4px'}}, level<3?'Tile area = feddan. Click to drill Farm › Sector › Plot › Block. Colour = crop.':'Click a block to open its detail.')),
+              (big&&!t.leaf)?ce('div',{className:'tm-sub'}, (t.mixed?'mixed · ':'')+t.count+' blk · '+fmt(Math.round(t.value))+' fed'):null); })),
+        ce('div',{style:{fontSize:11,color:'var(--text3)',marginTop:8,padding:'0 4px'}}, level<3?('Tile area = feddan. Click to drill Farm › Sector › Plot › Block. Colour = crop'+(ctx.crop==='all'?'; grey = mixed crops.':'.')):'Click a block to open its detail.')),
       ce('div',{style:{display:'flex',flexDirection:'column',gap:10}}, mixPanel, agePanel)),
     blocksInView,
     sel?ce(BlockDetail,{block:sel,ctx:ctx,onChanged:function(){ setSel(null); load(); },onClose:function(){setSel(null);}}):null
@@ -993,7 +996,7 @@ function BlockDetail(p){
           ce('button',{className:'btn btn-secondary btn-sm',onClick:function(){setAction('edit');}},'Edit identity'),
           ce('button',{className:'btn btn-secondary btn-sm',onClick:function(){setAction('split');}},'Split block'),
           ce('button',{className:'btn btn-secondary btn-sm',onClick:function(){setAction('replant');}},'Replant'),
-          ce('button',{className:'btn btn-secondary btn-sm',onClick:function(){setAction('retire');}},'Retire'),
+          ce('button',{className:'btn btn-secondary btn-sm',style:{color:'var(--red)',borderColor:'color-mix(in srgb,var(--red) 45%,var(--border))',marginLeft:6},onClick:function(){setAction('retire');},title:'Retire this planting — irreversible'},'Retire'),
           ce('button',{className:'btn btn-secondary btn-sm',onClick:function(){setAction('history');}},'History log')
         ) : (canWrite ? ce('div',{className:'action-row',style:{marginTop:16}},
           ce('button',{className:'btn btn-secondary btn-sm',onClick:function(){setAction('history');}},'History log')) : null),
@@ -1658,7 +1661,7 @@ function BulkImportScreen(ctx){
         ce('div',{className:'section-title'},ce('span',{className:'section-title-bar'}),'Target & mode'),
         ce('div',{style:{display:'flex',gap:8,flexWrap:'wrap',marginBottom:12}},
           ce('div',null,ce('label',{className:'form-label'},'Crop'),ce('select',{className:'tb-select',value:crop,onChange:function(e){setCrop(e.target.value);}},['citrus','grapes','mango','pomegranate','olives','berries'].map(function(c){return ce('option',{key:c,value:c},c);}))),
-          ce('div',null,ce('label',{className:'form-label'},'Season'),ce('select',{className:'tb-select',value:season,onChange:function(e){setSeason(+e.target.value);}},[2025,2024,2023,2022,2021,2020,2019,2018,2017].map(function(y){return ce('option',{key:y,value:y},y);}))),
+          ce('div',null,ce('label',{className:'form-label'},'Season'),ce('select',{className:'tb-select',value:season,onChange:function(e){setSeason(+e.target.value);}},[2026,2025,2024,2023,2022,2021,2020,2019,2018,2017].map(function(y){return ce('option',{key:y,value:y},y);}))),
           ce('div',null,ce('label',{className:'form-label'},'Scenario'),ce('select',{className:'tb-select',value:scenario,onChange:function(e){setScenario(e.target.value);}},['actual','plan'].map(function(x){return ce('option',{key:x,value:x},x);})))),
         ce('div',{style:{display:'flex',flexDirection:'column',gap:8}},
           [['upsert','Upsert','Match on Operational Block ID + season; update changed, insert new. Safe to re-run.'],['dry_run','Dry run','Produce the diff, write nothing.']].map(function(m){
@@ -2941,7 +2944,9 @@ function App(){
     });
   }, [auth.phase]);
 
-  if(auth.phase==='boot') return ce('div',{className:'login-wrap'}, ce('div',{style:{display:'flex',flexDirection:'column',alignItems:'center',gap:14}}, lcMark(52,false), ce('div',{style:{fontFamily:'var(--font-display)',fontSize:22}}, ce('span',{style:{color:'#f4f1e8'}},'Dal'), ce('span',{style:{color:'#5fc9c4'}},'OS'), ce('span',{style:{color:'#f4f1e8'}},' Land Cloud'))));
+  // Match the static #lc-splash exactly (dark #0e3a3d, same mark + wordmark) so the
+  // hand-off static-splash → React-boot is invisible — no background flash before login.
+  if(auth.phase==='boot') return ce('div',{style:{position:'fixed',inset:0,zIndex:9998,background:'#0e3a3d',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:16}}, lcMark(52,false), ce('div',{style:{fontFamily:'var(--font-display)',fontSize:22}}, ce('span',{style:{color:'#f4f1e8'}},'Dal'), ce('span',{style:{color:'#5fc9c4'}},'OS'), ce('span',{style:{color:'#f4f1e8'}},' Land Cloud')));
   if(auth.phase==='login') return ce(Login,null);
   if(auth.phase==='noaccess') return ce(NoAccess,{email:(auth.session&&auth.session.user.email)});
 
@@ -2991,7 +2996,7 @@ function App(){
         ce('div',{className:'topbar-spacer'}),
         screen==='entry'?ce('span',{className:'tb-label'},'Season'):null,
         screen==='entry'?ce('select',{className:'tb-select',value:season,onChange:function(e){setSeason(+e.target.value);}},
-          [2025,2024,2023,2022,2021,2020,2019,2018,2017].map(function(yy){ return ce('option',{key:yy,value:yy}, yy); })):null,
+          [2026,2025,2024,2023,2022,2021,2020,2019,2018,2017].map(function(yy){ return ce('option',{key:yy,value:yy}, yy); })):null,
         ce('span',{className:'staging-badge'+(location.pathname.indexOf('-dev/')>=0?' on':''),title:'Staging environment'},
           ce('span',{className:'staging-dot'}), 'Staging')
       ),
