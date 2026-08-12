@@ -436,6 +436,29 @@ var ce = React.createElement, useState = React.useState, useEffect = React.useEf
 var DALOS_SUPABASE_URL = 'https://sfyjvgjwvtwkrnqrvqyc.supabase.co';
 var DALOS_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNmeWp2Z2p3dnR3a3JucXJ2cXljIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ4NzIxNjYsImV4cCI6MjA5MDQ0ODE2Nn0.FjA75XZsp0Kx5Xam_rrnYoAHX4JHKey6vEFCH_zlMuQ';
 var supabase = window.supabase.createClient(DALOS_SUPABASE_URL, DALOS_ANON_KEY);
+
+/* ── Shared cross-app activity heartbeat. All DalOS apps sit on one Pages origin
+   and share ONE auth token. Vision's inactivity timer polls this key and signs
+   out only when nobody has been active in ANY app. Writing it here means time
+   spent in Land Cloud counts as activity, so Vision won't sign an active LC user
+   out from a background tab. Key must stay identical to DALOS_ACTIVITY_KEY in
+   Vision, Workspace and gate.js — scripts/check-auth-invariants.sh enforces it.
+   NOTE: this only WRITES activity; LC deliberately has no idle-timer signout. ── */
+var DALOS_ACTIVITY_KEY = 'dalos_last_activity';
+(function(){
+  var last=0;
+  function mark(){
+    var now=Date.now();
+    if(now-last<30000) return;   /* one write per 30s */
+    last=now;
+    try{ localStorage.setItem(DALOS_ACTIVITY_KEY,String(now)); }catch(e){}
+  }
+  ['mousemove','mousedown','keydown','scroll','touchstart','click'].forEach(function(e){
+    window.addEventListener(e,mark,{passive:true});
+  });
+  mark();
+})();
+
 var BUILD = 'v0.8.1 (2026.08.12)';
 
 /* ── Nav model. Screens are scaffolds in this shell; each maps to a PRD phase. ── */
