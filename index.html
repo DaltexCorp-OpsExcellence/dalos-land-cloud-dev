@@ -436,7 +436,7 @@ var ce = React.createElement, useState = React.useState, useEffect = React.useEf
 var DALOS_SUPABASE_URL = 'https://sfyjvgjwvtwkrnqrvqyc.supabase.co';
 var DALOS_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNmeWp2Z2p3dnR3a3JucXJ2cXljIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ4NzIxNjYsImV4cCI6MjA5MDQ0ODE2Nn0.FjA75XZsp0Kx5Xam_rrnYoAHX4JHKey6vEFCH_zlMuQ';
 var supabase = window.supabase.createClient(DALOS_SUPABASE_URL, DALOS_ANON_KEY);
-var BUILD = 'v0.7.7 (2026.08.12)';
+var BUILD = 'v0.8.0 (2026.08.12)';
 
 /* ── Nav model. Screens are scaffolds in this shell; each maps to a PRD phase. ── */
 function icon(paths){ return function(){ return ce('svg',{viewBox:'0 0 24 24',fill:'none',stroke:'currentColor',strokeWidth:2,strokeLinecap:'round',strokeLinejoin:'round'}, paths.map(function(d,i){return ce('path',{key:i,d:d});})); }; }
@@ -828,17 +828,23 @@ function BlockDetail(p){
     setLin({loading:true,plantings:[],series:{}});
     var sec=b.sector_code, plt=b.plot_code;
     if(sec==null||plt==null){ var parts=String(b.aydi_block_number||'').split('-'); sec=sec!=null?sec:parts[0]; plt=plt!=null?plt:String(parts[1]||'').replace(/[A-Za-z]+$/,''); }
-    supabase.from('farm_blocks').select('id,aydi_block_number,planting_year,lifecycle,total_area_fed,varieties(name)')
-      .eq('product_id',b.product_id).eq('farm_code',b.farm_code).eq('sector_code',sec).eq('plot_code',plt).then(function(pr){
-        if(pr.error||!pr.data){ setLin({loading:false,plantings:[],series:{}}); return; }
-        var plantings=pr.data.slice().sort(function(a,c){return (a.planting_year||0)-(c.planting_year||0);});
-        var ids=plantings.map(function(x){return x.id;});
-        supabase.from('v_farm_season_wide').select('block_id,season_year,metrics').eq('scenario','actual')
-          .in('block_id',ids.length?ids:['00000000-0000-0000-0000-000000000000']).then(function(sr){
-            var series={}; (sr.data||[]).forEach(function(w){ var v=Number((w.metrics||{}).actual_production||0); (series[w.block_id]=series[w.block_id]||{})[w.season_year]=v; });
-            setLin({loading:false,plantings:plantings,series:series});
-          });
-      });
+    // the split's authoritative area-share for THIS block (denominator is inheriting
+    // children only) — use it rather than re-deriving from current-block areas, which
+    // diverges whenever a sibling child was split off with inherits_history=false.
+    supabase.from('farm_historical_map').select('ratio').eq('block_id',b.id).maybeSingle().then(function(hm){
+      var storedRatio=(hm&&hm.data&&hm.data.ratio!=null)?Number(hm.data.ratio):null;
+      supabase.from('farm_blocks').select('id,aydi_block_number,planting_year,lifecycle,total_area_fed,varieties(name)')
+        .eq('product_id',b.product_id).eq('farm_code',b.farm_code).eq('sector_code',sec).eq('plot_code',plt).then(function(pr){
+          if(pr.error||!pr.data){ setLin({loading:false,plantings:[],series:{},ratio:storedRatio}); return; }
+          var plantings=pr.data.slice().sort(function(a,c){return (a.planting_year||0)-(c.planting_year||0);});
+          var ids=plantings.map(function(x){return x.id;});
+          supabase.from('v_farm_season_wide').select('block_id,season_year,metrics').eq('scenario','actual')
+            .in('block_id',ids.length?ids:['00000000-0000-0000-0000-000000000000']).then(function(sr){
+              var series={}; (sr.data||[]).forEach(function(w){ var v=Number((w.metrics||{}).actual_production||0); (series[w.block_id]=series[w.block_id]||{})[w.season_year]=v; });
+              setLin({loading:false,plantings:plantings,series:series,ratio:storedRatio});
+            });
+        });
+    });
   },[b.id]);
   function row(k,v){ return [ce('dt',{key:k+'k'},k), ce('dd',{key:k+'v',className:/[؀-ۿ]/.test(String(v))?'ar':null,dir:'auto'},v)]; }
 
@@ -862,7 +868,7 @@ function BlockDetail(p){
     if(prior.length && b.lifecycle!=='retired'){
       var AMBER='#b87820', TEAL='var(--accent2)';
       var curArea=current.reduce(function(a,pl){ return a+Number(pl.total_area_fed||0); },0);
-      var ratio = curArea>0 ? Number(b.total_area_fed||0)/curArea : 1;   // this plot's share of the split
+      var ratio = (lin.ratio!=null) ? lin.ratio : (curArea>0 ? Number(b.total_area_fed||0)/curArea : 1);   // stored split share; fall back to area re-derivation
       var pct = Math.round(ratio*100);
       var priorProd={}; prior.forEach(function(pl){ var s=lin.series[pl.id]||{}; Object.keys(s).forEach(function(y){ if(s[y]>0) priorProd[y]=(priorProd[y]||0)+s[y]; }); });
       var allocP={}; Object.keys(priorProd).forEach(function(y){ allocP[y]=priorProd[y]*ratio; });
@@ -943,7 +949,7 @@ function BlockDetail(p){
         ce('thead',null,ce('tr',null,['Year','Bearing','Production t','t/fed','Export t','Balance'].map(function(x){return ce('th',{key:x},x);}))),
         ce('tbody',null, withProd.slice().reverse().map(function(s){
           var m=s.metrics, prod=m.actual_production, ba=+s.bearing_area_fed;
-          var exp=m.export_packhouse!=null?m.export_packhouse:(m.export_carton!=null?m.export_carton:null);
+          var exp=pickExport(m);
           var bal=BAL[s.balance_status]||BAL.unchecked;
           return ce('tr',{key:s.season_year},
             ce('td',{className:'num'}, s.season_year),
@@ -1007,6 +1013,15 @@ function BlockDetail(p){
 }
 
 /* ── Production History (§6.4) — crop production by season, from the rollup ── */
+// Single source of truth for the export figure so a block shows the SAME tonnage in the
+// detail drawer, the Sankey, the yield league and the heatmap. Precedence: export_total
+// (whole-shipment) → export_packhouse (delivered) → export_carton (packed). Uses !=null so a
+// genuinely recorded 0 is kept rather than falling through. Returns null when none recorded.
+function pickExport(m){ m=m||{};
+  if(m.export_total!=null)     return Number(m.export_total);
+  if(m.export_packhouse!=null) return Number(m.export_packhouse);
+  if(m.export_carton!=null)    return Number(m.export_carton);
+  return null; }
 var SEG = [
   {k:'export', label:'Export', color:'var(--accent)', codes:['export_total','export_packhouse','export_carton'], pick:true},
   {k:'local',  label:'Local / farm-gate', color:'var(--accent2)', codes:['raw_to_traders','farm_gate_sales','local_sales_combined','field_reject_sales'], sum:true},
@@ -1019,7 +1034,7 @@ var SEG = [
 // when another crop recorded field-reject, making a single crop out-total "all crops".
 // (Verified no crop-year records local_sales_combined alongside its split codes.)
 function sankeyParts(m){ m=m||{};
-  return { exp:Number(m.export_total||m.export_packhouse||m.export_carton||0),
+  return { exp:Number(pickExport(m)||0),
            rej:Number(m.packhouse_reject||0),
            trd:Number(m.raw_to_traders||0)+Number(m.farm_gate_sales||0)+Number(m.local_sales_combined||0),
            fld:Number(m.field_reject_sales||0) }; }
@@ -1071,11 +1086,25 @@ function ProductionHistoryScreen(ctx){
   useEffect(function(){ load(); },[ctx.crop]);
   function load(){
     set({loading:true,err:null,rows:[]}); setLeague([]);
-    var q=supabase.from('v_farm_production_rollup').select('season_year,metric_code,total_t,area_fed,blocks').eq('scenario','actual');
-    if(ctx.crop!=='all') q=q.eq('product_id',ctx.crop);
-    q.then(function(r){
-      if(r.error){ set({loading:false,err:r.error.message,rows:[]}); return; }
-      var rows=r.data||[]; set({loading:false,err:null,rows:rows});
+    // The rollup is grained by farm × sector × product × season × metric × grain — for
+    // citrus / all-crops it exceeds 1,000 rows, so an unpaginated read was silently
+    // truncated by PostgREST (headline production showed 24k against a real 33k). Page it,
+    // ordered on the full grain key so range() stays stable across requests.
+    var PG=1000, acc=[];
+    function page(from){
+      var q=supabase.from('v_farm_production_rollup').select('farm_id,product_id,sector_code,season_year,metric_code,total_t,area_fed,blocks,grain').eq('scenario','actual')
+             .order('farm_id').order('product_id').order('sector_code').order('season_year').order('metric_code').order('grain')
+             .range(from,from+PG-1);
+      if(ctx.crop!=='all') q=q.eq('product_id',ctx.crop);
+      q.then(function(r){
+        if(r.error){ set({loading:false,err:r.error.message,rows:[]}); return; }
+        var d=r.data||[]; acc=acc.concat(d);
+        if(d.length===PG){ page(from+PG); return; }
+        afterRows(acc);
+      });
+    }
+    function afterRows(rows){
+      set({loading:false,err:null,rows:rows});
       var ys=rows.map(function(x){return x.season_year;}); var latestY=ys.length?Math.max.apply(null,ys):null;
       if(latestY==null) return;
       var bq=supabase.from('farm_blocks').select('id,aydi_block_number,operational_block_id,total_area_fed,product_id,varieties(name)').limit(1000);
@@ -1087,10 +1116,12 @@ function ProductionHistoryScreen(ctx){
           wr.data.forEach(function(w){ var b=dim[w.block_id]; if(!b) return; var m=w.metrics||{};
             var prod=Number(m.actual_production||0); if(prod<=0) return;
             var area=Number(w.bearing_area_fed||b.total_area_fed||0); if(area<=0) return;
-            var exp=Number(m.export_total||m.export_packhouse||m.export_carton||0);
+            var exp=Number(pickExport(m)||0);
             out.push({op:b.operational_block_id,aydi:b.aydi_block_number,variety:(b.varieties&&b.varieties.name)||'—',area:area,prod:prod,rate:prod/area,expPct:prod>0?exp/prod*100:0}); });
           out.sort(function(a,b){return b.rate-a.rate;});
-          setLeague({year:latestY,rows:out}); }); }); });
+          setLeague({year:latestY,rows:out}); }); });
+    }
+    page(0);
   }
   if(st.loading) return ce(Loading,{rows:6});
   if(st.err) return ce(ErrorState,{msg:st.err,onRetry:load});
@@ -1104,7 +1135,7 @@ function ProductionHistoryScreen(ctx){
   var maxP=years.reduce(function(m,y){return Math.max(m,byYear[y].codes.actual_production||0);},0)||1;
   function segTotal(y,seg){ var c=byYear[y].codes;
     if(seg.sum){ var s=0; seg.codes.forEach(function(cd){ s+=Number(c[cd]||0); }); return s; }   // distinct channels/losses — sum
-    for(var i=0;i<seg.codes.length;i++){ if(c[seg.codes[i]]!=null) return c[seg.codes[i]]; } return 0; }   // export: one measure — pick first present
+    var pe=pickExport(c); return pe==null?0:pe; }   // export: one measure — same precedence as everywhere else
   // for stacked bars use the first present code per segment (export_total supersedes carton etc.)
   var latestYear=years[years.length-1]; var latest=byYear[latestYear];
   var sExp=segTotal(latestYear,SEG[0]),sLoc=segTotal(latestYear,SEG[1]),sRej=segTotal(latestYear,SEG[2]);
@@ -1173,7 +1204,12 @@ function ProductionHistoryScreen(ctx){
     ce('div',{className:'grid2',style:{gridTemplateColumns:'1fr 1.3fr',marginBottom:10}}, prodBars, sankeyPanel),
     ce('div',{className:'grid2'}, segPanel, leaguePanel),
     ce('div',{className:'band',style:{background:'var(--bg2)',borderColor:'var(--border)',color:'var(--text3)'}},
-      'Grapes 2017–2025 shown. The 2021 local-sales split and 2024 export unbundling are visible in the segment shares. Rollup refreshes hourly (P5 cron).')
+      (ctx.crop==='grapes'
+        ? 'Grapes '+years[0]+'–'+years[years.length-1]+' shown — the 2021 local-sales split and 2024 export unbundling are visible in the segment shares. '
+        : (ctx.crop==='all'
+            ? 'All crops shown across their recorded seasons. '
+            : (ctx.crop.charAt(0).toUpperCase()+ctx.crop.slice(1)+' '+years[0]+'–'+years[years.length-1]+' shown across its recorded seasons. ')))
+      + 'Rollup refreshes hourly (P5 cron).')
   );
 }
 
@@ -1701,7 +1737,7 @@ function ReferenceDataScreen(ctx){
     Promise.all([
       supabase.from('farm_metrics').select('code,name_en,name_ar,role,parent_code,aliases,active').order('code'),
       supabase.from('farm_metric_sets').select('id,product_id,season_year,scenario,farm_metric_set_items(metric_id)').order('product_id').order('season_year'),
-      supabase.from('farm_rootstocks').select('code,name,product_id,raw_names,active').order('code'),
+      supabase.from('farm_rootstocks').select('id,code,name,product_id,raw_names,active').order('code'),
       supabase.from('varieties').select('id,code,name,canonical_name,raw_names,product_id,active').order('product_id').order('name'),
       supabase.from('farm_blocks').select('variety_id,rootstock_id').limit(1000)
     ]).then(function(r){
@@ -1765,7 +1801,7 @@ function ReferenceDataScreen(ctx){
             ce('td',null,rk.name),
             ce('td',null,rk.product_id||ce('span',{style:{color:'var(--text3)'}},'all')),
             ce('td',{className:'ar',dir:'auto',style:{fontSize:11,color:'var(--text3)'}},(rk.raw_names||[]).join(' · ')||'—'),
-            ce('td',{className:'num'}, '—'));}))
+            ce('td',{className:'num'}, d.rCount[rk.id]||0));}))
         )),
       ce('div',{className:'note',style:{marginTop:10}},'Codes are system-generated, never typed (§4.1b). A new rootstock or an alias is added here — no migration — and a block using it generates a correct operational ID immediately.')
     );
@@ -2357,22 +2393,24 @@ function SplitModal(p){
       if(numN(c.planted)!=null && numN(c.planted)>numN(c.total_area_fed)+0.001){ setS({busy:false,err:'Child '+(i+1)+': bearing area can’t exceed its total area.'}); return; }
     }
     if(!reconciled){ setS({busy:false,err:'Child total areas sum to '+fmt(Math.round(sum*100)/100)+' fed against a parent of '+fmt(b.total_area_fed)+' fed (limit ±0.5).'}); return; }
-    var payload=kids.map(function(c){ var o={sector_code:nul(c.sector_code),plot_code:nul(c.plot_code),total_area_fed:numN(c.total_area_fed),inherits_history:!!c.inherits_history,variety_id:c.variety_id,planting_year:numN(c.planting_year)};
-      if(nul(c.block_add)) o.block_add=nul(c.block_add); if(c.rootstock_id) o.rootstock_id=c.rootstock_id; return o; });
+    // trees / bearing / aero / cost-centre now travel INSIDE fn_split_block's child insert,
+    // so a required field can no longer be left null by a failed follow-up write. Geometry
+    // is the only best-effort follow-up (needs the PostGIS RPC).
+    var payload=kids.map(function(c){ var o={sector_code:nul(c.sector_code),plot_code:nul(c.plot_code),total_area_fed:numN(c.total_area_fed),inherits_history:!!c.inherits_history,variety_id:c.variety_id,planting_year:numN(c.planting_year),planted_area_fed:numN(c.planted),aerobotics_area_ha:numN(c.aero),tree_count_planted:numN(c.trees)};
+      if(nul(c.block_add)) o.block_add=nul(c.block_add); if(c.rootstock_id) o.rootstock_id=c.rootstock_id; if(nul(c.jde)) o.jde_cost_center_id=nul(c.jde); return o; });
     setS({busy:true,err:null,res:null});
     supabase.rpc('fn_split_block',{ p_parent_id:b.id, p_children:payload, p_effective_date:date, p_note:nul(note) }).then(function(r){
       if(r.error){ setS({busy:false,err:r.error.message,res:null}); return; }
       var children=(r.data&&r.data.children)||[];
-      // follow-up: bearing / aero / trees / cost-centre (RPC doesn't take these) + geometry, per child in order
+      // geometry only: per child, best-effort, reported by count
       var jobs=[];
       children.forEach(function(cr,i){ var c=kids[i]; if(!c||!cr.block_id) return;
-        var patch={ planted_area_fed:numN(c.planted), aerobotics_area_ha:numN(c.aero), tree_count_planted:numN(c.trees), jde_cost_center_id:nul(c.jde) };
-        jobs.push(supabase.from('farm_blocks').update(patch).eq('id',cr.block_id));
         if(c.geom) jobs.push(supabase.rpc('fn_set_block_geom',{p_block_id:cr.block_id,p_geojson:c.geom,p_source:'manual'}));
       });
+      if(!jobs.length){ setS({busy:false,err:null,res:{data:r.data,fails:0,geomTotal:0}}); return; }
       Promise.all(jobs.map(function(j){ return j.then(function(x){return x;},function(x){return {error:x};}); })).then(function(rr){
         var fails=rr.filter(function(x){ return x&&x.error; }).length;
-        setS({busy:false,err:null,res:{data:r.data,fails:fails}});
+        setS({busy:false,err:null,res:{data:r.data,fails:fails,geomTotal:jobs.length}});
       });
     });
   }
@@ -2381,7 +2419,7 @@ function SplitModal(p){
       footer:ce('button',{className:'btn btn-primary btn-sm',onClick:p.onDone},'Done')},
       ce('div',null, ce('div',{className:'ok-band'},'Split recorded. The parent is superseded; each child carries its area-share of the parent’s prior production and its own details. History follows the land.'),
         (warns.length?ce('div',{className:'band'}, warns.join(' ')):null),
-        (s.res.fails?ce('div',{className:'band'}, s.res.fails+' follow-up field/boundary write(s) didn’t save (e.g. boundaries need fn_set_block_geom deployed). The split itself committed — finish those from the register.'):null)));
+        (s.res.fails?ce('div',{className:'band'}, s.res.fails+' of '+s.res.geomTotal+' boundary write(s) didn’t save (needs the PostGIS geometry RPC). Every block detail — trees, bearing, aerobotics, cost centre — committed with the split; just redraw those boundaries from the Farm Map.'):null)));
   }
   function areaBox(idx,c){ return ce('div',{className:'area-box'},
     ce('div',{className:'area-primary'}, ce('label',{className:'form-label'},'Total area'), txt(c.total_area_fed, upk(idx,'total_area_fed'),{type:'number',step:'0.01',className:'form-input mono'}), ce('div',{className:'unit'},'feddan · drives split')),
@@ -2633,7 +2671,7 @@ function HeatmapScreen(ctx){
   if(y.loading) return vLoad();
   function metricVal(mm,bearing,tot){ mm=mm||{}; var prod=Number(mm.actual_production||0);
     if(metric==='prod') return prod>0?prod:null;
-    if(metric==='export'){ var e=Number(mm.export_total||mm.export_packhouse||mm.export_carton||0); return prod>0?Math.round(e/prod*100):null; }
+    if(metric==='export'){ var e=Number(pickExport(mm)||0); return prod>0?Math.round(e/prod*100):null; }
     var a=Number(bearing||0)||Number(tot||0); return (prod>0&&a>0)?Math.round(prod/a*100)/100:null; }
   var cells={},yearsSet={},varVals={};
   y.rows.forEach(function(w){ var b=y.dim[w.block_id]; if(!b)return; var v=metricVal(w.metrics,w.bearing_area_fed,b.total_area_fed);
@@ -2673,7 +2711,7 @@ function HeatmapScreen(ctx){
   var diverging=scale==='cohort';
   var scaleNote={abs:'Colour is calibrated across ALL blocks of this crop — good for the outright best and worst, but a young or small-variety block reads low because it is judged against mature ones.',
     own:'Each ROW is scaled to its own history (min→max) — shows whether a block is trending up or down against itself, independent of how it compares to others.',
-    cohort:'Each cell is compared only to its PEERS — same variety and age bracket — for a like-for-like read that controls for genetics and age. Green = above the peer median, amber = below; cells with fewer than 3 peers keep their number but stay grey.'}[scale];
+    cohort:'Each cell is compared to its PEER SEASON-CELLS — every season of the same variety and age bracket, pooled — a like-for-like read that controls for variety and age. (This is a per-season median across years; Benchmark ranks each block on its latest season only, so the same cohort can read slightly differently there.) Green = above the peer median, amber = below; cells with fewer than 3 peers keep their number but stay grey.'}[scale];
   var legend = diverging
     ? ce('div',{style:{display:'flex',alignItems:'center',gap:7}}, ce('span',{style:{fontSize:10,textTransform:'uppercase',letterSpacing:'.06em',color:'var(--text3)'}},'Below peers'),
         ce('div',{style:{display:'flex',height:11,borderRadius:3,overflow:'hidden',width:150}}, DIVERGE.map(function(c,i){return ce('div',{key:i,style:{flex:1,background:c}});})),
@@ -2758,7 +2796,7 @@ function BenchmarkScreen(ctx){
     items.sort(function(a,b){return b.dev-a.dev;});
     var show=items.length>28?items.slice(0,14).concat(items.slice(-14)):items;
     body=ce('div',null,
-      ce('div',{className:'band'}, ce('b',null,'Raw ranking lies.'), ' Each block is compared only against its own cohort — same variety, same age bracket. A deviation computed against fewer than 3 peers is greyed as noise.'),
+      ce('div',{className:'band'}, ce('b',null,'Raw ranking lies.'), ' Each block is compared only against its own cohort — same variety, same age bracket — on its latest producing season. A deviation computed against fewer than 3 peers is greyed as noise.'),
       ce('div',{className:'card'},
         ce('div',{className:'section-title'},ce('span',{className:'section-title-bar'}),'Deviation from cohort median — latest season'),
         show.length===0?ce('div',{style:{fontSize:12,color:'var(--text3)',padding:'12px 0'}},'No producing blocks for this crop.'):
@@ -2910,7 +2948,7 @@ function App(){
   var role = auth.role;
   var isAdmin = ['admin','power_user'].indexOf(role)>=0;
   var canWrite = isAdmin || role==='agronomy_admin';
-  var visible = function(it){ if(it.need==='admin') return isAdmin; return true; };
+  var visible = function(it){ if(it.need==='admin') return isAdmin||role==='agronomy_admin'||role==='agronomy_viewer'; return true; };
   var mapApi = {farm:mapFarm,setFarm:setMapFarm,mode:mapMode,setMode:setMapMode,off:mapOff,setOff:setMapOff,meta:mapMeta,setMeta:setMapMeta};
   var ctx = {crop:crop, season:season, role:role, canWrite:canWrite, isAdmin:isAdmin, products:products, go:setScreen, map:mapApi};
   var scr = SCREENS[screen];
@@ -2951,9 +2989,9 @@ function App(){
         ce('button',{className:'menu-btn',onClick:function(){setMenu(!menuOpen);}}, '☰'),
         ce('h1',null, scr.title),
         ce('div',{className:'topbar-spacer'}),
-        ce('span',{className:'tb-label'},'Season'),
-        ce('select',{className:'tb-select',value:season,onChange:function(e){setSeason(+e.target.value);}},
-          [2025,2024,2023,2022,2021,2020,2019,2018,2017].map(function(yy){ return ce('option',{key:yy,value:yy}, yy); })),
+        screen==='entry'?ce('span',{className:'tb-label'},'Season'):null,
+        screen==='entry'?ce('select',{className:'tb-select',value:season,onChange:function(e){setSeason(+e.target.value);}},
+          [2025,2024,2023,2022,2021,2020,2019,2018,2017].map(function(yy){ return ce('option',{key:yy,value:yy}, yy); })):null,
         ce('span',{className:'staging-badge'+(location.pathname.indexOf('-dev/')>=0?' on':''),title:'Staging environment'},
           ce('span',{className:'staging-dot'}), 'Staging')
       ),
