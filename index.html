@@ -619,35 +619,40 @@ function StructureScreen(ctx){
   var rsMiss=scope.filter(function(b){return isActive(b.lifecycle)&&!b.rootstock_id;}).length;
   var issues=scope.filter(function(b){return isActive(b.lifecycle)&&(!b.jde_cost_center_id||!b.rootstock_id);}).length;
 
-  // ── Crop mix (planted area share) ──
-  var mix={}; scope.forEach(function(b){ mix[b.product_id]=(mix[b.product_id]||0)+Number(b.total_area_fed||0); });
+  // ── Crop mix (total & bearing area) ──
+  var mix={},mixB={}; scope.forEach(function(b){ mix[b.product_id]=(mix[b.product_id]||0)+Number(b.total_area_fed||0); mixB[b.product_id]=(mixB[b.product_id]||0)+Number(b.planted_area_fed||0); });
   var mixTot=Object.keys(mix).reduce(function(a,k){return a+mix[k];},0)||1;
   var mixKeys=Object.keys(mix).sort(function(a,b){return mix[b]-mix[a];});
 
-  // ── Planting-age profile (3-year buckets) ──
-  var buck={}; scope.forEach(function(b){ if(!b.planting_year) return; var d=Math.floor(b.planting_year/3)*3; buck[d]=(buck[d]||0)+1; });
+  // ── Planting-age profile (3-year buckets, distinct plots) ──
+  var buck={},buckSeen={}; scope.forEach(function(b){ if(!b.planting_year) return; var d=Math.floor(b.planting_year/3)*3; var pk=d+'|'+b.farm_code+'|'+b.sector_code+'|'+b.plot_code; if(buckSeen[pk]) return; buckSeen[pk]=1; buck[d]=(buck[d]||0)+1; });
   var buckKeys=Object.keys(buck).sort(); var buckMax=buckKeys.reduce(function(m,k){return Math.max(m,buck[k]);},1);
 
   var mixPanel=ce('div',{className:'card'},
     ce('div',{className:'section-title'},ce('span',{className:'section-title-bar'}),'Crop mix'),
-    mixKeys.length?mixKeys.map(function(c){ var v=mix[c];
-      return ce('div',{key:c,style:{marginBottom:8}},
-        ce('div',{style:{display:'flex',fontSize:12,marginBottom:3}}, ce('span',null,cropName(c)),
-          ce('span',{style:{marginLeft:'auto',fontFamily:'var(--font-mono)',color:'var(--text3)'}}, fmt(Math.round(v))+' fed · '+Math.round(v/mixTot*100)+'%')),
-        ce('div',{style:{height:7,background:'var(--bg2)',borderRadius:4,overflow:'hidden'}},
-          ce('div',{style:{height:'100%',width:(v/mixTot*100)+'%',background:CROP_COLORS[c]||'#888',borderRadius:4}})));
+    ce('div',{style:{display:'flex',gap:14,alignItems:'center',margin:'2px 0 12px',fontSize:11,color:'var(--text3)'}},
+      ce('span',null, ce('span',{style:{display:'inline-block',width:20,height:8,borderRadius:3,background:'var(--accent)',opacity:.30,verticalAlign:'middle',marginRight:6}}),'Total area'),
+      ce('span',null, ce('span',{style:{display:'inline-block',width:20,height:8,borderRadius:3,background:'var(--accent)',verticalAlign:'middle',marginRight:6}}),'Bearing area'),
+      ce('span',{style:{marginLeft:'auto'}},'% = share of total')),
+    mixKeys.length?mixKeys.map(function(c){ var v=mix[c], vb=mixB[c]||0, col=CROP_COLORS[c]||'#888';
+      return ce('div',{key:c,style:{marginBottom:9}},
+        ce('div',{style:{display:'flex',fontSize:12,marginBottom:4}}, ce('span',null,cropName(c)),
+          ce('span',{style:{marginLeft:'auto',fontFamily:'var(--font-mono)',color:'var(--text3)',fontSize:11.5}}, 'Total ',ce('b',{style:{color:'var(--text2)'}},fmt(Math.round(v))),' · Bearing ',ce('b',{style:{color:'var(--text2)'}},fmt(Math.round(vb))),' fed · '+Math.round(v/mixTot*100)+'%')),
+        ce('div',{style:{position:'relative',height:9,background:'var(--bg2)',borderRadius:5,overflow:'hidden'}},
+          ce('div',{style:{position:'absolute',left:0,top:0,height:'100%',width:(v/mixTot*100)+'%',background:col,opacity:.30,borderRadius:5}}),
+          ce('div',{style:{position:'absolute',left:0,top:0,height:'100%',width:(vb/mixTot*100)+'%',background:col,borderRadius:5}})));
     }):ce('div',{style:{fontSize:12,color:'var(--text3)'}},'No blocks in scope.'));
 
   var agePanel=ce('div',{className:'card'},
     ce('div',{className:'section-title'},ce('span',{className:'section-title-bar'}),'Planting age profile'),
     ce('div',{style:{display:'flex',alignItems:'flex-end',gap:5,height:88}},
       buckKeys.length?buckKeys.map(function(k){
-        return ce('div',{key:k,title:buck[k]+' blocks planted '+k+'–'+(Number(k)+2),style:{flex:1,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'flex-end',height:'100%'}},
+        return ce('div',{key:k,title:buck[k]+(buck[k]===1?' plot':' plots')+' planted '+k+'–'+(Number(k)+2),style:{flex:1,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'flex-end',height:'100%'}},
           ce('div',{style:{fontSize:9,color:'var(--text2)',fontFamily:'var(--font-mono)',marginBottom:2}}, buck[k]),
           ce('div',{style:{width:'70%',height:Math.max(2,Math.round(buck[k]/buckMax*66))+'px',background:'var(--accent)',borderRadius:'3px 3px 0 0'}}),
           ce('div',{style:{fontSize:10,color:'var(--text3)',marginTop:4,fontFamily:'var(--font-mono)'}}, "'"+String(k).slice(2)));
       }):ce('div',{style:{fontSize:12,color:'var(--text3)'}},'No planting years recorded.')),
-    ce('div',{style:{fontSize:11,color:'var(--text3)',marginTop:6}},'Blocks by planting year (3-yr buckets).'));
+    ce('div',{style:{fontSize:11,color:'var(--text3)',marginTop:6}},'Plots by planting year (3-yr buckets).'));
 
   var bview=scope.slice(0,72);
   var blocksInView=ce('div',{className:'card'},
