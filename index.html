@@ -797,13 +797,13 @@ function RegisterScreen(ctx){
     ce('div',null,
       ce('div',{className:'table-wrap'},
         ce('table',null,
-          ce('thead',null,ce('tr',null,['Block ID','Crop','Farm','Aydi','Variety','Rootstock','Planted','Total fed','Bearing fed','Last season','Aero ha','Cost ctr','Status'].map(function(h){return ce('th',{key:h},h);}))),
+          ce('thead',null,ce('tr',null,['Aydi','Block ID','Crop','Farm','Variety','Rootstock','Planted','Total fed','Bearing fed','Last season','Aero ha','Cost ctr','Status'].map(function(h){return ce('th',{key:h},h);}))),
           ce('tbody',null, st.rows.map(function(b){
             return ce('tr',{key:b.id,className:'rowlink',onClick:function(){setSel(b);}},
-              ce('td',null, ce('span',{className:'lot'}, b.operational_block_id)),
+              ce('td',null, ce('span',{className:'lot',style:{fontWeight:600}}, b.aydi_block_number||'—')),
+              ce('td',null, ce('span',{className:'lot',style:{color:'var(--text3)'},title:'Operational block ID'}, b.operational_block_id)),
               ce('td',null, ce('span',{style:{display:'inline-block',width:8,height:8,borderRadius:2,background:CROP_COLORS[b.product_id]||'#999',marginRight:6}}), b.product_id),
               ce('td',null, (b.farms&&b.farms.name)||b.farm_code),
-              ce('td',{className:'num'}, b.aydi_block_number),
               ce('td',{className:'ar',dir:'auto'}, (b.varieties&&b.varieties.name)||'—'),
               ce('td',{className:'ar',dir:'auto'}, (b.farm_rootstocks&&b.farm_rootstocks.name)||'—'),
               ce('td',{className:'num'}, b.planting_year),
@@ -1998,8 +1998,8 @@ function ReconciliationScreen(ctx){
 
   // cost-centre tab body
   var ccBody;
-  if(tab==='missing') ccBody=ce('table',null, ce('thead',null,ce('tr',null,ce('th',null,'Block'),ce('th',null,'Farm'),ce('th',{className:'num'},'Area fed'))), ce('tbody',null, missing.slice(0,200).map(function(b){return ce('tr',{key:b.operational_block_id},ce('td',null,ce('span',{className:'lot'},b.operational_block_id)),ce('td',null,(b.farms&&b.farms.name)||b.farm_code),ce('td',{className:'num'},fmt(b.total_area_fed)));})));
-  else if(tab==='mismatch') ccBody=ce('table',null, ce('thead',null,ce('tr',null,ce('th',null,'Block'),ce('th',null,'Farm'),ce('th',{className:'num'},'Cost centre'),ce('th',null,'Expected'))), ce('tbody',null, mismatch.length?mismatch.map(function(b){return ce('tr',{key:b.operational_block_id},ce('td',null,ce('span',{className:'lot'},b.operational_block_id)),ce('td',null,(b.farms&&b.farms.name)||b.farm_code),ce('td',{className:'num'},ce('span',{className:'lot',style:{color:'var(--amber)'}},b.jde_cost_center_id)),ce('td',null,'…'+FARM_NUM[b.farm_code]+'…'));}):[ce('tr',{key:0},ce('td',{colSpan:4,style:{color:'var(--text3)'}},'No cost-centre / farm mismatches for this crop.'))]));
+  if(tab==='missing') ccBody=ce('table',null, ce('thead',null,ce('tr',null,ce('th',null,'Block'),ce('th',null,'Farm'),ce('th',{className:'num'},'Area fed'))), ce('tbody',null, missing.slice(0,200).map(function(b){return ce('tr',{key:b.operational_block_id},ce('td',null,ce('span',{className:'lot',title:b.operational_block_id},b.aydi_block_number||b.operational_block_id)),ce('td',null,(b.farms&&b.farms.name)||b.farm_code),ce('td',{className:'num'},fmt(b.total_area_fed)));})));
+  else if(tab==='mismatch') ccBody=ce('table',null, ce('thead',null,ce('tr',null,ce('th',null,'Block'),ce('th',null,'Farm'),ce('th',{className:'num'},'Cost centre'),ce('th',null,'Expected'))), ce('tbody',null, mismatch.length?mismatch.map(function(b){return ce('tr',{key:b.operational_block_id},ce('td',null,ce('span',{className:'lot',title:b.operational_block_id},b.aydi_block_number||b.operational_block_id)),ce('td',null,(b.farms&&b.farms.name)||b.farm_code),ce('td',{className:'num'},ce('span',{className:'lot',style:{color:'var(--amber)'}},b.jde_cost_center_id)),ce('td',null,'…'+FARM_NUM[b.farm_code]+'…'));}):[ce('tr',{key:0},ce('td',{colSpan:4,style:{color:'var(--text3)'}},'No cost-centre / farm mismatches for this crop.'))]));
   else { var byCC={}; B.forEach(function(b){ var k=b.jde_cost_center_id||'(none)'; var c=byCC[k]=byCC[k]||{n:0,a:0}; c.n++; c.a+=Number(b.total_area_fed||0); }); ccBody=ce('table',null, ce('thead',null,ce('tr',null,ce('th',null,'Cost centre'),ce('th',{className:'num'},'Blocks'),ce('th',{className:'num'},'Area fed'))), ce('tbody',null, Object.keys(byCC).sort().map(function(k){return ce('tr',{key:k},ce('td',null,ce('span',{className:'lot'},k)),ce('td',{className:'num'},byCC[k].n),ce('td',{className:'num'},fmt(Math.round(byCC[k].a))));}))); }
 
   return ce('div',null,
@@ -2025,7 +2025,7 @@ function ReconciliationScreen(ctx){
           ce('table',{style:{minWidth:'auto'}},
             ce('thead',null,ce('tr',null,ce('th',null,'Block'),ce('th',{className:'num'},'Book'),ce('th',{className:'num'},'Aero'),ce('th',{className:'num'},'Δ fed'),ce('th',{className:'num'},'Δ %'))),
             ce('tbody',null, areaSorted.map(function(b){var over=Math.abs(b.vpct)>10; return ce('tr',{key:b.operational_block_id},
-              ce('td',null,ce('span',{className:'lot'},b.operational_block_id)),
+              ce('td',null,ce('span',{className:'lot',title:b.operational_block_id},b.aydi_block_number||b.operational_block_id)),
               ce('td',{className:'num'},fmt(b.total_area_fed)),
               ce('td',{className:'num'},fmt(b.af)),
               ce('td',{className:'num'},fmt(b.vfed)),
@@ -2229,7 +2229,7 @@ function SeasonEntryScreen(ctx){
             var actual=parseFloat(metricVal(row,'actual_production')); var bn=parseFloat(bv);
             var tfed=(isFinite(actual)&&isFinite(bn)&&bn>0)?(actual/bn).toFixed(2):'';
             return ce('tr',{key:b.id},
-              ce('td',{className:'stickyc'}, ce('span',{className:'lot'},b.operational_block_id), ce('div',{className:'ar',dir:'auto',style:{fontSize:10,color:'var(--text3)',marginTop:1}}, (b.varieties&&b.varieties.name)||'')),
+              ce('td',{className:'stickyc'}, ce('span',{className:'lot',title:b.operational_block_id},b.aydi_block_number||b.operational_block_id), ce('div',{className:'ar',dir:'auto',style:{fontSize:10,color:'var(--text3)',marginTop:1}}, (b.varieties&&b.varieties.name)||'')),
               ce('td',null, ce('input',{className:'derived',readOnly:true,value:Number(b.total_area_fed).toFixed(2),title:'total_area_fed — lives on the block'})),
               ce('td',null, ce('input',{value:bv,disabled:!ctx.canWrite,style:blocked?{borderColor:'var(--red)',background:'var(--red-bg)'}:null,onChange:function(ev){editBearing(row,ev.target.value);}}),
                 src?ce('span',{className:'carr'+(src==='stated'?' st':'')}, src):null),
