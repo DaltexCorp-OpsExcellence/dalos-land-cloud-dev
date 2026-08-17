@@ -630,17 +630,18 @@ function StructureScreen(ctx){
 
   var mixPanel=ce('div',{className:'card'},
     ce('div',{className:'section-title'},ce('span',{className:'section-title-bar'}),'Crop mix'),
-    ce('div',{style:{display:'flex',gap:14,alignItems:'center',margin:'2px 0 12px',fontSize:11,color:'var(--text3)'}},
+    ce('div',{style:{display:'flex',flexWrap:'wrap',gap:14,rowGap:4,alignItems:'center',margin:'2px 0 12px',fontSize:11,color:'var(--text3)'}},
       ce('span',null, ce('span',{style:{display:'inline-block',width:20,height:8,borderRadius:3,background:'var(--accent)',opacity:.30,verticalAlign:'middle',marginRight:6}}),'Total area'),
       ce('span',null, ce('span',{style:{display:'inline-block',width:20,height:8,borderRadius:3,background:'var(--accent)',verticalAlign:'middle',marginRight:6}}),'Bearing area'),
       ce('span',{style:{marginLeft:'auto'}},'% = share of total')),
     mixKeys.length?mixKeys.map(function(c){ var v=mix[c], vb=mixB[c]||0, col=CROP_COLORS[c]||'#888';
-      return ce('div',{key:c,style:{marginBottom:9}},
-        ce('div',{style:{display:'flex',fontSize:12,marginBottom:4}}, ce('span',null,cropName(c)),
-          ce('span',{style:{marginLeft:'auto',fontFamily:'var(--font-mono)',color:'var(--text3)',fontSize:11.5}}, 'Total ',ce('b',{style:{color:'var(--text2)'}},fmt(Math.round(v))),' · Bearing ',ce('b',{style:{color:'var(--text2)'}},fmt(Math.round(vb))),' fed · '+Math.round(v/mixTot*100)+'%')),
+      return ce('div',{key:c,style:{marginBottom:11}},
+        ce('div',{style:{display:'flex',alignItems:'baseline',gap:8,fontSize:12,marginBottom:4}}, ce('span',null,cropName(c)),
+          ce('span',{style:{marginLeft:'auto',flexShrink:0,fontFamily:'var(--font-mono)',color:'var(--text2)'}}, Math.round(v/mixTot*100)+'%')),
         ce('div',{style:{position:'relative',height:9,background:'var(--bg2)',borderRadius:5,overflow:'hidden'}},
           ce('div',{style:{position:'absolute',left:0,top:0,height:'100%',width:(v/mixTot*100)+'%',background:col,opacity:.30,borderRadius:5}}),
-          ce('div',{style:{position:'absolute',left:0,top:0,height:'100%',width:(vb/mixTot*100)+'%',background:col,borderRadius:5}})));
+          ce('div',{style:{position:'absolute',left:0,top:0,height:'100%',width:(vb/mixTot*100)+'%',background:col,borderRadius:5}})),
+        ce('div',{style:{fontFamily:'var(--font-mono)',color:'var(--text3)',fontSize:11,marginTop:4}}, 'Total ',ce('b',{style:{color:'var(--text2)'}},fmt(Math.round(v))),' · Bearing ',ce('b',{style:{color:'var(--text2)'}},fmt(Math.round(vb))),' fed'));
     }):ce('div',{style:{fontSize:12,color:'var(--text3)'}},'No blocks in scope.'));
 
   var agePanel=ce('div',{className:'card'},
