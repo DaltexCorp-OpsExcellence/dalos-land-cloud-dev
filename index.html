@@ -1753,15 +1753,17 @@ function BulkImportScreen(ctx){
 
 /* ── Reference Data (§6.11) — Metrics / Rootstocks / Varieties admin ── */
 var ROLE_BADGE={total:'badge-pass',aggregate:'badge-warn',residual:'badge-warn',plan:'badge-neutral',branch:'badge-neutral',child:'badge-neutral',other:'badge-neutral'};
+var ROLE_ORDER=['total','plan','aggregate','branch','child','residual','other'];
 function ReferenceDataScreen(ctx){
   var tb=useState('metrics'); var tab=tb[0],setTab=tb[1];
   var s=useState({loading:true,err:null,d:null}); var st=s[0],set=s[1];
   var msg=useState(null); var flash=msg[0],setFlash=msg[1];
+  var no=useState(false); var newOpen=no[0],setNewOpen=no[1];
   useEffect(function(){ load(); },[]);
   function load(){
     set({loading:true,err:null,d:null});
     Promise.all([
-      supabase.from('farm_metrics').select('code,name_en,name_ar,role,parent_code,aliases,active').order('code'),
+      supabase.from('farm_metrics').select('id,code,name_en,name_ar,role,parent_code,aliases,active').order('code'),
       supabase.from('farm_metric_sets').select('id,product_id,season_year,scenario,farm_metric_set_items(metric_id)').order('product_id').order('season_year'),
       supabase.from('farm_rootstocks').select('id,code,name,product_id,raw_names,active').order('code'),
       supabase.from('varieties').select('id,code,name,canonical_name,raw_names,product_id,active').order('product_id').order('name'),
@@ -1803,8 +1805,10 @@ function ReferenceDataScreen(ctx){
             ce('td',null,m.parent_code?ce('span',{className:'lot'},m.parent_code):'—'),
             ce('td',{className:'ar',dir:'auto',style:{fontSize:11,color:'var(--text3)'}},(m.aliases||[]).join(' · ')||'—'));}))
         )),
-      ce('div',{className:'section-title'},ce('span',{className:'section-title-bar'}),'Metric sets ('+d.sets.length+') — clone for a new season'),
-      ce('div',{className:'note',style:{marginBottom:10}},ce('b',null,'This is the architectural claim (AC4):'),' adding next season is cloning a set here — one row in ',ce('span',{className:'lot'},'farm_metric_sets'),' and its items. No code change, no migration, no deploy.'),
+      ce('div',{style:{display:'flex',alignItems:'center',justifyContent:'space-between',margin:'4px 0 10px'}},
+        ce('div',{className:'section-title',style:{margin:0}},ce('span',{className:'section-title-bar'}),'Metric sets ('+d.sets.length+') — clone forward, or build a new one'),
+        ctx.isAdmin?ce('button',{className:'btn btn-primary btn-sm',onClick:function(){setNewOpen(true);}},'+ New set'):null),
+      ce('div',{className:'note',style:{marginBottom:10}},ce('b',null,'Two ways to add a set.'),' ',ce('b',null,'Clone →'),' copies a set forward one year — same crop, same scenario. ',ce('b',null,'+ New set'),' builds any crop · season · scenario, the only way to start a scenario a crop has never had (e.g. a first ',ce('span',{className:'lot'},'plan'),'). Both write only ',ce('span',{className:'lot'},'farm_metric_sets'),' and its items — no migration, no deploy.'),
       ce('div',{className:'table-wrap'},
         ce('table',null,
           ce('thead',null,ce('tr',null,['Crop','Season','Scenario','Metrics',''].map(function(h){return ce('th',{key:h},h);}))),
@@ -1856,7 +1860,95 @@ function ReferenceDataScreen(ctx){
     ce('div',{style:{display:'flex',gap:4,marginBottom:12}},
       [['metrics','Metrics'],['rootstocks','Rootstocks'],['varieties','Varieties']].map(function(t){
         return ce('button',{key:t[0],className:'chip'+(tab===t[0]?' active':''),onClick:function(){setTab(t[0]);setFlash(null);}},t[1]);})),
-    body
+    body,
+    newOpen?ce(NewMetricSetModal,{ctx:ctx,metrics:d.metrics,sets:d.sets,
+      onClose:function(){setNewOpen(false);},
+      onDone:function(m){ setNewOpen(false); setTab('metrics'); setFlash({kind:'ok',t:m+' No migration, no deploy.'}); load(); }}):null
+  );
+}
+
+/* ── New metric set — build any crop · season · scenario from a template ── */
+function metricSources(metrics, sets, crop, scenario){
+  var same=(sets||[]).filter(function(s){return s.scenario===scenario;}).slice().sort(function(a,b){
+    var ac=a.product_id===crop?0:1, bc=b.product_id===crop?0:1; if(ac!==bc) return ac-bc; return b.season_year-a.season_year; });
+  var opts=[];
+  if(scenario==='plan'){
+    var planIds=(metrics||[]).filter(function(m){return m.role==='plan';}).map(function(m){return m.id;});
+    if(planIds.length) opts.push({id:'tpl_plan', label:'Standard plan template ('+planIds.length+' metrics)', cols:planIds});
+  }
+  same.forEach(function(s){ var ids=(s.farm_metric_set_items||[]).map(function(it){return it.metric_id;});
+    opts.push({id:'copy:'+s.id, label:'Copy from '+s.product_id+' · '+s.season_year+' · '+s.scenario+' ('+ids.length+')', cols:ids}); });
+  opts.push({id:'blank', label:'Blank — pick manually', cols:[]});
+  // default: same-crop existing set → plan template → any set → blank
+  var def; if(same[0]&&same[0].product_id===crop) def='copy:'+same[0].id;
+  else if(scenario==='plan'&&opts[0]&&opts[0].id==='tpl_plan') def='tpl_plan';
+  else if(same[0]) def='copy:'+same[0].id; else def='blank';
+  return {opts:opts, def:def};
+}
+function NewMetricSetModal(p){
+  var crop0=(p.ctx.crop&&p.ctx.crop!=='all')?p.ctx.crop:((p.ctx.products[0]||{}).id||'citrus');
+  var cs=useState(crop0); var crop=cs[0],setCrop=cs[1];
+  var ys=useState(String(p.ctx.season||'')); var year=ys[0],setYear=ys[1];
+  var ss=useState('plan'); var scenario=ss[0],setScenario=ss[1];
+  var initSrc=metricSources(p.metrics,p.sets,crop0,'plan');
+  var srcS=useState(initSrc.def); var sourceId=srcS[0],setSourceId=srcS[1];
+  function seed(cols){ var o={}; (cols||[]).forEach(function(id){o[id]=true;}); return o; }
+  var initCols=(initSrc.opts.filter(function(o){return o.id===initSrc.def;})[0]||{}).cols||[];
+  var ch=useState(seed(initCols)); var checked=ch[0],setChecked=ch[1];
+  var sh=useState(false); var showList=sh[0],setShowList=sh[1];
+  var bs=useState(false); var busy=bs[0],setBusy=bs[1];
+  var es=useState(null); var err=es[0],setErr=es[1];
+
+  var src=metricSources(p.metrics,p.sets,crop,scenario);
+  function reseed(id, opts){ var o=(opts||src.opts).filter(function(x){return x.id===id;})[0]; setChecked(seed(o?o.cols:[])); setSourceId(id); }
+  function onCrop(v){ setCrop(v); var s=metricSources(p.metrics,p.sets,v,scenario); reseed(s.def, s.opts); }
+  function onScenario(v){ setScenario(v); var s=metricSources(p.metrics,p.sets,crop,v); reseed(s.def, s.opts); }
+
+  var byRole={}; (p.metrics||[]).forEach(function(m){ (byRole[m.role]=byRole[m.role]||[]).push(m); });
+  var ordered=[]; ROLE_ORDER.forEach(function(r){ (byRole[r]||[]).forEach(function(m){ordered.push(m);}); });
+  Object.keys(byRole).forEach(function(r){ if(ROLE_ORDER.indexOf(r)<0)(byRole[r]||[]).forEach(function(m){ordered.push(m);}); });
+  var nSel=ordered.filter(function(m){return checked[m.id];}).length;
+
+  function create(){
+    var y=parseInt(year,10);
+    if(!y||y<2000||y>2100){ setErr('Enter a valid season year.'); return; }
+    var ids=ordered.filter(function(m){return checked[m.id];}).map(function(m){return m.id;});
+    if(!ids.length){ setErr('Pick at least one metric, or choose a template.'); return; }
+    setBusy(true); setErr(null);
+    supabase.from('farm_metric_sets').insert({product_id:crop,season_year:y,scenario:scenario}).select('id').single().then(function(ins){
+      if(ins.error){ setBusy(false); setErr(/duplicate|unique/i.test(ins.error.message)?(crop+' '+y+' '+scenario+' already exists.'):('Create failed: '+ins.error.message)); return; }
+      var items=ids.map(function(id,i){return {metric_set_id:ins.data.id,metric_id:id,sort_order:i+1};});
+      supabase.from('farm_metric_set_items').insert(items).then(function(ir){
+        setBusy(false);
+        if(ir.error){ setErr('Set created but items failed — add them or delete the empty set: '+ir.error.message); return; }
+        p.onDone('Created '+crop+' '+y+' '+scenario+' ('+items.length+' metrics).');
+      });
+    });
+  }
+
+  var list=ce('div',{className:'table-wrap',style:{maxHeight:240,overflowY:'auto',marginTop:8}},
+    ROLE_ORDER.filter(function(r){return byRole[r];}).map(function(r){ return ce('div',{key:r},
+      ce('div',{style:{fontSize:9.5,textTransform:'uppercase',letterSpacing:'.08em',color:'var(--text3)',fontWeight:700,padding:'8px 12px 3px',background:'var(--bg2)'}},r),
+      (byRole[r]||[]).map(function(m){ return ce('label',{key:m.id,style:{display:'flex',alignItems:'center',gap:10,padding:'7px 12px',borderTop:'1px solid var(--border)',cursor:'pointer'}},
+        ce('input',{type:'checkbox',checked:!!checked[m.id],onChange:function(e){ var o=Object.assign({},checked); if(e.target.checked)o[m.id]=true; else delete o[m.id]; setChecked(o); }}),
+        ce('span',{style:{flex:1,fontSize:13}},m.name_en),
+        ce('span',{className:'lot',style:{fontSize:11}},m.code)); }));
+    }));
+
+  return ce(Modal,{title:'New metric set',sub:'writes farm_metric_sets + items · admin only',onClose:p.onClose,busy:busy,
+    footer:[ce('button',{key:'c',className:'btn btn-secondary',onClick:p.onClose,disabled:busy},'Cancel'),
+            ce('button',{key:'ok',className:'btn btn-primary',onClick:create,disabled:busy},busy?'Creating…':'Create set')]},
+    err?ce('div',{className:'alert alert-fail',style:{marginBottom:10}},ce('span',null,'✕'),ce('div',null,err)):null,
+    ce('div',{className:'field-row'},
+      ce(Field,{label:'Crop'}, selx(crop,onCrop,(p.ctx.products||[]).map(function(pr){return {v:pr.id,l:pr.name||pr.id};}))),
+      ce(Field,{label:'Season year'}, txt(year,setYear,{inputMode:'numeric',placeholder:'2026'}))),
+    ce('div',{className:'field-row'},
+      ce(Field,{label:'Scenario'}, selx(scenario,onScenario,[{v:'plan',l:'plan'},{v:'actual',l:'actual'}])),
+      ce(Field,{label:'Start from'}, selx(sourceId,function(v){reseed(v);},src.opts.map(function(o){return {v:o.id,l:o.label};})))),
+    ce('div',{className:'form-hint',style:{marginTop:6}},'Columns are filled from “Start from”. You can just press ',ce('b',null,'Create'),' — open “Review & adjust” only to change them.'),
+    ce('button',{className:'chip',style:{marginTop:12},onClick:function(){setShowList(!showList);}}, (showList?'▾':'▸')+' Review & adjust columns · '+nSel+' selected'),
+    showList?list:null,
+    ce('div',{className:'note',style:{marginTop:12,background:'var(--green-bg)',borderColor:'var(--green-border)',color:'var(--green)'}},'On save: one farm_metric_sets row + '+nSel+' item rows. Same write path as Clone — no migration, no deploy.')
   );
 }
 
