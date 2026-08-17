@@ -144,6 +144,20 @@ tr:last-child td{border-bottom:none}
 .staging-badge.on{display:inline-flex}
 .staging-dot{width:7px;height:7px;border-radius:50%;background:rgba(255,255,255,.9);display:inline-block;flex-shrink:0;animation:pulse 1.4s ease-in-out infinite}
 @keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(1.3)}}
+/* Land Cloud mark loading animation — dashed ring marches, inner hex breathes,
+   corner nodes twinkle. Applied only to marks carrying .lc-anim (splash + boot). */
+.lc-anim .lc-ring{animation:lc-march 2.2s linear infinite}
+.lc-anim .lc-core{transform-box:fill-box;transform-origin:center;animation:lc-core 2.4s ease-in-out infinite}
+.lc-anim .lc-node{transform-box:fill-box;transform-origin:center;animation:lc-twinkle 1.8s ease-in-out infinite}
+.lc-anim .lc-node:nth-of-type(2){animation-delay:.12s}
+.lc-anim .lc-node:nth-of-type(3){animation-delay:.24s}
+.lc-anim .lc-node:nth-of-type(4){animation-delay:.36s}
+.lc-anim .lc-node:nth-of-type(5){animation-delay:.48s}
+.lc-anim .lc-node:nth-of-type(6){animation-delay:.6s}
+@keyframes lc-march{to{stroke-dashoffset:-46}}
+@keyframes lc-core{0%,100%{opacity:.72;transform:scale(.9)}50%{opacity:1;transform:scale(1.07)}}
+@keyframes lc-twinkle{0%,100%{opacity:.35}50%{opacity:1}}
+@media(prefers-reduced-motion:reduce){.lc-anim .lc-ring,.lc-anim .lc-core,.lc-anim .lc-node{animation:none;opacity:1;transform:none;stroke-dashoffset:0}}
 
 /* Login */
 .login-wrap{height:100vh;display:flex;align-items:center;justify-content:center;background:var(--sidebar)}
@@ -403,11 +417,10 @@ thead .stickyc{background:var(--card)}
 <div id="root"></div>
 <!-- pre-mount splash: shows instantly while React/fonts/supabase load, faded out on mount -->
 <div id="lc-splash" style="position:fixed;inset:0;z-index:9999;background:#0e3a3d;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;transition:opacity .45s ease">
-  <svg width="60" height="60" viewBox="0 0 64 64" fill="none" aria-label="DalOS Land Cloud">
-    <path d="M8 22 L27 6 L52 13 L58 36 L39 56 L14 48 Z" stroke="#5fc9c4" stroke-width="2.4" stroke-linejoin="round" stroke-dasharray="6.5 5" opacity=".9"/>
-    <path d="M19 25 L30 17 L45 21 L48 34 L36 45 L22 40 Z" fill="#8fe0ad"/>
-    <g fill="#5fc9c4"><circle cx="8" cy="22" r="2.9"/><circle cx="27" cy="6" r="2.9"/><circle cx="52" cy="13" r="2.9"/><circle cx="58" cy="36" r="2.9"/><circle cx="39" cy="56" r="2.9"/><circle cx="14" cy="48" r="2.9"/></g>
-    <animateTransform attributeName="transform" attributeType="XML" type="scale" values="1;1.04;1" dur="2.4s" repeatCount="indefinite" additive="sum"/>
+  <svg class="lc-anim" width="60" height="60" viewBox="0 0 64 64" fill="none" aria-label="DalOS Land Cloud">
+    <path class="lc-ring" d="M8 22 L27 6 L52 13 L58 36 L39 56 L14 48 Z" stroke="#5fc9c4" stroke-width="2.4" stroke-linejoin="round" stroke-dasharray="6.5 5" opacity=".9"/>
+    <path class="lc-core" d="M19 25 L30 17 L45 21 L48 34 L36 45 L22 40 Z" fill="#8fe0ad"/>
+    <g fill="#5fc9c4"><circle class="lc-node" cx="8" cy="22" r="2.9"/><circle class="lc-node" cx="27" cy="6" r="2.9"/><circle class="lc-node" cx="52" cy="13" r="2.9"/><circle class="lc-node" cx="58" cy="36" r="2.9"/><circle class="lc-node" cx="39" cy="56" r="2.9"/><circle class="lc-node" cx="14" cy="48" r="2.9"/></g>
   </svg>
   <div style="font-family:'DM Serif Display',Georgia,serif;font-size:22px"><span style="color:#f4f1e8">Dal</span><span style="color:#5fc9c4">OS</span><span style="color:#f4f1e8"> Land Cloud</span></div>
   <div style="font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#5f8583;font-family:'Instrument Sans',system-ui,sans-serif">Loading…</div>
@@ -3008,12 +3021,12 @@ function BenchmarkScreen(ctx){
 
 /* ── Land Cloud mark (surveyed parcel): dashed boundary = total area, solid mint
    interior = bearing area. light=true → Teal & Sand (on white); else dark-bg mint. ── */
-function lcMark(size,light){
+function lcMark(size,light,animated){
   var bd=light?'#159490':'#5fc9c4', pl=light?'#0d6a68':'#8fe0ad';
-  return ce('svg',{width:size,height:size,viewBox:'0 0 64 64',fill:'none','aria-hidden':'true',style:{flex:'none',display:'block'}},
-    ce('path',{d:'M8 22 L27 6 L52 13 L58 36 L39 56 L14 48 Z',stroke:bd,strokeWidth:2.4,strokeLinejoin:'round',strokeDasharray:'6.5 5',opacity:0.9}),
-    ce('path',{d:'M19 25 L30 17 L45 21 L48 34 L36 45 L22 40 Z',fill:pl}),
-    ce('g',{fill:bd}, [[8,22],[27,6],[52,13],[58,36],[39,56],[14,48]].map(function(pt,i){ return ce('circle',{key:i,cx:pt[0],cy:pt[1],r:2.9}); })));
+  return ce('svg',{width:size,height:size,viewBox:'0 0 64 64',fill:'none','aria-hidden':'true',className:animated?'lc-anim':undefined,style:{flex:'none',display:'block'}},
+    ce('path',{className:'lc-ring',d:'M8 22 L27 6 L52 13 L58 36 L39 56 L14 48 Z',stroke:bd,strokeWidth:2.4,strokeLinejoin:'round',strokeDasharray:'6.5 5',opacity:0.9}),
+    ce('path',{className:'lc-core',d:'M19 25 L30 17 L45 21 L48 34 L36 45 L22 40 Z',fill:pl}),
+    ce('g',{fill:bd}, [[8,22],[27,6],[52,13],[58,36],[39,56],[14,48]].map(function(pt,i){ return ce('circle',{key:i,className:'lc-node',cx:pt[0],cy:pt[1],r:2.9}); })));
 }
 function initials(n){ n=(n||'').trim(); if(!n) return '—'; var p=n.split(/\s+/); return (((p[0]||'')[0]||'')+((p.length>1?(p[p.length-1][0]||''):''))).toUpperCase(); }
 // Workspace app-grid icon (3×3), matches the Commercial/CRM switch
@@ -3061,7 +3074,7 @@ function App(){
 
   // Match the static #lc-splash exactly (dark #0e3a3d, same mark + wordmark) so the
   // hand-off static-splash → React-boot is invisible — no background flash before login.
-  if(auth.phase==='boot') return ce('div',{style:{position:'fixed',inset:0,zIndex:9998,background:'#0e3a3d',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:16}}, lcMark(52,false), ce('div',{style:{fontFamily:'var(--font-display)',fontSize:22}}, ce('span',{style:{color:'#f4f1e8'}},'Dal'), ce('span',{style:{color:'#5fc9c4'}},'OS'), ce('span',{style:{color:'#f4f1e8'}},' Land Cloud')));
+  if(auth.phase==='boot') return ce('div',{style:{position:'fixed',inset:0,zIndex:9998,background:'#0e3a3d',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:16}}, lcMark(52,false,true), ce('div',{style:{fontFamily:'var(--font-display)',fontSize:22}}, ce('span',{style:{color:'#f4f1e8'}},'Dal'), ce('span',{style:{color:'#5fc9c4'}},'OS'), ce('span',{style:{color:'#f4f1e8'}},' Land Cloud')));
   if(auth.phase==='login') return ce(Login,null);
   if(auth.phase==='noaccess') return ce(NoAccess,{email:(auth.session&&auth.session.user.email)});
 
