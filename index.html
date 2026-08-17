@@ -2609,7 +2609,7 @@ function NewBlockModal(p){
     total_area_fed:'',planted_area_fed:'',aerobotics_area_ha:'',trees:'',lifecycle:'bearing',jde:'',comments:'',geom:p.seedGeojson||null}); var v=f[0],setV=f[1];
   var mo=useState(!!p.seedGeojson); var showMap=mo[0],setShowMap=mo[1];
   var st=useState({busy:false,err:null}); var s=st[0],setS=st[1];
-  useEffect(function(){ supabase.from('farms').select('id,name,farm_code').eq('active',true).order('name').then(function(r){ setFarms(r.data||[]);
+  useEffect(function(){ supabase.from('farms').select('id,name,farm_code').eq('active',true).order('name').then(function(r){ setFarms((r.data||[]).filter(function(x){return x.farm_code&&String(x.farm_code).trim();}));
     if(p.seedGeojson){ var ha=geojsonHa(p.seedGeojson); if(ha!=null) setV(function(x){ return Object.assign({},x,{aerobotics_area_ha:x.aerobotics_area_ha||String(Math.round(ha*100)/100),total_area_fed:x.total_area_fed||String(Math.round(ha*2.38095*100)/100)}); }); }
   }); },[]);
   function up(k){ return function(val){ setV(Object.assign({},v,mkObj(k,val))); }; }
@@ -2712,7 +2712,7 @@ function AssignPanel(p){
   var suggest=(function(){ if(!p.centroid||!p.farmCentroids||!p.farmCentroids.length) return null;
     var best=null; p.farmCentroids.forEach(function(f){ var d=haversineKm(p.centroid,f); if(best==null||d<best.d) best={f:f,d:d}; });
     return (best&&best.d<8)?best:null; })();
-  useEffect(function(){ supabase.from('farms').select('id,name,farm_code').eq('active',true).order('name').then(function(r){ setFarms(r.data||[]); });
+  useEffect(function(){ supabase.from('farms').select('id,name,farm_code').eq('active',true).order('name').then(function(r){ setFarms((r.data||[]).filter(function(x){return x.farm_code&&String(x.farm_code).trim();})); });
     if(suggest) setFarmCode(suggest.f.code);
     else if(p.ctx.map.farm&&p.ctx.map.farm!=='all') setFarmCode(p.ctx.map.farm);
   },[]);
