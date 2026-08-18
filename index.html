@@ -261,9 +261,11 @@ tr.rowlink:hover td{background:var(--bg)}
 .hm-grub{background:var(--bg3)}
 .hm-nodata{background:#fff;border:1px dashed var(--border2);line-height:20px;color:var(--border2)}
 .hm-lbl{font-family:var(--font-mono);font-size:11px;color:var(--text)}
-.bt-tabs{display:flex;gap:4px;margin-bottom:12px;flex-wrap:wrap}
-.bt-tab{border:1px solid var(--border2);background:#fff;color:var(--text2);border-radius:20px;padding:5px 13px;font-size:12px;cursor:pointer}
-.bt-tab.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+/* Underline tab row — in-page view switcher (distinct from filter chips) */
+.ntabs{display:flex;gap:2px;border-bottom:1px solid var(--border);margin-bottom:14px;flex-wrap:wrap}
+.ntab{background:none;border:none;padding:9px 15px;font-size:13px;color:var(--text3);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;font-weight:500;font-family:inherit}
+.ntab.on{color:var(--accent);border-bottom-color:var(--accent);font-weight:600}
+.ntab:hover:not(.on){color:var(--text)}
 .mx-cell{font-family:var(--font-mono);font-size:12px;text-align:center;padding:7px 6px;border-radius:4px;white-space:nowrap}
 .devrow{display:flex;align-items:center;gap:8px;font-size:11.5px;padding:3px 0;border-bottom:1px solid var(--border)}
 .devrow .nm{width:150px;flex:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -1876,9 +1878,9 @@ function ReferenceDataScreen(ctx){
   return ce('div',null,
     !ctx.isAdmin?ce('div',{className:'band',style:{marginBottom:10}},'Read-only view — the metric registry is editable by admin / power_user only.'):null,
     flash?ce('div',{className:'alert '+(flash.kind==='ok'?'alert-ok':flash.kind==='err'?'alert-fail':'alert-warn'),style:{marginBottom:10}},ce('span',null,flash.kind==='ok'?'✓':flash.kind==='err'?'✕':'…'),ce('div',null,flash.t)):null,
-    ce('div',{style:{display:'flex',gap:4,marginBottom:12}},
+    ce('div',{className:'ntabs'},
       [['metrics','Metrics'],['rootstocks','Rootstocks'],['varieties','Varieties']].map(function(t){
-        return ce('button',{key:t[0],className:'chip'+(tab===t[0]?' active':''),onClick:function(){setTab(t[0]);setFlash(null);}},t[1]);})),
+        return ce('button',{key:t[0],className:'ntab'+(tab===t[0]?' on':''),onClick:function(){setTab(t[0]);setFlash(null);}},t[1]);})),
     body,
     newOpen?ce(NewMetricSetModal,{ctx:ctx,metrics:d.metrics,sets:d.sets,
       onClose:function(){setNewOpen(false);},
@@ -2018,9 +2020,9 @@ function ReconciliationScreen(ctx){
     ce('div',{className:'card',style:{marginBottom:10}},
       ce('div',{className:'section-title'},ce('span',{className:'section-title-bar'}),'Cost-centre coverage'),
       ce('div',{className:'note',style:{marginBottom:10}},'Finance reconciles blocks to JDE cost centres. The export is generated from this table, not maintained by hand.'),
-      ce('div',{style:{display:'flex',gap:4,marginBottom:10}},
+      ce('div',{className:'ntabs'},
         [['missing','Missing ('+missing.length+')'],['mismatch','Farm mismatch ('+mismatch.length+')'],['rollup','Rollup by cost centre']].map(function(t){
-          return ce('button',{key:t[0],className:'chip'+(tab===t[0]?' active':''),onClick:function(){setTab(t[0]);}},t[1]);})),
+          return ce('button',{key:t[0],className:'ntab'+(tab===t[0]?' on':''),onClick:function(){setTab(t[0]);}},t[1]);})),
       ce('div',{className:'table-wrap',style:{maxHeight:300,overflowY:'auto'}}, ccBody)
     ),
     ce('div',{className:'grid2'},
@@ -2918,7 +2920,7 @@ function BenchmarkScreen(ctx){
   var live=liveAll.filter(function(b){ return (!farmF||b.farm_code===farmF)&&(!varF||b.variety_code===varF); });  // filtered display set
   var farmList=(function(){ var m={}; liveAll.forEach(function(b){ if(b.farm_code) m[b.farm_code]=(b.farms&&b.farms.name)||b.farm_code; }); return Object.keys(m).sort(function(a,b){return m[a]<m[b]?-1:1;}).map(function(c){return {code:c,name:m[c]};}); })();
   var varList=(function(){ var m={}; liveAll.forEach(function(b){ if(b.variety_code) m[b.variety_code]=vname(b); }); return Object.keys(m).sort(function(a,b){return m[a]<m[b]?-1:1;}).map(function(c){return {code:c,name:m[c]};}); })();
-  var tabBtn=function(k,label){ return ce('button',{key:k,className:'bt-tab'+(tab===k?' on':''),onClick:function(){setTab(k);}}, label); };
+  var tabBtn=function(k,label){ return ce('button',{key:k,className:'ntab'+(tab===k?' on':''),onClick:function(){setTab(k);}}, label); };
   var filterBar=ce('div',{className:'card',style:{marginBottom:10,padding:'10px 14px'}},
     ce('div',{className:'toolbar',style:{gap:16,flexWrap:'wrap',margin:0}},
       ce(Field,{label:'Farm'}, selx(farmF,setFarmF,[{v:'',l:'All farms'}].concat(farmList.map(function(f){return {v:f.code,l:f.name};})))),
@@ -3021,7 +3023,7 @@ function BenchmarkScreen(ctx){
     }
   }
   return ce('div',null,
-    ce('div',{className:'bt-tabs'}, tabBtn('cohort','Cohort comparison'), tabBtn('matrix','Rootstock × variety'), tabBtn('age','Age curve'), tabBtn('plan','Plan vs actual')),
+    ce('div',{className:'ntabs'}, tabBtn('cohort','Cohort comparison'), tabBtn('matrix','Rootstock × variety'), tabBtn('age','Age curve'), tabBtn('plan','Plan vs actual')),
     filterBar,
     body);
 }
