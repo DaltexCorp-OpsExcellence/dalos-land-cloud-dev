@@ -1,0 +1,958 @@
+<title>Harvest Planner</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Mono:wght@400;500&family=Instrument+Sans:wght@400;500;600&family=Noto+Sans+Arabic:wght@400;500;600&display=swap" rel="stylesheet"/>
+<style>
+/* Land Cloud design tokens (copied verbatim from dalos-land-cloud/index.html) */
+:root{
+  --bg:#eef1f0;--bg2:#e0e8e6;--bg3:#cedad7;
+  --sidebar:#0e3a3d;--sidebar2:#164c4f;
+  --sidebar-text:#bdd8d6;--sidebar-muted:#5f8583;
+  --accent:#0d6a68;--accent2:#159490;
+  --amber:#b87820;--amber-bg:#fdf3e0;--amber-border:#e8c87a;
+  --red:#b03030;--red-bg:#faeaea;--red-border:#e8a0a0;
+  --green:#1e6b3a;--green-bg:#e8f5ec;--green-border:#8ecba4;
+  --text:#111f1f;--text2:#3b4b4a;--text3:#6a7a79;
+  --border:#c6d4d2;--border2:#aabdbb;--card:#ffffff;
+  --font-display:'DM Serif Display',serif;
+  --font-body:'Instrument Sans','Noto Sans Arabic',sans-serif;
+  --font-mono:'DM Mono','Noto Sans Arabic',monospace;
+  --r:8px;--r2:12px;--sidebar-w:218px;--aqua:#159490;--violet:#6a10b0;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font-body);background:var(--bg);color:var(--text);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
+.app{display:flex;min-height:100vh}
+.sidebar{width:var(--sidebar-w);background:var(--sidebar);flex-shrink:0;display:flex;flex-direction:column;padding:16px 0;position:sticky;top:0;height:100vh;overflow-y:auto}
+.logo{padding:0 18px 16px;border-bottom:1px solid rgba(255,255,255,.07);margin-bottom:12px}
+.logo .name{font-family:var(--font-display);font-size:19px;color:#fff;line-height:1.1}
+.logo .sub{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--sidebar-muted);margin-top:5px;display:flex;align-items:center;gap:6px}
+.dot{width:6px;height:6px;border-radius:50%;background:var(--aqua);display:inline-block}
+.nav-sec{font-size:10px;letter-spacing:.11em;text-transform:uppercase;color:var(--sidebar-muted);padding:14px 18px 6px}
+.nav-item{display:flex;align-items:center;gap:10px;padding:8px 18px;font-size:13px;color:var(--sidebar-text);cursor:pointer;transition:.15s}
+.nav-item .ic{width:15px;text-align:center;opacity:.6;font-size:13px}
+.nav-item:hover{background:rgba(255,255,255,.04)}
+.nav-item.active{background:var(--accent);color:#fff;font-weight:500}
+.nav-item.active .ic{opacity:1}
+.side-foot{margin-top:auto;padding:12px 18px 0;border-top:1px solid rgba(255,255,255,.07)}
+.side-foot .u{font-size:12px;color:var(--sidebar-text)}
+.side-foot .r{font-size:10px;color:var(--sidebar-muted);text-transform:uppercase;letter-spacing:.08em;margin-top:2px}
+.acct{display:flex;align-items:center;gap:9px}
+.acct-av{width:32px;height:32px;border-radius:9px;flex-shrink:0;background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700}
+.side-ver{font-size:10px;color:var(--sidebar-muted);margin-top:8px}
+.nav-sec{margin-top:2px}
+.main{flex:1;min-width:0;display:flex;flex-direction:column}
+.topbar{position:sticky;top:0;z-index:20;height:52px;background:var(--bg);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px;padding:0 18px}
+.topbar h1{font-family:var(--font-display);font-size:17px;font-weight:400}
+.spacer{flex:1}
+.pageswitch{display:inline-flex;border:1px solid var(--border2);border-radius:var(--r);overflow:hidden}
+.pageswitch b{padding:6px 16px;font-size:13px;font-weight:500;cursor:pointer;color:var(--text2);background:var(--card)}
+.pageswitch b.active{background:var(--accent);color:#fff}
+.season-sel{display:flex;align-items:center;gap:7px;background:var(--card);border:1px solid var(--border2);border-radius:var(--r);padding:5px 11px;font-size:12px;cursor:pointer}
+.season-sel .tag{font-size:9px;background:var(--green-bg);color:var(--green);border:1px solid var(--green-border);border-radius:20px;padding:1px 6px;font-weight:600}
+.crop-bar{display:flex;align-items:center;gap:8px;padding:9px 18px;background:var(--bg);border-bottom:1px solid var(--border);overflow-x:auto;flex-shrink:0;position:sticky;top:52px;z-index:15}
+.crop-bar .cb-lbl{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--text3);font-weight:600;flex-shrink:0;margin-right:2px}
+.crop-chip{display:inline-flex;align-items:center;gap:7px;padding:6px 13px;border-radius:20px;border:1px solid var(--border2);background:#fff;color:var(--text2);font-size:12.5px;font-weight:500;cursor:pointer;white-space:nowrap;flex-shrink:0;transition:.12s}
+.crop-chip:hover{background:var(--bg2)}
+.crop-chip.on{background:var(--accent);color:#fff;border-color:var(--accent);font-weight:600}
+.crop-seg{display:inline-flex;border:1px solid var(--border2);border-radius:var(--r);overflow:hidden;flex-shrink:0}
+.crop-seg b{padding:6px 16px;font-size:12.5px;font-weight:500;color:var(--text2);background:var(--card);cursor:pointer;border-right:1px solid var(--border);transition:.12s;white-space:nowrap}
+.crop-seg b:last-child{border-right:none}
+.crop-seg b:hover{background:var(--bg2)}
+.crop-seg b.on{background:var(--accent);color:#fff;font-weight:600}
+.page{padding:16px 18px 48px}
+.btn{border-radius:var(--r);font-size:13px;font-weight:500;padding:7px 14px;border:1px solid transparent;cursor:pointer;font-family:inherit;transition:.15s;display:inline-flex;align-items:center;gap:6px}
+.btn-primary{background:var(--accent);color:#fff}.btn-primary:hover{background:var(--accent2)}
+.btn-sec{background:var(--card);border-color:var(--border2);color:var(--text2)}.btn-sec:hover{background:var(--bg2)}
+.btn-sm{padding:4px 10px;font-size:12px}
+.ctrl-row{display:flex;align-items:center;gap:12px;margin-bottom:12px;flex-wrap:wrap}
+.wkstep{display:flex;align-items:center;gap:8px}
+.wkstep .nav{width:28px;height:28px;border-radius:6px;border:1px solid var(--border2);background:var(--card);cursor:pointer;font-size:14px;color:var(--text2);display:flex;align-items:center;justify-content:center}
+.wkstep .lbl{font-size:14px;font-weight:600;min-width:130px;text-align:center}
+.seg{display:inline-flex;border:1px solid var(--border2);border-radius:var(--r);overflow:hidden}
+.seg b{padding:6px 13px;font-size:12px;font-weight:500;cursor:pointer;color:var(--text2);background:var(--card)}
+.seg b.active{background:var(--accent);color:#fff}
+.hint{font-size:12px;color:var(--text3);margin-bottom:12px;max-width:82ch}
+.legend{display:flex;gap:14px;font-size:11px;color:var(--text3);margin:10px 0 0;flex-wrap:wrap;align-items:center}
+.legend .sw{width:18px;height:12px;border-radius:3px;display:inline-block;border:1px solid var(--border);vertical-align:middle;margin-right:4px}
+/* tables */
+.table-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:var(--r2);background:var(--card)}
+.logwrap{overflow:auto;max-height:68vh}
+table{border-collapse:collapse;width:100%}
+th{font-size:10px;text-transform:uppercase;letter-spacing:.04em;color:var(--text3);text-align:left;padding:9px 10px;border-bottom:2px solid var(--border2);white-space:nowrap;font-weight:600;background:var(--card);position:sticky;top:0;z-index:2}
+td{font-size:13px;color:var(--text2);padding:6px 10px;border-bottom:1px solid var(--border);white-space:nowrap}
+tr:last-child td{border-bottom:none}
+.num{font-family:var(--font-mono);font-size:12px;text-align:right;font-variant-numeric:tabular-nums}
+th.num{text-align:right}
+.plot{font-family:var(--font-mono);font-size:11px;background:var(--bg2);border-radius:4px;padding:1px 6px;color:var(--text)}
+.vname{font-weight:600;color:var(--text)}
+.grp td{background:var(--bg2);font-weight:600;color:var(--text);font-size:11px;text-transform:uppercase;letter-spacing:.05em;position:sticky;left:0}
+tr.subtot td{background:#edeae4;font-weight:600;font-size:11px;color:#4a4840;padding:3px 10px}
+tr.subtot .num{text-align:center}
+tr.subtot .stlab{position:sticky;left:0;background:#edeae4;text-transform:uppercase;letter-spacing:.04em;font-size:10px;color:#7a7668}
+tr.grandtot td{background:#38352f;font-weight:700;color:#fff;font-size:12px;padding:4px 10px}
+tr.grandtot .num{text-align:center;color:#fff}
+tr.grandtot .stlab{position:sticky;left:0;background:#38352f;color:#fff;text-transform:uppercase;letter-spacing:.04em;font-size:10px}
+.tot td{background:var(--bg2);font-weight:600;color:var(--text)}
+.pill{display:inline-flex;align-items:center;border-radius:20px;padding:1px 7px;font-size:10px;font-weight:500;border:1px solid;white-space:nowrap}
+.p-P{background:var(--green-bg);color:var(--green);border-color:var(--green-border)}
+.p-NP{background:var(--bg2);color:var(--text3);border-color:var(--border2)}
+/* editable cells — persistent affordance so touch users see what's editable */
+.cin{width:52px;background:var(--card);border:1px solid var(--border);border-bottom-width:2px;border-radius:5px;padding:4px 5px;font-family:var(--font-mono);font-size:12px;text-align:center;color:var(--text);font-variant-numeric:tabular-nums}
+.cin:focus{outline:none;border-color:var(--accent);background:#fff}
+.cin.plan{border-bottom-color:var(--accent2);background:#eaf3f2}
+.cin.harv{border-bottom-color:var(--amber);background:#fdfaf3}
+.cin.int{border-bottom-color:#2a50c0;background:#eef1fb}
+.daycell.flag{background:#fff3e0;box-shadow:inset 0 0 0 1.5px #e0a94a}
+.v-flag{background:var(--amber-bg);color:var(--amber);border-color:var(--amber-border)}
+.plancell{font-family:var(--font-mono);font-size:12px;text-align:right;color:var(--text);font-weight:500}
+.wchip{display:inline-flex;align-items:center;gap:5px;cursor:pointer;border:1px solid var(--border2);border-radius:20px;padding:2px 9px;font-size:11px;color:var(--text2);background:var(--card);white-space:nowrap}
+.wchip:hover{background:var(--bg2);border-color:var(--accent)}
+.wchip .wk{color:var(--accent);font-size:11px}
+.wchip.auto{border-style:dashed;border-color:var(--amber-border);background:var(--amber-bg);color:var(--amber)}
+.daycell{text-align:center;padding:3px 4px;border-left:1px solid var(--border)}
+th.dayh{text-align:center}
+.modebanner{display:flex;align-items:center;gap:10px;border-radius:8px;padding:9px 14px;margin-bottom:10px;font-size:13px;font-weight:600;border:1px solid;border-left-width:4px}
+.modebanner .tag{font-size:10px;text-transform:uppercase;letter-spacing:.08em;font-weight:700;padding:2px 8px;border-radius:20px}
+.modebanner.plan{background:#eaf3f2;border-color:var(--accent2);color:#0b3f3d}
+.modebanner.plan .tag{background:var(--accent);color:#fff}
+.modebanner.harv{background:#fdf3e0;border-color:var(--amber-border);color:#7a4a10}
+.modebanner.harv .tag{background:var(--amber);color:#fff}
+.seg b.active.actmode{background:var(--amber)}
+.grpby{display:flex;align-items:center;gap:7px}
+.grpby .gl{font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);font-weight:600}
+.celllegend{display:flex;align-items:center;gap:10px;margin:-4px 0 12px;font-size:11px;color:var(--text3);flex-wrap:wrap}
+.celllegend .demo{display:inline-flex;flex-direction:column;align-items:flex-end;background:var(--card);border:1px solid var(--border);border-radius:6px;padding:3px 7px;line-height:1.1}
+.celllegend .demo .big{font-family:var(--font-mono);font-size:12px;color:var(--text);font-weight:500}
+.celllegend .demo .sm{font-family:var(--font-mono);font-size:9px;color:var(--text2)}
+.celllegend .demo .sm .tg{color:var(--text3);font-size:8px;text-transform:uppercase;margin-right:2px}
+.daycell .dp{font-family:var(--font-mono);font-size:10px;color:var(--text2);display:block;line-height:1.15;margin-top:1px;border-top:1px dotted var(--border2);padding-top:2px}
+.daycell .dp .tg{color:var(--text3);font-size:8px;text-transform:uppercase;letter-spacing:.04em;margin-right:2px}
+.daycell.off{background:#f5efff}
+.daycell.off .cin{color:var(--violet);font-weight:600}
+.daycell.fut{background:repeating-linear-gradient(45deg,#faf8f3,#faf8f3 4px,#f2efe8 4px,#f2efe8 8px)}
+.daycell.fut .cin{background:transparent;border-color:var(--border);color:var(--text3)}
+.daycell.unlogged .cin{border-style:dashed;background:#fbfbf9}
+.daycell.dirty{box-shadow:inset 0 0 0 2px var(--accent2);border-radius:5px}
+.dirtybadge{font-size:11px;color:var(--amber);background:var(--amber-bg);border:1px solid var(--amber-border);border-radius:20px;padding:2px 9px;font-weight:600;white-space:nowrap}
+.rotxt{font-family:var(--font-mono);font-size:12px;color:var(--text2)}
+.wchip.ro{cursor:default;opacity:.8}
+th.todayh{color:var(--amber);font-weight:700}
+.wkhead{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text3);margin-bottom:10px;flex-wrap:wrap}
+.wkhead b{color:var(--text)}
+.wkhead .chipk{font-family:var(--font-mono);font-size:11px;background:var(--bg2);border:1px solid var(--border);border-radius:20px;padding:1px 8px;color:var(--text2)}
+.hcell small{display:block;font-size:8px;opacity:.8;line-height:1}
+.hcell b{font-weight:600}
+.frozen{position:sticky;background:var(--card);z-index:1;overflow:hidden;text-overflow:ellipsis}
+.f0{left:0;width:72px;min-width:72px;max-width:72px}
+.f1{left:72px;width:82px;min-width:82px;max-width:82px}
+.f2{left:154px;width:64px;min-width:64px;max-width:64px}
+.vsub{font-size:10px;color:var(--text3);font-weight:400;margin-top:2px;max-width:78px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+th.frozen{z-index:3}
+.varcell{font-family:var(--font-mono);font-size:11px;padding:1px 7px;border-radius:20px;border:1px solid;font-weight:500}
+.v-over{background:var(--green-bg);color:var(--green);border-color:var(--green-border)}
+.v-under{background:var(--red-bg);color:var(--red);border-color:var(--red-border)}
+.v-on{background:var(--bg2);color:var(--text3);border-color:var(--border2)}
+.v-off{background:#f0e8ff;color:var(--violet);border-color:#c090e0}
+/* overview */
+.kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:16px}
+.card{background:var(--card);border:1px solid var(--border);border-radius:var(--r2);padding:13px 15px}
+.kpi .lab{font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em}
+.kpi .val{font-family:var(--font-display);font-size:23px;line-height:1.15;margin-top:5px}
+.kpi .val .un{font-family:var(--font-body);font-size:11px;color:var(--text3);font-weight:400}
+.kpi .sub{font-size:11px;margin-top:3px}
+.up{color:var(--green)}.down{color:var(--red)}.flat{color:var(--text3)}
+.sec-title{display:flex;align-items:center;gap:8px;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.09em;color:var(--text3);margin:22px 0 10px}
+.sec-title::before{content:"";width:20px;height:2px;background:var(--accent);display:block}
+.sec-title .r{margin-left:auto;font-weight:400;text-transform:none;letter-spacing:0;font-size:11px;color:var(--text3)}
+.cal-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:var(--r2);background:var(--card);padding:12px 14px}
+.cal{border-collapse:separate;border-spacing:3px;min-width:820px}
+.cal th{position:static;background:none;font-size:10px;padding:2px 4px;text-transform:uppercase;color:var(--text3);border:none;text-align:center}
+.cal th.cur{color:var(--accent);font-weight:700}
+.cal td.rl{font-size:12px;font-weight:600;color:var(--text);text-align:left;padding-right:10px;white-space:nowrap;border:none;background:none}
+.hcell{width:48px;height:30px;border-radius:5px;font-family:var(--font-mono);font-size:10px;text-align:center;color:var(--text2);vertical-align:middle;border:1px solid var(--border);line-height:1.1}
+.wbtn{cursor:pointer;display:inline-flex;align-items:center;gap:4px;border-radius:5px;padding:2px 5px}
+.wbtn:hover{background:var(--bg2)}
+.wico{color:var(--accent);font-size:11px}
+/* window modal */
+.mscrim{position:fixed;inset:0;background:rgba(0,0,0,.45);opacity:0;pointer-events:none;transition:.2s;z-index:50;display:flex;align-items:center;justify-content:center;padding:16px}
+.mscrim.open{opacity:1;pointer-events:auto}
+.modal{background:var(--bg);border:1px solid var(--border2);border-radius:var(--r2);width:520px;max-width:100%;transform:translateY(10px);transition:.2s}
+.mscrim.open .modal{transform:none}
+.mh{padding:15px 18px;border-bottom:1px solid var(--border);background:var(--bg2);border-radius:var(--r2) var(--r2) 0 0}
+.mh .x{float:right;cursor:pointer;color:var(--text3);font-size:18px}
+.mh h2{font-family:var(--font-display);font-size:19px;font-weight:400}
+.mh .s{font-size:11px;color:var(--text3);margin-top:2px}
+.mb{padding:16px 18px}
+.mf{padding:13px 18px;border-top:1px solid var(--border);background:var(--bg2);display:flex;gap:8px;border-radius:0 0 var(--r2) var(--r2)}
+.mf .btn{flex:1;justify-content:center}
+.wrow{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px}
+.wf label{font-size:10px;text-transform:uppercase;font-weight:600;letter-spacing:.05em;color:var(--text3);display:block;margin-bottom:4px}
+.wf select,.wf input{width:100%;background:var(--card);border:1px solid var(--border2);border-radius:6px;padding:7px 8px;font-size:13px;color:var(--text);font-family:var(--font-body)}
+.wf select:focus,.wf input:focus{outline:none;border-color:var(--accent)}
+.wprev{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:12px;margin-top:4px}
+.wprev .cap{font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--text3);margin-bottom:8px;display:flex;justify-content:space-between}
+.wbars{display:flex;align-items:flex-end;gap:3px;height:70px}
+.wbars .wb{flex:1;background:var(--accent2);border-radius:2px 2px 0 0;min-height:2px;position:relative}
+.wbars .wb.pk{background:var(--accent)}
+.wbars .wb.out{background:var(--bg3)}
+.wlabs{display:flex;gap:3px;margin-top:4px}
+.wlabs span{flex:1;text-align:center;font-size:8px;color:var(--text3);overflow:hidden}
+/* revisions */
+.rev{display:grid;grid-template-columns:196px 1fr;gap:0}
+.rev-list{border-right:1px solid var(--border);padding-right:2px}
+.rev-item{padding:11px 13px;cursor:pointer;border-left:2px solid transparent;transition:.12s}
+.rev-item:hover{background:var(--bg2)}
+.rev-item.active{background:var(--bg2);border-left-color:var(--accent)}
+.rev-item .rt{font-size:12px;font-weight:600;color:var(--text)}
+.rev-item .rd{font-size:11px;color:var(--text3);margin-top:1px}
+.rev-item .who{font-size:10px;color:var(--text3);margin-top:4px;display:flex;gap:5px;align-items:center}
+.rev-item .lockchip{font-size:9px;background:var(--accent);color:#fff;border-radius:20px;padding:0 6px;margin-left:auto}
+.avatar{width:16px;height:16px;border-radius:50%;background:var(--accent);color:#fff;font-size:8px;display:inline-flex;align-items:center;justify-content:center;font-weight:600}
+.rev-detail{padding:2px 0 4px 18px}
+.diff-row{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:6px;font-size:12px}
+.diff-row:nth-child(odd){background:var(--bg2)}
+.diff-plot{font-family:var(--font-mono);font-size:11px;color:var(--text3);width:170px;flex-shrink:0}
+.diff-vals{font-family:var(--font-mono);font-size:12px;display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+.was{color:var(--text3);text-decoration:line-through}.now{color:var(--text);font-weight:500}.arw{color:var(--text3)}
+.chg{font-family:var(--font-mono);font-size:11px;padding:0 6px;border-radius:20px;border:1px solid}
+.note-box{background:var(--amber-bg);border:1px solid var(--amber-border);border-radius:8px;padding:10px 12px;font-size:12px;color:#7a4a10;margin-bottom:14px;display:flex;gap:8px}
+/* trucks */
+.cap-panel{display:flex;flex-wrap:wrap;align-items:center;gap:8px;background:var(--card);border:1px solid var(--border);border-radius:var(--r2);padding:10px 12px;margin-bottom:14px}
+.cap-lab{font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);font-weight:600;margin-right:4px}
+.cap-chip{font-size:12px;color:var(--text2);display:inline-flex;align-items:center;gap:6px;background:var(--bg2);border:1px solid var(--border);border-radius:20px;padding:3px 5px 3px 11px}
+.cap-chip input{width:44px;background:var(--card);border:1px solid var(--border2);border-radius:14px;padding:3px 6px;font-family:var(--font-mono);font-size:12px;color:var(--text);text-align:center}
+.trk{width:70px;text-align:center;vertical-align:middle}
+.trk .n{font-family:var(--font-mono);font-size:16px;font-weight:600;color:var(--text)}
+.trk .n.zero{color:var(--border2);font-weight:400}
+.trk .t{font-family:var(--font-mono);font-size:9px;color:var(--text3);display:block}
+.trk.peak{background:var(--amber-bg)}
+.trow-tot td{background:var(--bg2);font-weight:600}
+.trk .trkin{width:46px;text-align:center;margin:0 auto;font-size:14px}
+.trk .trkin:focus{border-color:var(--accent)}
+.vsel{font-size:12px;color:var(--text2);display:flex;align-items:center;gap:6px}
+.vsel select{background:var(--card);border:1px solid var(--border2);border-radius:6px;padding:5px 8px;font-size:13px;color:var(--text);font-family:var(--font-body)}
+.vsel select:focus{outline:none;border-color:var(--accent)}
+.pageview{display:none}.pageview.active{display:block}
+.menu-btn{display:none;width:30px;height:30px;border:1px solid var(--border2);background:var(--card);border-radius:6px;cursor:pointer;font-size:15px;color:var(--text2);align-items:center;justify-content:center}
+.sidebar-overlay{position:fixed;inset:0;background:rgba(0,0,0,.4);opacity:0;pointer-events:none;transition:.2s;z-index:38}
+.sidebar-overlay.open{opacity:1;pointer-events:auto}
+.mobnav{display:none}
+@media(max-width:1024px){
+  .sidebar{width:190px}.page{padding:14px}
+  .kpi-grid{grid-template-columns:repeat(2,1fr)}.kpi .val{font-size:22px}
+}
+@media(max-width:767px){
+  .menu-btn{display:flex}
+  .sidebar{position:fixed;left:0;top:0;bottom:0;z-index:39;transform:translateX(-100%);transition:.25s}
+  .sidebar.open{transform:none}
+  .pageswitch b{padding:6px 10px;font-size:12px}
+  .page{padding:12px 12px 76px}
+  .topbar{gap:8px;padding:0 12px}.topbar h1{font-size:15px}
+  .season-sel{display:none}
+  /* bottom mobile nav */
+  .mobnav{display:flex;position:fixed;left:0;right:0;bottom:0;height:56px;background:var(--sidebar);z-index:37;overflow-x:auto;align-items:stretch}
+  .mobnav a{flex:0 0 auto;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:0 16px;color:var(--sidebar-muted);font-size:10px;cursor:pointer;text-decoration:none}
+  .mobnav a .mi{font-size:18px}
+  .mobnav a.active{color:#fff}
+}
+</style>
+
+<div class="app">
+  <div class="sidebar-overlay" id="sideOv" onclick="toggleSide()"></div>
+  <aside class="sidebar" id="sidebar">
+    <div class="logo"><div class="name">Land Cloud</div><div class="sub"><span class="dot"></span>Citrus · 2025/26</div></div>
+    <div class="nav-sec">Explore</div>
+    <div class="nav-item"><span class="ic">▤</span>Structure</div>
+    <div class="nav-item"><span class="ic">▦</span>Block Register</div>
+    <div class="nav-item"><span class="ic">≈</span>Production History</div>
+    <div class="nav-item"><span class="ic">▧</span>Yield Heatmap</div>
+    <div class="nav-item"><span class="ic">◫</span>Benchmark</div>
+    <div class="nav-item"><span class="ic">◱</span>Farm Map</div>
+    <div class="nav-sec">Manage</div>
+    <div class="nav-item active"><span class="ic">◷</span>Harvest Planner</div>
+    <div class="nav-item"><span class="ic">✎</span>Season Entry</div>
+    <div class="nav-item"><span class="ic">⇪</span>Bulk Import</div>
+    <div class="nav-item"><span class="ic">⇄</span>Reconciliation</div>
+    <div class="nav-item"><span class="ic">✚</span>Data Health</div>
+    <div class="nav-item"><span class="ic">⚙</span>Reference Data</div>
+    <div class="side-foot">
+      <div class="acct"><span class="acct-av">TG</span><div><div class="u">Tarek Ghanem</div><div class="r">Admin · Planner</div></div></div>
+      <div class="side-ver">Land Cloud · v2025.9</div>
+    </div>
+  </aside>
+
+  <div class="main">
+    <div class="topbar">
+      <div class="menu-btn" onclick="toggleSide()">☰</div>
+      <h1>Harvest Planner</h1>
+      <div class="pageswitch"><b class="active" id="swLog" onclick="setPage('log')">Harvest Plan / Actual</b><b id="swTrk" onclick="setPage('trk')">Trucks</b><b id="swOv" onclick="setPage('ov')">Season Overview</b><b id="swRev" onclick="setPage('rev')">Revisions</b></div>
+      <div class="spacer"></div>
+      <div class="season-sel">2025/26 <span class="tag">ACTIVE</span> ▾</div>
+    </div>
+
+    <div class="crop-bar">
+      <span class="cb-lbl">Crop</span>
+      <div class="crop-seg" onclick="if(event.target.tagName==='B'){this.querySelectorAll('b').forEach(x=>x.classList.remove('on'));event.target.classList.add('on');}">
+        <b class="on">Citrus</b><b>Grapes</b><b>Mango</b><b>Pomegranate</b>
+      </div>
+    </div>
+
+    <!-- ===================== PLAN & LOG ===================== -->
+    <div class="page pageview active" id="page-log">
+      <div class="ctrl-row">
+        <div class="seg" id="modeSeg"><b class="active" id="mePlan" onclick="setMode('plan')">✎ Set Plan</b><b id="meHarv" onclick="setMode('harv')">Actual Harvest</b></div>
+        <div class="seg" id="viewSeg" style="display:none"><b class="active" id="vwToday" onclick="setView('today')">Today</b><b id="vwWeek" onclick="setView('week')">Week</b></div>
+        <div class="wkstep"><div class="nav" onclick="stepWeek(-1)">‹</div><div class="lbl" id="wkLbl"></div><div class="nav" onclick="stepWeek(1)">›</div></div>
+        <div class="grpby"><span class="gl">Group by</span><div class="seg"><b class="active" id="gbVar" onclick="setGroup('variety')">Variety</b><b id="gbFarm" onclick="setGroup('farm')">Farm</b></div></div>
+        <div class="spacer"></div>
+        <button class="btn btn-sec btn-sm" onclick="alert('Concept: opens the plan revision history for this plot.')">History</button>
+        <span class="dirtybadge" id="dirtyBadge" style="display:none"></span>
+        <button class="btn btn-primary btn-sm" onclick="saveAll()">Save changes</button>
+      </div>
+      <div class="modebanner" id="modeBanner"></div>
+      <div class="hint" id="logHint"></div>
+      <div class="celllegend" id="cellLegend"></div>
+      <div class="table-wrap logwrap"><table id="logTable"></table></div>
+      <div class="legend">
+        <span><span class="sw" style="background:var(--green-bg);border-color:var(--green-border)"></span>on/above plan</span>
+        <span><span class="sw" style="background:var(--red-bg);border-color:var(--red-border)"></span>below plan</span>
+        <span><span class="sw" style="background:#f5efff;border-color:#c090e0"></span>off-plan pick</span>
+        <span><span class="sw" style="background:repeating-linear-gradient(45deg,#faf8f3,#faf8f3 4px,#f2efe8 4px,#f2efe8 8px)"></span>future day</span>
+      </div>
+    </div>
+
+    <!-- ===================== SEASON OVERVIEW ===================== -->
+    <div class="page pageview" id="page-ov">
+      <div id="ovWeek"></div>
+      <div class="kpi-grid" id="ovKpis"></div>
+
+      <div class="sec-title">Watch list <span class="r">late start · stalled · off-plan · overrunning — auto-derived, top 10</span></div>
+      <div class="table-wrap"><table id="ovWatch"></table></div>
+
+      <div class="sec-title">Season shape <span class="r">per week · past weeks show <b>actual</b>/plan · shading relative to each variety's own peak</span></div>
+      <div class="cal-wrap"><table class="cal" id="ovCal"></table></div>
+
+      <div class="sec-title">By variety <span class="r">mirrors the planning sheet — budget → estimates → latest → actuals</span></div>
+      <div class="table-wrap"><table id="ovVar"></table></div>
+
+      <div class="sec-title">By plot <span class="r">the detail rows behind each variety</span></div>
+      <div class="table-wrap"><table id="ovPlot"></table></div>
+    </div>
+
+    <!-- ===================== REVISIONS ===================== -->
+    <div class="page pageview" id="page-rev">
+      <div class="ctrl-row">
+        <div class="hint" style="margin:0">Every plan update is stored as a named <b>revision</b> — not a new column. Pick one to see which plots changed, by how much, who did it, and why. Nothing is overwritten.</div>
+        <div class="spacer"></div>
+        <button class="btn btn-primary btn-sm" onclick="alert('Concept: freezes the current plan as a named snapshot (e.g. \'Plan as of the 8 Feb meeting\') — becomes the as-presented version and the baseline for the next diff.')">+ Capture snapshot</button>
+      </div>
+      <div class="card"><div class="rev"><div class="rev-list" id="revList"></div><div class="rev-detail" id="revDetail"></div></div></div>
+    </div>
+
+    <!-- ===================== TRUCKS ===================== -->
+    <div class="page pageview" id="page-trk">
+      <div class="ctrl-row">
+        <div class="wkstep"><div class="nav" onclick="stepWeek(-1)">‹</div><div class="lbl" id="trkWk"></div><div class="nav" onclick="stepWeek(1)">›</div></div>
+        <div class="grpby"><span class="gl">Group by</span><div class="seg"><b class="active" id="tgbVar" onclick="setTrkGroup('variety')">Variety</b><b id="tgbFarm" onclick="setTrkGroup('farm')">Farm</b></div></div>
+        <div class="spacer"></div>
+      </div>
+      <div class="hint">Truck plan — <b>per variety × farm × day</b>, laid out like the Harvest Plan / Actual grid. Rows are grouped by variety, one row per farm; type the number of trucks into each day cell (the small number is that variety-farm-day's planned tonnage, for reference). Per-variety subtotals and an all-farms total per day. Flexible — no capacity formula.</div>
+      <div class="kpi-grid" id="trkKpis"></div>
+      <div class="table-wrap logwrap" id="trkWrap"><table id="trkTable"></table></div>
+    </div>
+  </div>
+  <nav class="mobnav">
+    <a class="mi-wrap"><span class="mi">▤</span>Plots</a>
+    <a class="mi-wrap"><span class="mi">✿</span>Varieties</a>
+    <a class="active"><span class="mi">◷</span>Planner</a>
+    <a class="mi-wrap"><span class="mi">≈</span>Yields</a>
+    <a class="mi-wrap"><span class="mi">▦</span>Reports</a>
+  </nav>
+</div>
+
+<!-- Harvest window modal -->
+<div class="mscrim" id="winScrim" onclick="if(event.target===this)closeWin()">
+  <div class="modal">
+    <div class="mh"><span class="x" onclick="closeWin()">✕</span><h2 id="winTitle">Harvest window</h2><div class="s" id="winSub"></div></div>
+    <div class="mb">
+      <div class="wrow">
+        <div class="wf"><label>Season total</label><input id="winTotal" readonly></div>
+        <div class="wf"><label>Start week</label><select id="winStart" onchange="winPrev()"></select></div>
+        <div class="wf"><label>Peak week</label><select id="winPeak" onchange="winPrev()"></select></div>
+        <div class="wf"><label>End week</label><select id="winEnd" onchange="winPrev()"></select></div>
+      </div>
+      <div class="wf" style="margin-bottom:6px"><label>Curve shape</label>
+        <select id="winShape" onchange="winPrev()" style="max-width:200px">
+          <option value="bell">Bell — peak in the middle</option>
+          <option value="early">Early — front-loaded</option>
+          <option value="late">Late — back-loaded</option>
+          <option value="flat">Flat — even across weeks</option>
+        </select></div>
+      <div class="wprev">
+        <div class="cap"><span>Drawn plan · raw t per week</span><span id="winSum"></span></div>
+        <div class="wbars" id="winBars"></div>
+        <div class="wlabs" id="winLabs"></div>
+      </div>
+      <div class="hint" style="margin:10px 0 0">The tool draws the curve from these four inputs; you can still hand-edit any week's days afterward. Total comes from Area × Yield.</div>
+    </div>
+    <div class="mf"><button class="btn btn-sec" onclick="closeWin()">Cancel</button><button class="btn btn-primary" onclick="applyWin()">Apply window</button></div>
+  </div>
+</div>
+
+<script>
+const WK=["7 Dec","14 Dec","21 Dec","28 Dec","4 Jan","11 Jan","18 Jan","25 Jan","1 Feb","8 Feb","15 Feb","22 Feb","1 Mar","8 Mar"];
+const WD=["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+const CUR=9, CURDAY=3;
+let selWeek=CUR, page='log', editMode='plan';
+function sum(a){return a.reduce((x,y)=>x+(y||0),0)}
+
+const jit=[1.03,0.96,1.08,0.94,1.05,0.98,1.12,0.9,1.06,0.97];
+const patterns=[[0.16,0.15,0.14,0.15,0.14,0.13,0.13],[0.10,0.18,0.16,0.14,0.16,0.12,0.14],[0.18,0.10,0.16,0.16,0.12,0.16,0.12],[0.14,0.16,0.14,0.14,0.14,0.14,0.14],[0.12,0.16,0.14,0.16,0.14,0.14,0.14]];
+const curves={
+ Eureka:[80,120,180,220,240,200,150,120,90,60,40,25,10,5],
+ "Star Ruby":[140,200,260,230,180,120,90,60,40,20,10,0,0,0],
+ "Double Murcott":[0,0,10,40,90,140,190,240,300,330,310,260,190,120],
+ Nova:[0,10,40,80,140,190,220,200,160,110,60,30,10,0],
+ Tango:[120,220,340,300,260,220,180,150,120,90,60,30,10,0],
+ Olinda:[90,180,240,220,180,120,80,50,30,15,5,0,0,0],
+};
+const genPlots=[
+ {f:"Hana", p:"01-01A",v:"Eureka",        vt:"Lemon",      pnp:"P", area:20,  latest:310},
+ {f:"Hana", p:"03-10A",v:"Olinda",        vt:"Juicing",    pnp:"P", area:40,  latest:655},
+ {f:"Hana", p:"04-06A",v:"Double Murcott",vt:"Soft Citrus",pnp:"P", area:20,  latest:531},
+ {f:"Kheir",p:"08-02B",v:"Star Ruby",     vt:"Grapefruit", pnp:"NP",area:12,  latest:155},
+ {f:"Kheir",p:"09-05B",v:"Tango",         vt:"Soft Citrus",pnp:"P", area:16,  latest:497},
+ {f:"Kheir",p:"10-02A",v:"Tango",         vt:"Soft Citrus",pnp:"P", area:33,  latest:839},
+ {f:"Layla",p:"00-01A",v:"Star Ruby",     vt:"Grapefruit", pnp:"P", area:29.5,latest:821},
+ {f:"Hana", p:"02-03A",v:"Nova",          vt:"Soft Citrus",pnp:"P", area:20,  latest:317},
+];
+const explicitPlots=[
+ {f:"Kheir",p:"07-01A",v:"Lanelate",vt:"Table Citrus",pnp:"NP",area:45,latest:118,
+  plan:[60,120,150,120,70,30,10,0,0,0,0,0,0,0], actual:[58,124,151,118,72,28,9,0,0,14,null,null,null,null]},
+ {f:"Baraka",p:"00-04A",v:"Caracara",vt:"Table Citrus",pnp:"NP",area:11.6,latest:101,
+  plan:[0,0,20,40,25,10,5,0,0,0,0,0,0,0], actual:[0,0,18,42,24,11,4,0,6,9,null,null,null,null]},
+];
+const plots=[
+ ...genPlots.map((g,si)=>{const c=curves[g.v],scale=g.latest/sum(c);
+   const plan=c.map(x=>Math.round(x*scale));
+   const actual=plan.map((p,i)=> i<=CUR ? (p===0?0:Math.round(p*jit[(i+si)%jit.length])) : null);
+   return {...g,plan,actual};}),
+ ...explicitPlots
+];
+plots.forEach(p=>{p.budget=Math.round(p.latest*0.85);p.jul=Math.round(p.latest*0.90);p.nov=Math.round(p.latest*0.97);p.yield=+(p.latest/p.area).toFixed(1);});
+
+// per-plot editable overrides
+const planStore={}, actStore={}, planDayStore={}, winStore={}; // area/yield ; actual ; day-plan override ; harvest window
+function getAY(pi){return planStore[pi]||{area:plots[pi].area,yield:plots[pi].yield};}
+function plannedNow(pi){const a=getAY(pi);return a.area*a.yield;}
+// harvest window: {start,peak,end,shape} — total comes from area×yield
+function winOf(pi){
+  if(winStore[pi])return winStore[pi];
+  const pl=plots[pi].plan; let s=pl.findIndex(x=>x>0);
+  let e=pl.length-1-[...pl].reverse().findIndex(x=>x>0);
+  if(s<0){s=CUR;e=Math.min(13,CUR+4);}
+  let peak=pl.indexOf(Math.max(...pl)); if(peak<s||peak>e)peak=Math.round((s+e)/2);
+  return {start:s,peak,end:e,shape:'bell'};
+}
+// draw the weekly curve from the window + total
+function genCurve(pi){
+  const w=winOf(pi), total=plannedNow(pi), arr=Array(14).fill(0), wts=[];
+  for(let k=w.start;k<=w.end;k++){let wt;
+    if(w.shape==='flat')wt=1;
+    else if(w.shape==='early')wt=(w.end-k+1);
+    else if(w.shape==='late')wt=(k-w.start+1);
+    else{const sig=Math.max(0.9,(w.end-w.start)/3.2);wt=Math.exp(-((k-w.peak)**2)/(2*sig*sig));}
+    wts.push({k,wt});}
+  const tot=sum(wts.map(x=>x.wt))||1;
+  wts.forEach(x=>arr[x.k]=Math.round(total*x.wt/tot));
+  return arr;
+}
+function dayPlanAuto(pi,w,d){return Math.round(genCurve(pi)[w]*patterns[pi%patterns.length][d]);}
+function dayPlan(pi,w,d){const k=pi+'|'+w+'|'+d;return k in planDayStore?planDayStore[k]:dayPlanAuto(pi,w,d);}
+let seedPlanDay=null; // frozen copy of the drawn plan at load, so demo actuals track the same curve the grid shows
+function dayActualDefault(pi,w,d){
+  const pl=plots[pi], base=seedPlanDay?seedPlanDay[pi][w][d]:Math.round(pl.plan[w]*patterns[pi%patterns.length][d]);
+  if(pl.plan[w]===0 && (pl.actual[w]||0)>0 && w<=CUR){ return d===2 ? pl.actual[w] : 0; } // seeded off-plan
+  const past=w<CUR||(w===CUR&&d<=CURDAY);
+  if(w===CUR&&d===CURDAY&&pi%3===0) return null; // not yet logged today (demo of the blank state)
+  return past ? (base?Math.round(base*jit[(d+pi)%jit.length]):0) : null;
+}
+function getActual(pi,w,d){const k=pi+'|'+w+'|'+d;return k in actStore?actStore[k]:dayActualDefault(pi,w,d);} // field harvest = source of truth
+// packhouse intake: separate number, defaults near harvest with deliberate discrepancies (loss / errors)
+// actual harvest = actual_production. It splits into: packhouse intake (raw_to_packhouse)
+// + field-side dispositions (field sales / traders / condemned) + weight loss. Only the
+// UNEXPLAINED residual is flagged — the rest is accounted, not error.
+const intakeStore={};
+// actual_production splits into: raw_to_packhouse + field-side children + weight loss.
+// Field children per the metric tree: field_reject_sales (فرزة ارض), farm_gate/local (بيع محلى),
+// raw_to_traders (للتجار), condemned (اعدام). Only the unexplained residual is a discrepancy.
+const DISPO=[
+ {k:'reject',   en:'Field reject', ar:'فرزة ارض'},
+ {k:'local',    en:'Local sales',  ar:'بيع محلى'},
+ {k:'traders',  en:'To traders',   ar:'للتجار'},
+ {k:'condemned',en:'Condemned',    ar:'اعدام'},
+ {k:'loss',     en:'Weight loss',  ar:'فقد الوزن'},
+];
+function dispo(pi,w,d){const h=getActual(pi,w,d)||0;
+  if(!h)return {reject:0,local:0,traders:0,condemned:0,loss:0};
+  return {
+    reject:   ((pi+d)%9===0)? Math.round(h*0.08):0,
+    local:    ((pi+d)%7===0)? Math.round(h*0.05):0,
+    traders:  ((pi*3+d)%11===0)? Math.round(h*0.06):0,
+    condemned:((pi+d+w)%13===0)? Math.round(h*0.03):0,
+    loss:     Math.round(h*0.02),
+  };}
+function fieldChildren(pi,w,d){const x=dispo(pi,w,d);return x.reject+x.local+x.traders+x.condemned;} // excludes weight loss
+function lossOf(pi,w,d){return dispo(pi,w,d).loss;}
+function intakeDefault(pi,w,d){const h=getActual(pi,w,d);if(h==null)return null;if(h===0)return 0;
+  let base=h-fieldChildren(pi,w,d)-lossOf(pi,w,d);
+  if((pi*7+d+w)%23===0)base=Math.round(base*0.82); // injected genuine error → unexplained residual
+  return Math.max(0,base);}
+function getIntake(pi,w,d){const k=pi+'|'+w+'|'+d;return k in intakeStore?intakeStore[k]:intakeDefault(pi,w,d);}
+function residualOf(pi,w,d){const h=getActual(pi,w,d);if(h==null)return null;return (h||0)-(getIntake(pi,w,d)||0)-fieldChildren(pi,w,d)-lossOf(pi,w,d);}
+function auditFlag(pi,w,d){const h=getActual(pi,w,d),r=residualOf(pi,w,d);return h!=null&&h>0&&Math.abs(r)>Math.max(1,h*0.04);}
+
+// ---------- PLAN & LOG page ----------
+function setMode(m){editMode=m;renderLog();}
+let groupBy='variety'; // 'variety' (→farm) | 'farm' (→variety)
+function setGroup(g){groupBy=g;
+  document.getElementById('gbVar').classList.toggle('active',g==='variety');
+  document.getElementById('gbFarm').classList.toggle('active',g==='farm');
+  renderLog();
+}
+function logGroups(){
+  const byFarm=groupBy==='farm';
+  const sorted=plots.map((p,i)=>({p,i})).sort((a,b)=> byFarm
+    ? (a.p.f.localeCompare(b.p.f)||a.p.v.localeCompare(b.p.v)||a.p.p.localeCompare(b.p.p))
+    : (a.p.v.localeCompare(b.p.v)||a.p.f.localeCompare(b.p.f)));
+  const gs=[], map={};
+  sorted.forEach(({p,i})=>{const key=byFarm?p.f:p.v; const label=byFarm?('Farm '+p.f):(p.v+' · '+p.vt);
+    if(!map[key]){map[key]={key,label,idxs:[]};gs.push(map[key]);}map[key].idxs.push(i);});
+  return gs;
+}
+let todayMode=true; // Actual Harvest defaults to the single-column Today view
+let curDays=[];
+function setView(v){todayMode=(v==='today');renderLog();}
+function renderLog(){
+  const m=editMode; // 'plan' | 'harv'
+  const today=(m==='harv'&&todayMode);
+  if(today) selWeek=CUR; // "Today" always lives in the current week
+  document.getElementById('mePlan').classList.toggle('active',m==='plan');
+  document.getElementById('meHarv').classList.toggle('active',m==='harv');
+  document.getElementById('meHarv').classList.toggle('actmode',m==='harv');
+  const vs=document.getElementById('viewSeg'); if(vs){vs.style.display=m==='harv'?'':'none';
+    document.getElementById('vwToday').classList.toggle('active',today);document.getElementById('vwWeek').classList.toggle('active',!today);}
+  document.getElementById('modeBanner').className='modebanner '+(m==='plan'?'plan':'harv');
+  document.getElementById('wkLbl').textContent='Week of '+WK[selWeek];
+  document.getElementById('logHint').innerHTML=
+    m==='plan' ? '<b>Setting the plan.</b> Set <b>Area × Yield</b> (season total), then click the <b>harvest-window</b> chip to set start/peak/end/shape — the tool draws the curve. Day cells can be hand-tweaked (edited cells get a green outline). Faint number = actual harvest.'
+  : today ? '<b>Logging today.</b> One column: type each plot\'s tonnes and press <b>Enter</b> (or ↓) to move to the next plot. <b>Blank = not logged yet</b>; type <b>0</b> for “no pick”. Rows = plots in window today or already logged today. Plan fields are read-only here.'
+  :         '<b>Logging harvest</b> (actual production). Type tonnes per plot-day; faint number = plan; blank = not logged; Enter/↓ moves down a column. A pick on a 0-plan day turns <b style="color:var(--violet)">purple</b> (off-plan). Future days are locked. Plan fields are read-only here.';
+  const start=+WK[selWeek].split(' ')[0];
+  let days=WD.map((wd,i)=>{let d=start+i;if(d>31)d-=31;return{wd,d,di:i};});
+  if(today) days=[days[CURDAY]];
+  curDays=days;
+  const NCOL=7+days.length+2;
+  const wkLbl = m==='plan'?'Wk plan':'Wk harv';
+  const varLbl= m==='plan'?'':'vs plan';
+  document.getElementById('cellLegend').innerHTML=
+    `<span>Each day cell:</span>`+
+    `<span class="demo"><span class="big">${m==='plan'?'18':'17'}</span><span class="sm"><span class="tg">${m==='plan'?'act':'plan'}</span>${m==='plan'?'17':'18'}</span></span>`+
+    `<span><b style="color:var(--text2)">big</b> = ${m==='plan'?'planned tonnes you\'re setting':'harvest tonnes you\'re logging'} · <b style="color:var(--text2)">small</b> = ${m==='plan'?'actual harvest, for reference':'the plan, for reference'} · <b style="color:var(--text2)">all values in tonnes (t)</b></span>`;
+  let head=`<tr>
+    <th class="frozen f0">Farm</th><th class="frozen f1">Plot</th><th class="frozen f2">Var.</th>
+    <th class="num">Area</th><th class="num">Yield</th><th class="num">Planned</th><th>Harvest window</th>`
+    +days.map(d=>`<th class="dayh ${today?'todayh':''}" style="border-left:1px solid var(--border)">${today?'Today · ':''}${d.wd}<br>${d.d}</th>`).join('')
+    +`<th class="num">${wkLbl}</th><th class="num">${varLbl}</th></tr>`;
+  const groups=logGroups();
+  let body='', grand=days.map(()=>0), grandWk=0, rowsN=0, loggedN=0;
+  groups.forEach((g,gi)=>{
+    const idxs = today ? g.idxs.filter(i=>dayPlan(i,CUR,CURDAY)>0 || (getActual(i,CUR,CURDAY)||0)>0) : g.idxs;
+    if(!idxs.length) return;
+    body+=`<tr class="grp"><td colspan="${NCOL}">${g.label}</td></tr>`;
+    let gsum=days.map(()=>0), gwk=0;
+    idxs.forEach(i=>{
+      const p=plots[i], ay=getAY(i);
+      let wkPlan=0,wkHarv=0;
+      for(let di=0;di<7;di++){wkPlan+=dayPlan(i,selWeek,di);wkHarv+=(getActual(i,selWeek,di)||0);}
+      const cells=days.map((d,c)=>{
+        const di=d.di;
+        const dp=dayPlan(i,selWeek,di), h=getActual(i,selWeek,di);
+        const val=m==='plan'?dp:(h||0); gsum[c]+=val; grand[c]+=val;
+        const isFut=(selWeek>CUR)||(selWeek===CUR&&di>CURDAY);
+        let editVal, refVal, cinCls, extra='', dis='';
+        if(m==='plan'){editVal=dp; refVal=(h==null?'':('<span class="tg">act</span>'+h)); cinCls='plan'; if(dp===0&&(h||0)>0)extra=' off';}
+        else {editVal=(h==null?'':h); refVal=(dp?('<span class="tg">plan</span>'+dp):''); cinCls='harv'; if(dp===0&&(h||0)>0)extra=' off'; if(isFut){extra+=' fut';dis=' disabled';} else if(h==null){extra+=' unlogged';}}
+        if(dirty.has(i+'|'+selWeek+'|'+di+'|'+m))extra+=' dirty';
+        return `<td class="daycell${extra}"><input class="cin ${cinCls}" id="c_${i}_${di}" value="${editVal===0&&m==='plan'?0:editVal}"${dis} placeholder="${m==='harv'&&!isFut?'—':''}" oninput="edited(this)"><span class="dp">${refVal}</span></td>`;
+      }).join('');
+      if(today){rowsN++; if(getActual(i,CUR,CURDAY)!=null)loggedN++;}
+      const wset=!!winStore[i], w=winOf(i);
+      const wchip = m==='plan'
+        ? `<span class="wchip ${wset?'':'auto'}" onclick="openWin(${i})" title="Set harvest window"><span class="wk">◷</span>${wset?`${WK[w.start]}→${WK[w.end]} · ${w.shape}`:'Auto — set window'}</span>`
+        : `<span class="wchip ro" title="Plan is read-only in Actual Harvest mode"><span class="wk">◷</span>${WK[w.start]}→${WK[w.end]} · ${w.shape}</span>`;
+      let wkTot, varCell='';
+      if(m==='plan'){wkTot=wkPlan;}
+      else {wkTot=wkHarv;const v=wkHarv-wkPlan,off=wkPlan===0&&wkHarv>0;
+        const vc=off?'v-off':(Math.abs(v)<Math.max(3,wkPlan*0.06)?'v-on':(v>0?'v-over':'v-under'));
+        const vt=off?`+${wkHarv} off`:(Math.abs(v)<Math.max(3,wkPlan*0.06)?'on plan':`${v>0?'+':''}${v} t`);
+        varCell=`<span class="varcell ${vc}" id="vr_${i}">${vt}</span>`;}
+      gwk+=wkTot;
+      const areaCell = m==='plan' ? `<input class="cin plan" id="ar_${i}" value="${ay.area}" oninput="edited(this)">` : `<span class="rotxt">${ay.area}</span>`;
+      const yldCell  = m==='plan' ? `<input class="cin plan" id="yl_${i}" value="${ay.yield}" oninput="edited(this)">` : `<span class="rotxt">${ay.yield}</span>`;
+      body+=`<tr>
+        <td class="frozen f0" title="${p.f}">${p.f}</td><td class="frozen f1"><span class="plot">${p.p}</span>${groupBy==='farm'?`<div class="vsub" title="${p.v}">${p.v}</div>`:''}</td>
+        <td class="frozen f2"><span class="pill p-${p.pnp}">${p.pnp}</span></td>
+        <td class="num">${areaCell}</td>
+        <td class="num">${yldCell}</td>
+        <td class="num"><span class="plancell" id="pl_${i}">${Math.round(plannedNow(i))}</span></td>
+        <td>${wchip}</td>
+        ${cells}
+        <td class="num" id="wp_${i}">${wkTot}</td>
+        <td class="num">${m==='plan'?'':varCell}</td>
+      </tr>`;
+    });
+    grandWk+=gwk;
+    body+=`<tr class="subtot"><td class="stlab" colspan="7">${g.key} — subtotal</td>`+gsum.map((s,c)=>`<td class="num" id="st_${gi}_${c}">${s}</td>`).join('')+`<td class="num" id="stwk_${gi}">${gwk}</td><td></td></tr>`;
+  });
+  body+=`<tr class="grandtot"><td class="stlab" colspan="7">All plots — total per day</td>`+grand.map((s,c)=>`<td class="num" id="gt_${c}">${s}</td>`).join('')+`<td class="num" id="gtwk">${grandWk}</td><td></td></tr>`;
+  document.getElementById('logTable').innerHTML=head+body;
+  // banner (structural mode statement + today completeness)
+  document.getElementById('modeBanner').innerHTML= m==='plan'
+    ? `<span class="tag">Planning</span><span>Set Plan — you're editing the <b>planned</b> harvest. Actuals are shown greyed for reference and are not editable here.</span>`
+    : today
+      ? `<span class="tag">Actual Harvest</span><span>Today · ${days[0].wd} ${days[0].d} — <b><span id="todayCnt">${loggedN} of ${rowsN}</span></b> in-window plots logged. Blank = not logged · 0 = no pick. Plan fields are read-only.</span>`
+      : `<span class="tag">Actual Harvest</span><span>Actual Harvest — you're logging <b>what was actually picked</b>. Plan is shown greyed for reference and is read-only here.</span>`;
+  updateDirtyBadge();
+}
+// recompute on edit — stores ONLY the cell that changed (per-cell dirty set); totals recomputed from the model
+const dirty=new Set();
+function updateDirtyBadge(){const b=document.getElementById('dirtyBadge');if(!b)return;const n=dirty.size;b.textContent=n?`${n} unsaved change${n>1?'s':''}`:'';b.style.display=n?'':'none';}
+function edited(el){
+  const m=editMode;
+  if(el&&el.id){
+    const id=el.id;
+    if(id.startsWith('ar_')||id.startsWith('yl_')){
+      const i=+id.split('_')[1]; const ar=document.getElementById('ar_'+i), yl=document.getElementById('yl_'+i);
+      if(ar&&yl){planStore[i]={area:parseFloat(ar.value)||0,yield:parseFloat(yl.value)||0};
+        const pc=document.getElementById('pl_'+i); if(pc)pc.textContent=Math.round(plannedNow(i)); dirty.add('plan-total|'+i);
+        // curve rescales for untouched days; refresh their inputs in place
+        for(let di=0;di<7;di++){const inp=document.getElementById('c_'+i+'_'+di); if(inp&&!(i+'|'+selWeek+'|'+di in planDayStore)&&m==='plan')inp.value=dayPlan(i,selWeek,di);}}
+    } else if(id.startsWith('c_')){
+      const parts=id.split('_'); const i=+parts[1], di=+parts[2]; const k=i+'|'+selWeek+'|'+di;
+      const val=el.value===''?null:parseFloat(el.value);
+      if(m==='plan'){ if(val!=null&&!isNaN(val))planDayStore[k]=val; else delete planDayStore[k]; }
+      else { if(val!=null&&!isNaN(val))actStore[k]=val; else actStore[k]=null; } // blank = not logged
+      dirty.add(k+'|'+m); el.parentElement.classList.add('dirty');
+      const dp=dayPlan(i,selWeek,di), h=getActual(i,selWeek,di);
+      el.parentElement.classList.toggle('off',dp===0&&(h||0)>0);
+      if(m==='harv')el.parentElement.classList.toggle('unlogged',h==null);
+    }
+  }
+  const days=curDays.length?curDays:WD.map((wd,i)=>({di:i}));
+  // row totals + variance (from the model, not by re-reading every input)
+  plots.forEach((p,i)=>{
+    if(!document.getElementById('c_'+i+'_'+days[0].di))return; // row not rendered (filtered)
+    let wkPlan=0,wkHarv=0; for(let di=0;di<7;di++){wkPlan+=dayPlan(i,selWeek,di);wkHarv+=(getActual(i,selWeek,di)||0);}
+    const wp=document.getElementById('wp_'+i); if(wp)wp.textContent=m==='plan'?wkPlan:wkHarv;
+    const vr=document.getElementById('vr_'+i);
+    if(vr&&m==='harv'){const v=wkHarv-wkPlan,off=wkPlan===0&&wkHarv>0;
+      const vc=off?'v-off':(Math.abs(v)<Math.max(3,wkPlan*0.06)?'v-on':(v>0?'v-over':'v-under'));
+      vr.className='varcell '+vc; vr.textContent=off?`+${wkHarv} off`:(Math.abs(v)<Math.max(3,wkPlan*0.06)?'on plan':`${v>0?'+':''}${v} t`);}
+  });
+  // subtotals + grand
+  const groups=logGroups(); const grand=days.map(()=>0); let grandWk=0;
+  groups.forEach((g,gi)=>{
+    const gsum=days.map(()=>0); let gwk=0, any=false;
+    g.idxs.forEach(i=>{ if(!document.getElementById('c_'+i+'_'+days[0].di))return; any=true;
+      days.forEach((d,c)=>{const v=m==='plan'?dayPlan(i,selWeek,d.di):(getActual(i,selWeek,d.di)||0);gsum[c]+=v;grand[c]+=v;});
+      for(let di=0;di<7;di++)gwk+= m==='plan'?dayPlan(i,selWeek,di):(getActual(i,selWeek,di)||0); });
+    if(!any)return; grandWk+=gwk;
+    days.forEach((d,c)=>{const cell=document.getElementById('st_'+gi+'_'+c);if(cell)cell.textContent=gsum[c];});
+    const w=document.getElementById('stwk_'+gi);if(w)w.textContent=gwk;
+  });
+  days.forEach((d,c)=>{const cell=document.getElementById('gt_'+c);if(cell)cell.textContent=grand[c];});
+  const gw=document.getElementById('gtwk');if(gw)gw.textContent=grandWk;
+  // today completeness
+  if(m==='harv'&&todayMode){let rowsN=0,loggedN=0;plots.forEach((p,i)=>{if(document.getElementById('c_'+i+'_'+CURDAY)){rowsN++;if(getActual(i,CUR,CURDAY)!=null)loggedN++;}});const c=document.getElementById('todayCnt');if(c)c.textContent=`${loggedN} of ${rowsN}`;}
+  updateDirtyBadge();
+}
+// keyboard: Enter / ↓ = next plot in the same day column, ↑ or Shift+Enter = previous
+document.getElementById('logTable').addEventListener('keydown',e=>{
+  const t=e.target; if(!t||!t.classList||!t.classList.contains('cin')||!String(t.id).startsWith('c_'))return;
+  if(e.key==='Enter'||e.key==='ArrowDown'||e.key==='ArrowUp'){e.preventDefault();
+    const di=t.id.split('_')[2];
+    const col=[...document.querySelectorAll('#logTable input.cin')].filter(x=>x.id.startsWith('c_')&&x.id.split('_')[2]===di&&!x.disabled);
+    const idx=col.indexOf(t); const back=(e.key==='ArrowUp')||(e.key==='Enter'&&e.shiftKey);
+    const nxt=col[idx+(back?-1:1)]; if(nxt){nxt.focus(); if(nxt.select)nxt.select();}
+  }
+});
+function stepWeek(d){selWeek=Math.max(0,Math.min(WK.length-1,selWeek+d));renderLog();if(page==='trk')renderTrucks();}
+
+// ---- harvest window modal ----
+let winPi=0;
+function openWin(pi){winPi=pi;const p=plots[pi],w=winOf(pi);
+  document.getElementById('winTitle').textContent=`${p.f} ${p.p} — ${p.v}`;
+  document.getElementById('winSub').textContent='Set the harvest window; the tool draws the weekly curve';
+  document.getElementById('winTotal').value=Math.round(plannedNow(pi))+' t';
+  const opt=(sel)=>WK.map((wk,i)=>`<option value="${i}" ${i===sel?'selected':''}>${wk}</option>`).join('');
+  document.getElementById('winStart').innerHTML=opt(w.start);
+  document.getElementById('winPeak').innerHTML=opt(w.peak);
+  document.getElementById('winEnd').innerHTML=opt(w.end);
+  document.getElementById('winShape').value=w.shape;
+  winPrev();
+  document.getElementById('winScrim').classList.add('open');
+}
+function closeWin(){document.getElementById('winScrim').classList.remove('open');}
+function readWin(){return{start:+document.getElementById('winStart').value,peak:+document.getElementById('winPeak').value,end:+document.getElementById('winEnd').value,shape:document.getElementById('winShape').value};}
+function winPrev(){
+  let w=readWin(); if(w.end<w.start)w.end=w.start; if(w.peak<w.start)w.peak=w.start; if(w.peak>w.end)w.peak=w.end;
+  winStore[winPi]=w; // temp for preview
+  const c=genCurve(winPi), mx=Math.max(...c,1);
+  document.getElementById('winBars').innerHTML=c.map((v,i)=>{
+    const cls=i===w.peak?'pk':(v===0?'out':'');
+    return `<div class="wb ${cls}" style="height:${Math.max(2,v/mx*66)}px" title="${WK[i]}: ${v} t"></div>`;}).join('');
+  document.getElementById('winLabs').innerHTML=WK.map((wk,i)=>`<span>${(i%2===0)?wk.split(' ')[0]:''}</span>`).join('');
+  document.getElementById('winSum').textContent=sum(c).toLocaleString()+' t · '+(w.end-w.start+1)+' wks';
+}
+function applyWin(){winStore[winPi]=readWin();
+  for(let wk=0;wk<14;wk++)for(let d=0;d<7;d++)delete planDayStore[winPi+'|'+wk+'|'+d]; // let the drawn curve take over
+  closeWin();renderLog();}
+function saveAll(){const n=dirty.size;alert(`Concept: saves ${n} changed cell${n===1?'':'s'} — actuals are written as facts (autosave in the real build); plan edits accumulate as a draft you commit as a named revision from the Revisions page.`);dirty.clear();document.querySelectorAll('.daycell.dirty').forEach(td=>td.classList.remove('dirty'));updateDirtyBadge();}
+
+// ---------- SEASON OVERVIEW page (everything derived from the SAME daily model as the grid) ----------
+const YDAY=CURDAY-1; // actuals are complete through yesterday
+function sumTo(fn,i,upW,upD){let s=0;for(let w=0;w<=upW;w++)for(let d=0;d<7;d++){if(w===upW&&d>upD)break;s+=(fn(i,w,d)||0);}return s;}
+function agg(){
+  const vs=[...new Set(plots.map(p=>p.v))];
+  return vs.map(v=>{const ps=plots.map((p,i)=>({p,i})).filter(x=>x.p.v===v);
+    const area=sum(ps.map(x=>x.p.area));
+    const planW=WK.map((_,w)=>sum(ps.map(x=>sum(WD.map((__,d)=>dayPlan(x.i,w,d))))));
+    const actW=WK.map((_,w)=> w>CUR?null: sum(ps.map(x=>sum(WD.map((__,d)=>getActual(x.i,w,d)||0)))));
+    const latest=sum(planW);
+    const harv=sum(ps.map(x=>sumTo(getActual,x.i,CUR,CURDAY)));
+    const planTD=sum(ps.map(x=>sumTo(dayPlan,x.i,CUR,YDAY)));
+    const actTD=sum(ps.map(x=>sumTo(getActual,x.i,CUR,YDAY)));
+    const planWkTD=sum(ps.map(x=>sum(WD.slice(0,CURDAY+1).map((__,d)=>dayPlan(x.i,CUR,d)))));
+    const next2=(planW[CUR+1]||0)+(planW[CUR+2]||0);
+    return {v,vt:ps[0].vt,n:ps.length,area,budget:sum(ps.map(x=>x.p.budget)),jul:sum(ps.map(x=>x.p.jul)),nov:sum(ps.map(x=>x.p.nov)),
+      latest,harv,rem:latest-harv,rate:+(latest/area).toFixed(1),planW,actW,planTD,actTD,planWk:planW[CUR],actWk:actW[CUR]||0,planWkTD,next2};
+  });
+}
+function watchList(){
+  const rows=[];
+  plots.forEach((p,i)=>{
+    const w=winOf(i), harvTot=sumTo(getActual,i,CUR,CURDAY), planTD=sumTo(dayPlan,i,CUR,YDAY), latest=sum(WK.map((_,wk)=>sum(WD.map((__,d)=>dayPlan(i,wk,d)))));
+    // last 7 days window (across week boundary)
+    let l7p=0,l7a=0;{let wk=CUR,d=CURDAY;for(let k=0;k<7;k++){l7p+=dayPlan(i,wk,d);l7a+=(getActual(i,wk,d)||0);d--;if(d<0){d=6;wk--;if(wk<0)break;}}}
+    let offN=0,offT=0;for(let wk=0;wk<=CUR;wk++)for(let d=0;d<7;d++){if(wk===CUR&&d>CURDAY)break;const dp=dayPlan(i,wk,d),a=getActual(i,wk,d);if(dp===0&&(a||0)>0){offN++;offT+=a;}}
+    const base={f:p.f,p:p.p,v:p.v,planTD,harvTot};
+    if(w.start<=CUR&&planTD>0&&harvTot===0) rows.push({...base,status:'late start',cls:'v-under',delta:-planTD});
+    else if(harvTot>0&&l7p>0&&l7a===0) rows.push({...base,status:'stalled 7d',cls:'v-under',delta:-l7p});
+    if(offN>0) rows.push({...base,status:`off-plan ×${offN}`,cls:'v-off',delta:offT});
+    if(harvTot>latest&&latest>0) rows.push({...base,status:'overrunning',cls:'v-flag',delta:harvTot-latest});
+  });
+  rows.sort((a,b)=>Math.abs(b.delta)-Math.abs(a.delta));
+  return rows;
+}
+function renderOv(){
+  const A=agg();
+  const tPlan=sum(A.map(a=>a.latest)), tHarv=sum(A.map(a=>a.harv)), tBud=sum(A.map(a=>a.budget)), tArea=sum(A.map(a=>a.area));
+  const planTD=sum(A.map(a=>a.planTD)), actTD=sum(A.map(a=>a.actTD));
+  const pace=actTD-planTD, pacePct=planTD?Math.round(actTD/planTD*100):0;
+  const planWkTD=sum(A.map(a=>a.planWkTD)), actWk=sum(A.map(a=>a.actWk)), planWk=sum(A.map(a=>a.planWk));
+  const next2=sum(A.map(a=>a.next2));
+  // peak day in next 2 weeks
+  let pk={t:0,w:CUR+1,d:0};for(let w=CUR+1;w<=Math.min(CUR+2,WK.length-1);w++)for(let d=0;d<7;d++){const t=sum(plots.map((p,i)=>dayPlan(i,w,d)));if(t>pk.t)pk={t,w,d};}
+  const WL=watchList(); const wlN=WL.length;
+  const chg=revs[0]; const chgRows=chg.diff.filter(d=>!d.txt); const net=sum(chgRows.map(d=>d.now-d.was));
+  const top=chgRows.slice().sort((a,b)=>Math.abs(b.now-b.was)-Math.abs(a.now-a.was))[0];
+  const L=dayLabels(CUR);
+  const budDelta=tBud?(tPlan/tBud*100-100):0;
+  document.getElementById('ovWeek').innerHTML=`
+    <div class="wkhead"><span class="chipk">Wk ${CUR+1}</span><b>${L[0].d}–${L[6].d} ${L[6].mon} 2026</b><span>· actuals through <b>${WD[CURDAY]} ${L[CURDAY].d}</b></span><span>· plan revision <b>${chg.t}</b>${chg.locked?' <span class="chipk">locked</span>':''}</span><span>· field harvest, tonnes</span></div>
+    <div class="kpi-grid">
+      <div class="card kpi"><div class="lab">This week vs plan</div><div class="val">${actWk.toLocaleString()} <span class="un">/ ${planWkTD.toLocaleString()} t</span></div><div class="sub ${actWk>=planWkTD?'up':'down'}">${planWkTD?Math.round(actWk/planWkTD*100):0}% of plan-to-date · full-week plan ${planWk.toLocaleString()} t</div></div>
+      <div class="card kpi"><div class="lab">Season pace</div><div class="val">${pacePct}<span class="un">% of schedule</span></div><div class="sub ${pace>=0?'up':'down'}">${pace>=0?'▲ ahead':'▼ behind'} ${Math.abs(pace).toLocaleString()} t · through ${WD[YDAY]}</div></div>
+      <div class="card kpi"><div class="lab">Next 2 weeks</div><div class="val">${next2.toLocaleString()} <span class="un">t</span></div><div class="sub flat">peak ${WD[pk.d]} ${WK[pk.w]} · ${pk.t} t</div></div>
+      <div class="card kpi"><div class="lab">Watch list</div><div class="val">${wlN} <span class="un">plots</span></div><div class="sub ${wlN?'down':'flat'}">${wlN?`${WL[0].f} ${WL[0].p} · ${WL[0].v} · ${WL[0].status}`:'nothing flagged'}</div></div>
+      <div class="card kpi"><div class="lab">Changed since snapshot</div><div class="val">${chgRows.length} <span class="un">plots</span></div><div class="sub ${net>=0?'up':'down'}">net ${net>=0?'+':''}${net} t${top?` · top: ${top.p} ${top.now-top.was>0?'+':''}${top.now-top.was} t`:''}</div></div>
+    </div>`;
+  document.getElementById('ovKpis').innerHTML=`
+    <div class="card kpi"><div class="lab">Planted area</div><div class="val">${tArea.toFixed(0)} <span class="un">fed</span></div><div class="sub flat">${plots.length} plots · ${A.length} varieties</div></div>
+    <div class="card kpi"><div class="lab">Latest plan</div><div class="val">${tPlan.toLocaleString()} <span class="un">t</span></div><div class="sub ${budDelta>=0?'up':'down'}">${budDelta>=0?'▲':'▼'} ${Math.abs(budDelta).toFixed(0)}% vs budget ${tBud.toLocaleString()} t</div></div>
+    <div class="card kpi"><div class="lab">Harvested to date</div><div class="val">${tHarv.toLocaleString()} <span class="un">t</span></div><div class="sub flat">${tPlan?Math.round(tHarv/tPlan*100):0}% of season plan · through ${WD[CURDAY]}</div></div>
+    <div class="card kpi"><div class="lab">Remaining</div><div class="val">${(tPlan-tHarv).toLocaleString()} <span class="un">t</span></div><div class="sub flat">on the trees</div></div>`;
+  // watch list table
+  const wh=`<tr><th>Status</th><th>Farm</th><th>Plot</th><th>Variety</th><th class="num">Plan to date</th><th class="num">Harvested</th><th class="num">Δ</th></tr>`;
+  const wb=WL.length?WL.slice(0,10).map(r=>`<tr><td><span class="varcell ${r.cls}">${r.status}</span></td><td>${r.f}</td><td><span class="plot">${r.p}</span></td><td>${r.v}</td><td class="num">${Math.round(r.planTD)}</td><td class="num">${Math.round(r.harvTot)}</td><td class="num">${r.delta>0?'+':''}${Math.round(r.delta)} t</td></tr>`).join('')
+    :`<tr><td colspan="7" style="color:var(--text3)">Nothing flagged — all plots on schedule.</td></tr>`;
+  document.getElementById('ovWatch').innerHTML=wh+wb+(WL.length>10?`<tr><td colspan="7" style="color:var(--text3);font-size:11px">${WL.length-10} more…</td></tr>`:'');
+  // season shape heatmap — per-variety binning, past weeks show actual/plan, plus Total row
+  function heatRow(v,mx){if(!v)return{bg:'#eef1f0',c:'var(--border2)'};const r=v/(mx||1);if(r<0.34)return{bg:'#cfe6e4',c:'var(--text2)'};if(r<0.67)return{bg:'#5fb0ab',c:'#06322f'};return{bg:'#0d6a68',c:'#fff'};}
+  let calHead=`<tr><th class="rl"></th>`+WK.map((w,i)=>`<th class="${i===CUR?'cur':''}">${w}</th>`).join('')+`</tr>`;
+  let calBody=A.map(a=>{const mx=Math.max(...a.planW);return `<tr><td class="rl">${a.v}</td>`+a.planW.map((v,i)=>{const h=heatRow(v,mx);const past=i<=CUR&&a.actW[i]!=null;
+    return `<td class="hcell" style="background:${h.bg};color:${h.c}">${past?`<b>${a.actW[i]||''}</b><small>/${v||0}</small>`:(v||'')}</td>`}).join('')+`</tr>`;}).join('');
+  const totW=WK.map((_,w)=>sum(A.map(a=>a.planW[w]))), totA=WK.map((_,w)=>w>CUR?null:sum(A.map(a=>a.actW[w]||0))), tmx=Math.max(...totW);
+  calBody+=`<tr><td class="rl" style="border-top:1px solid var(--border)">Total</td>`+totW.map((v,i)=>{const h=heatRow(v,tmx);const past=i<=CUR;return `<td class="hcell" style="background:${h.bg};color:${h.c};font-weight:600">${past?`<b>${totA[i]||''}</b><small>/${v||0}</small>`:(v||'')}</td>`}).join('')+`</tr>`;
+  document.getElementById('ovCal').innerHTML=calHead+calBody;
+  // variety table — this-week columns first, estimates history at the end
+  let vh=`<tr><th class="frozen f0">Variety</th><th>Type</th><th class="num">Plots</th><th class="num">Plan wk</th><th class="num">Actual wk</th><th class="num">Δ wk</th><th class="num">Next 2 wks</th><th class="num">Season plan</th><th class="num">Harvested</th><th class="num">% done</th><th class="num">Pace Δ</th><th class="num">Remaining</th><th class="num">Plan t/fed</th><th class="num">Budget</th><th class="num">Jul est</th><th class="num">Nov est</th></tr>`;
+  const dchip=(v,base)=>{const on=Math.abs(v)<Math.max(3,base*0.06);const cls=on?'v-on':(v>0?'v-over':'v-under');return `<span class="varcell ${cls}">${on?'on':(v>0?'+':'')+Math.round(v)}</span>`;};
+  let vb=A.map(a=>`<tr>
+    <td class="frozen f0"><span class="vname">${a.v}</span></td><td>${a.vt}</td><td class="num">${a.n}</td>
+    <td class="num">${a.planWkTD.toLocaleString()}</td><td class="num"><b style="color:var(--text)">${a.actWk.toLocaleString()}</b></td><td class="num">${dchip(a.actWk-a.planWkTD,a.planWkTD)}</td>
+    <td class="num">${a.next2.toLocaleString()}</td>
+    <td class="num">${a.latest.toLocaleString()}</td><td class="num">${a.harv.toLocaleString()}</td><td class="num">${a.latest?Math.round(a.harv/a.latest*100):0}%</td>
+    <td class="num">${dchip(a.actTD-a.planTD,a.planTD)}</td><td class="num">${a.rem.toLocaleString()}</td><td class="num">${a.rate}</td>
+    <td class="num" style="color:var(--text3)">${a.budget.toLocaleString()}</td><td class="num" style="color:var(--text3)">${a.jul.toLocaleString()}</td><td class="num" style="color:var(--text3)">${a.nov.toLocaleString()}</td></tr>`).join('');
+  const T={planWkTD:sum(A.map(a=>a.planWkTD)),actWk:sum(A.map(a=>a.actWk)),next2,latest:tPlan,harv:tHarv,rem:tPlan-tHarv,budget:tBud,jul:sum(A.map(a=>a.jul)),nov:sum(A.map(a=>a.nov)),planTD,actTD};
+  vb+=`<tr class="tot"><td class="frozen f0">Total</td><td></td><td class="num">${plots.length}</td><td class="num">${T.planWkTD.toLocaleString()}</td><td class="num">${T.actWk.toLocaleString()}</td><td class="num">${dchip(T.actWk-T.planWkTD,T.planWkTD)}</td><td class="num">${T.next2.toLocaleString()}</td><td class="num">${T.latest.toLocaleString()}</td><td class="num">${T.harv.toLocaleString()}</td><td class="num">${T.latest?Math.round(T.harv/T.latest*100):0}%</td><td class="num">${dchip(T.actTD-T.planTD,T.planTD)}</td><td class="num">${T.rem.toLocaleString()}</td><td></td><td class="num">${T.budget.toLocaleString()}</td><td class="num">${T.jul.toLocaleString()}</td><td class="num">${T.nov.toLocaleString()}</td></tr>`;
+  document.getElementById('ovVar').innerHTML=vh+vb;
+  // plot table — from the same model
+  let ph=`<tr><th class="frozen f0">Farm</th><th>Plot</th><th>Variety</th><th>P/NP</th><th class="num">Area</th><th class="num">Season plan</th><th class="num">Harvested</th><th class="num">% done</th><th class="num">Remaining</th><th class="num">Budget</th><th class="num">Nov est</th></tr>`;
+  const psorted=plots.map((p,i)=>({p,i})).sort((a,b)=>a.p.v.localeCompare(b.p.v)||a.p.f.localeCompare(b.p.f));
+  let pb=psorted.map(({p,i})=>{const latest=sum(WK.map((_,w)=>sum(WD.map((__,d)=>dayPlan(i,w,d))))); const harv=sumTo(getActual,i,CUR,CURDAY);
+    return `<tr>
+    <td class="frozen f0">${p.f}</td><td><span class="plot">${p.p}</span></td><td><span class="vname">${p.v}</span></td>
+    <td><span class="pill p-${p.pnp}">${p.pnp}</span></td>
+    <td class="num">${p.area.toFixed(1)}</td>
+    <td class="num"><b style="color:var(--text)">${latest.toLocaleString()}</b></td>
+    <td class="num">${harv.toLocaleString()}</td><td class="num">${latest?Math.round(harv/latest*100):0}%</td><td class="num">${(latest-harv).toLocaleString()}</td>
+    <td class="num" style="color:var(--text3)">${p.budget.toLocaleString()}</td><td class="num" style="color:var(--text3)">${p.nov.toLocaleString()}</td></tr>`;}).join('');
+  document.getElementById('ovPlot').innerHTML=ph+pb;
+}
+
+function setPage(p){page=p;
+  document.getElementById('swLog').classList.toggle('active',p==='log');
+  document.getElementById('swOv').classList.toggle('active',p==='ov');
+  document.getElementById('swRev').classList.toggle('active',p==='rev');
+  document.getElementById('swTrk').classList.toggle('active',p==='trk');
+  document.getElementById('page-log').classList.toggle('active',p==='log');
+  document.getElementById('page-ov').classList.toggle('active',p==='ov');
+  document.getElementById('page-rev').classList.toggle('active',p==='rev');
+  document.getElementById('page-trk').classList.toggle('active',p==='trk');
+  if(p==='ov')renderOv();
+  if(p==='rev')renderRevList();
+  if(p==='trk')renderTrucks();
+}
+
+// ---------- TRUCKS (grid layout: variety group → farm rows × day, like Plan/Actual) ----------
+const truckLog={}; // "variety|farm|week|day" -> trucks typed by the analyst (flexible, no formula)
+function dayLabels(w){const parts=WK[w].split(' ');let start=+parts[0];const mon=parts[1];
+  return WD.map((wd,i)=>{let d=start+i;if(d>31)d-=31;return{wd,d,mon};});}
+const farmsList=[...new Set(plots.map(p=>p.f))];
+function fvDayTons(v,f,w,di){return sum(plots.map((p,i)=>({p,i})).filter(x=>x.p.f===f&&x.p.v===v).map(x=>dayPlan(x.i,w,di)));}
+function tkey(v,f,w,di){return v+'|'+f+'|'+w+'|'+di;}
+function getTruck(v,f,w,di){const k=tkey(v,f,w,di);return k in truckLog?truckLog[k]:'';}
+let trkGroupBy='variety'; // 'variety' (→farm rows) | 'farm' (→variety rows)
+function setTrkGroup(g){trkGroupBy=g;
+  document.getElementById('tgbVar').classList.toggle('active',g==='variety');
+  document.getElementById('tgbFarm').classList.toggle('active',g==='farm');
+  renderTrucks();
+}
+function truckPairs(){const seen=new Set(),out=[];plots.forEach(p=>{const k=p.v+'|'+p.f;if(!seen.has(k)){seen.add(k);out.push({v:p.v,vt:p.vt,f:p.f});}});return out;}
+function truckGroups(){ // group by variety (rows=farm) or by farm (rows=variety)
+  const byFarm=trkGroupBy==='farm';
+  const pairs=truckPairs().sort((a,b)=> byFarm ? (a.f.localeCompare(b.f)||a.v.localeCompare(b.v)) : (a.v.localeCompare(b.v)||a.f.localeCompare(b.f)));
+  const gs=[], map={};
+  pairs.forEach(pr=>{const key=byFarm?pr.f:pr.v; const label=byFarm?('Farm '+pr.f):(pr.v+' · '+pr.vt); const rowLabel=byFarm?pr.v:pr.f;
+    if(!map[key]){map[key]={key,label,rows:[]};gs.push(map[key]);}map[key].rows.push({v:pr.v,f:pr.f,rowLabel});});
+  return gs;
+}
+// seed current week per variety×farm (editable); other weeks blank
+truckPairs().forEach(pr=>{for(let di=0;di<7;di++){const t=fvDayTons(pr.v,pr.f,CUR,di);if(t>0)truckLog[tkey(pr.v,pr.f,CUR,di)]=Math.max(1,Math.round(t/20));}});
+function renderTrucks(){
+  const L=dayLabels(selWeek);
+  document.getElementById('trkWk').textContent='Week of '+WK[selWeek];
+  const head=`<tr><th class="frozen f0">${trkGroupBy==='farm'?'Farm / Variety':'Variety / Farm'}</th>`+L.map(l=>`<th class="dayh" style="border-left:1px solid var(--border)">${l.wd}<br>${l.d}</th>`).join('')+`<th class="num">Week</th></tr>`;
+  const groups=truckGroups();
+  let body='', grand=[0,0,0,0,0,0,0], grandWk=0;
+  groups.forEach((g,gi)=>{
+    body+=`<tr class="grp"><td colspan="9">${g.label}</td></tr>`;
+    let gsum=[0,0,0,0,0,0,0], gwk=0;
+    g.rows.forEach((row,fi)=>{
+      let rowWk=0;
+      const cells=L.map((l,di)=>{
+        const tons=fvDayTons(row.v,row.f,selWeek,di), val=getTruck(row.v,row.f,selWeek,di);
+        const n=val===''?0:(parseInt(val)||0); rowWk+=n; gsum[di]+=n; grand[di]+=n;
+        return `<td class="trk daycell"><input class="cin trkin" id="tk_${gi}_${fi}_${di}" value="${val}" oninput="trucksEdited()"><span class="t">${tons?tons+' t':''}</span></td>`;
+      }).join('');
+      gwk+=rowWk;
+      body+=`<tr><td class="frozen f0">${row.rowLabel}</td>${cells}<td class="trk"><span class="n" id="trw_${gi}_${fi}">${rowWk}</span></td></tr>`;
+    });
+    grandWk+=gwk;
+    body+=`<tr class="subtot"><td class="stlab">${g.key} — subtotal</td>`+gsum.map((s,di)=>`<td class="num" id="tst_${gi}_${di}">${s}</td>`).join('')+`<td class="num" id="tstwk_${gi}">${gwk}</td></tr>`;
+  });
+  body+=`<tr class="grandtot"><td class="stlab">All varieties — trucks / day</td>`+grand.map((s,di)=>`<td class="num" id="tgt_${di}">${s}</td>`).join('')+`<td class="num" id="tgtwk">${grandWk}</td></tr>`;
+  document.getElementById('trkTable').innerHTML=head+body;
+  trucksEdited();
+}
+function trucksEdited(){
+  const L=dayLabels(selWeek);
+  const groups=truckGroups(); const grand=[0,0,0,0,0,0,0]; let grandWk=0; const farmTot={};
+  groups.forEach((g,gi)=>{
+    const gsum=[0,0,0,0,0,0,0]; let gwk=0;
+    g.rows.forEach((row,fi)=>{
+      let rowWk=0;
+      for(let di=0;di<7;di++){
+        const inp=document.getElementById('tk_'+gi+'_'+fi+'_'+di); if(!inp)continue;
+        const v=inp.value===''?0:parseInt(inp.value)||0;
+        truckLog[tkey(row.v,row.f,selWeek,di)]=inp.value===''?'':v;
+        rowWk+=v; gsum[di]+=v; grand[di]+=v;
+      }
+      farmTot[row.f]=(farmTot[row.f]||0)+rowWk;
+      const w=document.getElementById('trw_'+gi+'_'+fi); if(w)w.textContent=rowWk;
+    });
+    gwk=gsum.reduce((a,b)=>a+b,0); grandWk+=gwk;
+    for(let di=0;di<7;di++){const c=document.getElementById('tst_'+gi+'_'+di); if(c)c.textContent=gsum[di];}
+    const w=document.getElementById('tstwk_'+gi); if(w)w.textContent=gwk;
+  });
+  for(let di=0;di<7;di++){const c=document.getElementById('tgt_'+di); if(c)c.textContent=grand[di];}
+  const gw=document.getElementById('tgtwk'); if(gw)gw.textContent=grandWk;
+  const peak=grand.indexOf(Math.max(...grand));
+  document.querySelectorAll('#trkTable td').forEach(td=>td.classList.remove('peak'));
+  if(grand[peak]>0){document.querySelectorAll('#trkTable tr').forEach(tr=>{const td=tr.children[peak+1];if(td)td.classList.add('peak');});}
+  const busy=Object.entries(farmTot).sort((a,b)=>b[1]-a[1])[0]||['—',0];
+  document.getElementById('trkKpis').innerHTML=`
+    <div class="card kpi"><div class="lab">Truck-loads this week</div><div class="val">${grandWk} <span class="un">🚛</span></div><div class="sub flat">all varieties · all farms</div></div>
+    <div class="card kpi"><div class="lab">Peak day</div><div class="val">${grand[peak]||0} <span class="un">trucks</span></div><div class="sub flat">${L[peak].wd} ${L[peak].d} ${L[peak].mon}</div></div>
+    <div class="card kpi"><div class="lab">Busiest farm</div><div class="val" style="font-size:22px">${busy[0]}</div><div class="sub flat">${busy[1]} loads this week</div></div>
+    <div class="card kpi"><div class="lab">Avg per day</div><div class="val">${(grandWk/7).toFixed(1)} <span class="un">trucks</span></div><div class="sub flat">7 harvest days</div></div>`;
+}
+
+// ---------- REVISIONS ----------
+const revs=[
+ {t:"Weekly update — 8 Feb",d:"08 Feb 2026 · 09:12",who:"Agro Analyst",in:"AA",locked:false,note:"Double Murcott flush pulled forward after field walk; Tango tailing faster than modelled.",
+  diff:[{p:"Hana 04-06A · D.Murcott",was:470,now:531},{p:"Kheir 10-02A · Tango",was:900,now:839},{p:"Hana 02-03A · Nova",was:300,now:317}]},
+ {t:"Weekly update — 1 Feb",d:"01 Feb 2026 · 16:40",who:"Agro Analyst",in:"AA",locked:false,note:"Grapefruit sizing better than plan.",
+  diff:[{p:"Layla 00-01A · Star Ruby",was:760,now:821},{p:"Kheir 08-02B · Star Ruby",was:144,now:155}]},
+ {t:"November estimate",d:"08 Nov 2025 · 14:00",who:"Tarek G.",in:"TG",locked:true,note:"Post-bloom count — the season baseline. Locked as the as-presented plan.",
+  diff:[{p:"Hana 01-01A · Eureka",was:270,now:310},{p:"Hana 03-10A · Olinda",was:600,now:655},{p:"Kheir 09-05B · Tango",was:430,now:497}]},
+ {t:"July estimate",d:"20 Jul 2025 · 12:30",who:"Agronomy",in:"AG",locked:true,note:"First-pass on tree age, bearing area and windows.",
+  diff:[{p:"All bearing plots",was:0,now:0,txt:"Per-plot yield model + harvest windows applied"}]},
+ {t:"Budget (موازنة)",d:"01 Jul 2025 · 08:00",who:"Tarek G.",in:"TG",locked:true,note:"Board budget locked.",
+  diff:[{p:"Season total",was:0,now:0,txt:"Committed budget by variety"}]},
+];
+function chgChip(w,n){const d=n-w,over=d>0,under=d<0;return `<span class="chg" style="border-color:${over?'var(--green-border)':under?'var(--red-border)':'var(--border2)'};background:${over?'var(--green-bg)':under?'var(--red-bg)':'var(--bg2)'};color:${over?'var(--green)':under?'var(--red)':'var(--text3)'}">${d>0?'+':''}${d} t</span>`;}
+function renderRevList(){
+  document.getElementById('revList').innerHTML=revs.map((r,i)=>`
+    <div class="rev-item ${i===0?'active':''}" onclick="pickRev(${i})">
+      <div class="rt">${r.t}</div><div class="rd">${r.d}</div>
+      <div class="who"><span class="avatar">${r.in}</span>${r.who}${r.locked?'<span class="lockchip">locked</span>':''}</div>
+    </div>`).join('');
+  pickRev(0);
+}
+function pickRev(i){
+  document.querySelectorAll('.rev-item').forEach((e,j)=>e.classList.toggle('active',j===i));
+  const r=revs[i];
+  const rows=r.diff.map(d=>{
+    const vals=d.txt?`<span class="now">${d.txt}</span>`:`<span class="was">${d.was.toLocaleString()}</span><span class="arw">→</span><span class="now">${d.now.toLocaleString()} t</span> ${chgChip(d.was,d.now)}`;
+    return `<div class="diff-row"><span class="diff-plot">${d.p}</span><span class="diff-vals">${vals}</span></div>`;
+  }).join('');
+  document.getElementById('revDetail').innerHTML=`<div class="note-box"><span>“</span><div><b>${r.who}</b> — ${r.note}</div></div><div style="font-size:11px;color:var(--text3);margin-bottom:6px">CHANGES IN THIS REVISION</div>${rows}`;
+}
+seedPlanDay=plots.map((p,i)=>WK.map((_,w)=>WD.map((__,d)=>dayPlanAuto(i,w,d))));
+function toggleSide(){const s=document.getElementById('sidebar'),o=document.getElementById('sideOv');const open=!s.classList.contains('open');s.classList.toggle('open',open);o.classList.toggle('open',open);}
+renderLog();
+</script>
