@@ -349,8 +349,8 @@ body.present .diff-row{font-size:15px}
 
     <div class="crop-bar">
       <span class="cb-lbl">Crop</span>
-      <div class="crop-seg" onclick="if(event.target.tagName==='B'){this.querySelectorAll('b').forEach(x=>x.classList.remove('on'));event.target.classList.add('on');}">
-        <b class="on">Citrus</b><b>Grapes</b><b>Mango</b><b>Pomegranate</b>
+      <div class="crop-seg" id="cropSeg">
+        <b class="on" data-p="citrus" onclick="pickProduct('citrus')">Citrus</b><b data-p="grapes" onclick="pickProduct('grapes')">Grapes</b><b data-p="mango" onclick="pickProduct('mango')">Mango</b><b data-p="pomegranate" onclick="pickProduct('pomegranate')">Pomegranate</b>
       </div>
     </div>
 
@@ -544,6 +544,8 @@ const MON=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","De
 let WK=[], WKDATE=[], CUR=0, CURDAY=3;
 let selWeek=0, page='log', editMode='plan';
 let plots=[], farmsList=[], SEASON=null, SEASONS=[], canWrite=false, seasonHasPlan=true;
+let product='citrus';
+const PRODUCT_LABEL={citrus:'Citrus',grapes:'Grapes',mango:'Mango',pomegranate:'Pomegranate'};
 function sum(a){return a.reduce((x,y)=>x+(y||0),0)}
 const jit=[1.03,0.96,1.08,0.94,1.05,0.98,1.12,0.9,1.06,0.97];
 const patterns=[[0.16,0.15,0.14,0.15,0.14,0.13,0.13],[0.10,0.18,0.16,0.14,0.16,0.12,0.14],[0.18,0.10,0.16,0.16,0.12,0.16,0.12],[0.14,0.16,0.14,0.14,0.14,0.14,0.14],[0.12,0.16,0.14,0.16,0.14,0.14,0.14]];
@@ -1010,7 +1012,7 @@ async function openCopyLast(){
   const b=document.getElementById('clsApply'); b.disabled=true; b.style.opacity='.5';
   document.getElementById('copyScrim').classList.add('open');
   try{
-    const {data,error}=await SB.rpc('hp_prior_year_list'); if(error)throw error;
+    const {data,error}=await SB.rpc('hp_prior_year_list',{p_product:product}); if(error)throw error;
     const years=data||[];
     if(!years.length){sel.innerHTML='<option>—</option>';document.getElementById('clsNote').textContent='No prior-season actuals found for citrus.';return;}
     sel.innerHTML=years.map(y=>`<option value="${y.season_year}">${y.season_year} · ${y.blocks} plots · ${Number(y.total_t).toLocaleString()} t</option>`).join('');
@@ -1022,9 +1024,10 @@ async function copyLastPrev(){
   const yr=+document.getElementById('clsSeason').value; if(!yr)return;
   const note=document.getElementById('clsNote'); note.textContent='Loading '+yr+' yields…';
   try{
-    if(!clsCache[yr]){const {data,error}=await SB.rpc('hp_prior_yields',{p_season_year:yr});if(error)throw error;
-      const m={};(data||[]).forEach(r=>{if(r.yield!=null)m[r.block_id]=Number(r.yield);});clsCache[yr]=m;}
-    clsMap=clsCache[yr];
+    const ck=product+'|'+yr;
+    if(!clsCache[ck]){const {data,error}=await SB.rpc('hp_prior_yields',{p_season_year:yr,p_product:product});if(error)throw error;
+      const m={};(data||[]).forEach(r=>{if(r.yield!=null)m[r.block_id]=Number(r.yield);});clsCache[ck]=m;}
+    clsMap=clsCache[ck];
   }catch(err){note.textContent='Could not load '+yr+' yields: '+((err&&err.message)||err);clsMap=null;return;}
   const hist=plots.map((p,i)=>({i,p,y:clsMap[p.blockId]})).filter(x=>x.y!=null);
   const avg=hist.length?(hist.reduce((s,x)=>s+x.y,0)/hist.length):0;
@@ -1066,8 +1069,8 @@ async function saveAll(){
     if(b){const s=data.saved||{};b.textContent='Saved ✓'+(s.events?(' · '+s.events+' change'+(s.events>1?'s':'')+' logged'):'');b.style.display='';setTimeout(updateDirtyBadge,1800);}
   }catch(err){uiToast('Save failed: '+((err&&err.message)||err),'err');if(b){b.textContent='Save failed';b.style.display='';}}
 }
-async function truckCellEdit(el){trucksEdited();try{const q=el.id.split('_'),gi=+q[1],fi=+q[2],di=+q[3];const g=truckGroups()[gi];if(!g)return;const row=g.rows[fi];if(!row)return;const plot=plots.find(p=>p.v===row.v&&p.f===row.f);if(!plot)return;const val=el.value===''?0:parseInt(el.value)||0;const {error}=await SB.from('hp_truck').upsert({product_id:'citrus',season_id:SEASON.id,farm_id:plot.farmId,variety_id:plot.varId,plan_date:dateOf(selWeek,di),trucks:val},{onConflict:'product_id,season_id,farm_id,variety_id,plan_date'});if(error)throw error;el.style.borderColor='';el.title='';}catch(err){el.style.borderColor='var(--red,#b03030)';el.title='Not saved: '+((err&&err.message)||err);console.warn('truck save failed',err);}}
-async function captureSnapshot(){const name=await uiPrompt('Name this snapshot','Weekly — '+labelOf(new Date()),'e.g. Before 12 Apr meeting');if(!name)return;try{const {data:r,error}=await SB.from('hp_revision').insert({product_id:'citrus',season_id:SEASON.id,name:name,kind:'weekly',note:'Captured from Harvest Planner'}).select().single();if(error)throw error;const lines=plots.map((pt,i)=>{const w=winStore[i]||winOf(i),ay=getAY(i);return {revision_id:r.id,block_id:pt.blockId,bearing_area_fed:ay.area,plan_yield_t_fed:ay.yield,planned_t:Math.round(plannedNow(i)),harvest_start:dateOf(w.start,0),harvest_peak:dateOf(w.peak,0),harvest_end:dateOf(w.end,6),harvest_shape:w.shape};});await SB.from('hp_revision_line').insert(lines);revs.unshift({id:r.id,t:name,d:new Date().toLocaleDateString('en-GB'),who:'you',in:'HP',locked:false,note:'Captured from Harvest Planner',diff:[]});renderRevList();uiToast('Snapshot “'+name+'” captured.');}catch(err){uiToast('Snapshot failed: '+((err&&err.message)||err),'err');}}
+async function truckCellEdit(el){trucksEdited();try{const q=el.id.split('_'),gi=+q[1],fi=+q[2],di=+q[3];const g=truckGroups()[gi];if(!g)return;const row=g.rows[fi];if(!row)return;const plot=plots.find(p=>p.v===row.v&&p.f===row.f);if(!plot)return;const val=el.value===''?0:parseInt(el.value)||0;const {error}=await SB.from('hp_truck').upsert({product_id:product,season_id:SEASON.id,farm_id:plot.farmId,variety_id:plot.varId,plan_date:dateOf(selWeek,di),trucks:val},{onConflict:'product_id,season_id,farm_id,variety_id,plan_date'});if(error)throw error;el.style.borderColor='';el.title='';}catch(err){el.style.borderColor='var(--red,#b03030)';el.title='Not saved: '+((err&&err.message)||err);console.warn('truck save failed',err);}}
+async function captureSnapshot(){const name=await uiPrompt('Name this snapshot','Weekly — '+labelOf(new Date()),'e.g. Before 12 Apr meeting');if(!name)return;try{const {data:r,error}=await SB.from('hp_revision').insert({product_id:product,season_id:SEASON.id,name:name,kind:'weekly',note:'Captured from Harvest Planner'}).select().single();if(error)throw error;const lines=plots.map((pt,i)=>{const w=winStore[i]||winOf(i),ay=getAY(i);return {revision_id:r.id,block_id:pt.blockId,bearing_area_fed:ay.area,plan_yield_t_fed:ay.yield,planned_t:Math.round(plannedNow(i)),harvest_start:dateOf(w.start,0),harvest_peak:dateOf(w.peak,0),harvest_end:dateOf(w.end,6),harvest_shape:w.shape};});await SB.from('hp_revision_line').insert(lines);revs.unshift({id:r.id,t:name,d:new Date().toLocaleDateString('en-GB'),who:'you',in:'HP',locked:false,note:'Captured from Harvest Planner',diff:[]});renderRevList();uiToast('Snapshot “'+name+'” captured.');}catch(err){uiToast('Snapshot failed: '+((err&&err.message)||err),'err');}}
 
 // ---------- SEASON OVERVIEW page (everything derived from the SAME daily model as the grid) ----------
 const YDAY=CURDAY-1; // actuals are complete through yesterday
@@ -1403,6 +1406,18 @@ async function pickSeason(id){
   try{ await loadSeason(s); uiToast('Now viewing '+s.name+(s.active?' (active)':'')); }
   catch(err){ uiToast('Could not load '+s.name+': '+((err&&err.message)||err),'err'); }
 }
+async function pickProduct(p){
+  if(p===product)return;
+  if(dirty.size){const ok=await uiConfirm('Switch crop?','You have '+dirty.size+' unsaved change'+(dirty.size>1?'s':'')+' in '+(PRODUCT_LABEL[product]||product)+'. Switching crops will discard them.','Switch');
+    if(!ok)return;}
+  product=p;
+  try{ await loadSeason(SEASON); uiToast('Now viewing '+(PRODUCT_LABEL[p]||p)); }
+  catch(err){ uiToast('Could not load '+(PRODUCT_LABEL[p]||p)+': '+((err&&err.message)||err),'err'); }
+}
+function syncChrome(){
+  const seg=document.getElementById('cropSeg'); if(seg)seg.querySelectorAll('b').forEach(b=>b.classList.toggle('on',b.getAttribute('data-p')===product));
+  const sub=document.querySelector('.sidebar .logo .sub'); if(sub)sub.innerHTML='<span class="dot"></span>'+(PRODUCT_LABEL[product]||product)+' · '+(SEASON?SEASON.name:'');
+}
 function renderStartBanner(){
   const b=document.getElementById('startBanner'); if(!b)return;
   if(seasonHasPlan){ b.innerHTML=''; return; }
@@ -1416,7 +1431,7 @@ async function startSeason(){
   const ok=await uiConfirm('Start '+SEASON.name+'?','This creates a blank plan for every citrus plot in '+SEASON.name+' — bearing areas are filled from Land Cloud; yields and harvest windows are left blank for the team to set. It won\'t touch any other season.','Start season');
   if(!ok)return;
   try{
-    const {data,error}=await SB.rpc('hp_start_season',{p_season_id:SEASON.id});
+    const {data,error}=await SB.rpc('hp_start_season',{p_season_id:SEASON.id,p_product:product});
     if(error)throw error;
     if(data&&data.ok===false){ uiToast(data.error==='not_authorized'?'Only agronomy admins can start a season.':'Could not start: '+data.error,'err'); return; }
     uiToast(SEASON.name+' started — '+((data&&data.created)||0)+' plots.');
@@ -1428,7 +1443,7 @@ async function loadSeason(season){
   clearSeasonStores();
   {
     const [bR,pR,pdR,adR,tkR,rvR]=await Promise.all([
-      SB.from('farm_blocks').select('id,farm_code,sector_code,plot_code,block_add,aydi_block_number,total_area_fed,variety_id,farm_id,varieties(name),farms(name)').eq('product_id','citrus').eq('lifecycle','bearing').not('variety_id','is',null).not('farm_id','is',null),
+      SB.from('farm_blocks').select('id,farm_code,sector_code,plot_code,block_add,aydi_block_number,total_area_fed,variety_id,farm_id,varieties(name),farms(name)').eq('product_id',product).eq('lifecycle','bearing').not('variety_id','is',null).not('farm_id','is',null),
       SB.from('hp_plan').select('*').eq('season_id',SEASON.id),
       SB.from('hp_plan_day').select('block_id,plan_date,planned_t').eq('season_id',SEASON.id),
       SB.from('hp_actual_day').select('block_id,harvest_date,actual_t,review_status').eq('season_id',SEASON.id),
@@ -1449,7 +1464,7 @@ async function loadSeason(season){
     buildWeeks(lo, hi);
     const ti=wkIndexOfDate(ymd(new Date())); const beforeSeason=new Date()<WKDATE[0]; CUR=ti>=0?ti:(beforeSeason?0:WK.length-1); CURDAY=ti>=0?new Date().getDay():(beforeSeason?0:3); selWeek=CUR;
     const planBy={},farmName={},varName={}; plan.forEach(p=>planBy[p.block_id]=p);
-    plots=blocks.map(b=>{const code=b.farm_code+'-'+b.sector_code+'-'+b.plot_code+(b.block_add||'');const fn=(b.farms&&b.farms.name)||b.farm_code,vn=(b.varieties&&b.varieties.name)||'—';farmName[b.farm_id]=fn;varName[b.variety_id]=vn;const pl=planBy[b.id]||{};const aydi=(b.aydi_block_number&&String(b.aydi_block_number).trim())||code;return {blockId:b.id,farmId:b.farm_id,varId:b.variety_id,f:fn,p:code,aydi:aydi,v:vn,vt:'Citrus',pnp:'P',area:Number(b.total_area_fed||0),latest:Number(pl.planned_t||0),budget:null,jul:null,nov:null,plan:Array(WK.length).fill(0),actual:Array(WK.length).fill(null)};});
+    plots=blocks.map(b=>{const code=b.farm_code+'-'+b.sector_code+'-'+b.plot_code+(b.block_add||'');const fn=(b.farms&&b.farms.name)||b.farm_code,vn=(b.varieties&&b.varieties.name)||'—';farmName[b.farm_id]=fn;varName[b.variety_id]=vn;const pl=planBy[b.id]||{};const aydi=(b.aydi_block_number&&String(b.aydi_block_number).trim())||code;return {blockId:b.id,farmId:b.farm_id,varId:b.variety_id,f:fn,p:code,aydi:aydi,v:vn,vt:PRODUCT_LABEL[product]||product,pnp:'P',area:Number(b.total_area_fed||0),latest:Number(pl.planned_t||0),budget:null,jul:null,nov:null,plan:Array(WK.length).fill(0),actual:Array(WK.length).fill(null)};});
     farmsList=[...new Set(plots.map(p=>p.f))];
     const idx={}; plots.forEach((pt,i)=>{idx[pt.blockId]=i;const pl=planBy[pt.blockId];if(pl){planStore[i]={area:Number(pl.bearing_area_fed||pt.area||0),yield:pl.plan_yield_t_fed==null?null:Number(pl.plan_yield_t_fed)};if(pl.updated_at)planBaseTs[pt.blockId]=pl.updated_at;
       if(pl.harvest_start){let ws=wkIndexOfDate(pl.harvest_start),we=wkIndexOfDate(pl.harvest_end),wp=wkIndexOfDate(pl.harvest_peak);if(ws<0)ws=0;if(we<0)we=WK.length-1;if(wp<ws||wp>we)wp=Math.round((ws+we)/2);winStore[i]={start:ws,peak:wp,end:we,shape:pl.harvest_shape||'bell'};}
@@ -1460,6 +1475,7 @@ async function loadSeason(season){
     revs = rv.length?rv.map(r=>({id:r.id,t:r.name,d:new Date(r.captured_at).toLocaleDateString('en-GB'),who:'—',in:'HP',locked:r.is_locked,note:r.note||'',diff:[]})):[{id:null,t:'No snapshots yet',d:'',who:'—',in:'HP',locked:false,note:'Use “Capture snapshot” to start the history.',diff:[]}];
   }
   buildSeasonPicker();
+  syncChrome();
   renderLog();
   if(page==='ov')renderOv(); else if(page==='trk')renderTrucks(); else if(page==='rev')renderRevList();
   updateDirtyBadge();
