@@ -492,7 +492,7 @@ body.present .diff-row{font-size:15px}
   <div class="modal" style="max-width:640px">
     <div class="mh"><span class="x" onclick="closePaste()">✕</span><h2>Paste from Excel / Sheets</h2><div class="s">Paste plot rows straight from your planning sheet — matched to plots by plot code.</div></div>
     <div class="mb">
-      <div class="hint" style="margin:0 0 8px">Columns, tab- or comma-separated, one plot per line:<br><b>Plot code</b> · <b>Yield t/fed</b> · <span style="color:var(--text3)">Start</span> · <span style="color:var(--text3)">End</span> &nbsp;<span style="color:var(--text3)">(start/end optional — a date like <code>2026-02-01</code> or a week label like <code>1 Feb</code>). A header row is ignored.</span></div>
+      <div class="hint" style="margin:0 0 8px">Columns, tab- or comma-separated, one plot per line:<br><b>Plot (Aydi name)</b> · <b>Yield t/fed</b> · <span style="color:var(--text3)">Start</span> · <span style="color:var(--text3)">End</span> &nbsp;<span style="color:var(--text3)">(start/end optional — a date like <code>2026-02-01</code> or a week label like <code>1 Feb</code>). A header row is ignored.</span></div>
       <textarea id="pasteBox" spellcheck="false" oninput="pastePrev()" placeholder="KH-09-02A&#9;15&#9;30 Nov&#9;12 Apr&#10;KH-09-03A&#9;15&#10;BD-02-01A&#9;18&#9;2026-01-04&#9;2026-04-12" style="width:100%;height:150px;font-family:var(--font-mono,'DM Mono',monospace);font-size:12px;border:1px solid var(--border2,#bcd);border-radius:8px;padding:8px;resize:vertical;box-sizing:border-box"></textarea>
       <div id="pastePrev" class="hint" style="margin:8px 0 0"></div>
       <div id="pasteUnmatched" style="margin:6px 0 0;font-size:11px;color:var(--red,#b03030)"></div>
@@ -732,7 +732,7 @@ function renderLog(){
       const areaCell = m==='plan' ? `<input class="cin plan" id="ar_${i}" value="${ay.area}" oninput="edited(this)">` : `<span class="rotxt">${ay.area}</span>`;
       const yldCell  = m==='plan' ? `<input class="cin plan" id="yl_${i}" value="${ay.yield}" oninput="edited(this)">` : `<span class="rotxt">${ay.yield}</span>`;
       body+=`<tr>
-        <td class="frozen f0" title="${p.f}">${p.f}</td><td class="frozen f1"><span class="plot">${p.p}</span>${groupBy==='farm'?`<div class="vsub" title="${p.v}">${p.v}</div>`:''}</td>
+        <td class="frozen f0" title="${p.f}">${p.f}</td><td class="frozen f1"><span class="plot" title="${p.p}">${p.aydi}</span>${groupBy==='farm'?`<div class="vsub" title="${p.v}">${p.v}</div>`:''}</td>
         <td class="frozen f2"><span class="pill p-${p.pnp}">${p.pnp}</span></td>
         <td class="num hidecol">${areaCell}</td>
         <td class="num hidecol">${yldCell}</td>
@@ -918,7 +918,11 @@ function closeBulk(){document.getElementById('bulkScrim').classList.remove('open
 
 // ---- Paste from Excel: match rows to plots by code, set yield (+ optional window) ----
 function normCode(s){return (s||'').toUpperCase().replace(/\s+/g,'').replace(/[–—]/g,'-');}
-function codeIndex(){const m={};plots.forEach((p,i)=>{const k=normCode(p.p);if(!(k in m))m[k]=i;});return m;}
+function codeIndex(){const m={},aydiN={};
+  plots.forEach(p=>{const a=normCode(p.aydi);aydiN[a]=(aydiN[a]||0)+1;});
+  plots.forEach((p,i)=>{const k=normCode(p.p);if(!(k in m))m[k]=i;});            // full farm-qualified code (always unique)
+  plots.forEach((p,i)=>{const a=normCode(p.aydi);if(aydiN[a]===1&&!(a in m))m[a]=i;}); // Aydi name, only when it maps to a single plot
+  return m;}
 function weekIdxFromCell(s){s=(s||'').trim();if(!s)return null;
   const norm=s.toLowerCase().replace(/\s+/g,'');
   const li=WK.findIndex(w=>w.toLowerCase().replace(/\s+/g,'')===norm); if(li>=0)return li;
@@ -999,7 +1003,7 @@ async function copyLastPrev(){
   const hist=plots.map((p,i)=>({i,p,y:clsMap[p.blockId]})).filter(x=>x.y!=null);
   const avg=hist.length?(hist.reduce((s,x)=>s+x.y,0)/hist.length):0;
   note.innerHTML=`<b>${hist.length}</b> of ${plots.length} plots have ${yr} history · avg <b>${avg.toFixed(1)}</b> t/fed. Plots without history keep their current yield. Area is unchanged — only the yield rate is copied.`;
-  const sample=hist.slice(0,6).map(x=>{const cur=getAY(x.i).yield;return `<div style="display:flex;justify-content:space-between;padding:2px 0;border-bottom:1px solid var(--border,#e2e2e2)"><span style="font-family:var(--font-mono,monospace)">${x.p.p}</span><span style="color:var(--text3)">${x.p.v}</span><span><span class="was" style="color:var(--text3)">${cur}</span> → <b>${x.y}</b> t/fed</span></div>`;}).join('');
+  const sample=hist.slice(0,6).map(x=>{const cur=getAY(x.i).yield;return `<div style="display:flex;justify-content:space-between;padding:2px 0;border-bottom:1px solid var(--border,#e2e2e2)"><span style="font-family:var(--font-mono,monospace)" title="${x.p.p}">${x.p.aydi}</span><span style="color:var(--text3)">${x.p.v}</span><span><span class="was" style="color:var(--text3)">${cur}</span> → <b>${x.y}</b> t/fed</span></div>`;}).join('');
   document.getElementById('clsPrev').innerHTML=sample+(hist.length>6?`<div style="color:var(--text3);padding:4px 0">…and ${hist.length-6} more</div>`:'');
   const b=document.getElementById('clsApply'); b.disabled=!hist.length; b.style.opacity=hist.length?'':'.5';
 }
@@ -1065,7 +1069,7 @@ function watchList(){
     // last 7 days window (across week boundary)
     let l7p=0,l7a=0;{let wk=CUR,d=CURDAY;for(let k=0;k<7;k++){l7p+=dayPlan(i,wk,d);l7a+=(getActual(i,wk,d)||0);d--;if(d<0){d=6;wk--;if(wk<0)break;}}}
     let offN=0,offT=0;for(let wk=0;wk<=CUR;wk++)for(let d=0;d<7;d++){if(wk===CUR&&d>CURDAY)break;const dp=dayPlan(i,wk,d),a=getActual(i,wk,d);if(dp===0&&(a||0)>0){offN++;offT+=a;}}
-    const base={f:p.f,p:p.p,v:p.v,planTD,harvTot};
+    const base={f:p.f,p:p.aydi,v:p.v,planTD,harvTot};
     if(w.start<=CUR&&planTD>0&&harvTot===0) rows.push({...base,status:'late start',cls:'v-under',delta:-planTD});
     else if(harvTot>0&&l7p>0&&l7a===0) rows.push({...base,status:'stalled 7d',cls:'v-under',delta:-l7p});
     if(offN>0) rows.push({...base,status:`off-plan ×${offN}`,cls:'v-off',delta:offT});
@@ -1079,7 +1083,7 @@ function offPlanPicks(){
   const out=[];
   plots.forEach((p,i)=>{for(let w=0;w<WK.length;w++)for(let d=0;d<7;d++){
     const a=getActual(i,w,d);
-    if((a||0)>0 && dayPlan(i,w,d)===0) out.push({i,w,d,p:p.p,v:p.v,f:p.f,t:a,status:reviewStore[i+'|'+w+'|'+d]||'unreviewed'});
+    if((a||0)>0 && dayPlan(i,w,d)===0) out.push({i,w,d,p:p.aydi,v:p.v,f:p.f,t:a,status:reviewStore[i+'|'+w+'|'+d]||'unreviewed'});
   }});
   out.sort((a,b)=>((a.status==='unreviewed'?0:1)-(b.status==='unreviewed'?0:1))||(b.t-a.t));
   return out;
@@ -1173,7 +1177,7 @@ function renderOv(){
   const psorted=plots.map((p,i)=>({p,i})).sort((a,b)=>a.p.v.localeCompare(b.p.v)||a.p.f.localeCompare(b.p.f));
   let pb=psorted.map(({p,i})=>{const latest=sum(WK.map((_,w)=>sum(WD.map((__,d)=>dayPlan(i,w,d))))); const harv=sumTo(getActual,i,CUR,CURDAY);
     return `<tr>
-    <td class="frozen f0">${p.f}</td><td><span class="plot">${p.p}</span></td><td><span class="vname">${p.v}</span></td>
+    <td class="frozen f0">${p.f}</td><td><span class="plot" title="${p.p}">${p.aydi}</span></td><td><span class="vname">${p.v}</span></td>
     <td><span class="pill p-${p.pnp}">${p.pnp}</span></td>
     <td class="num">${p.area.toFixed(1)}</td>
     <td class="num"><b style="color:var(--text)">${latest.toLocaleString()}</b></td>
@@ -1319,7 +1323,7 @@ async function pickRev(i){
       const w=winStore[idx]||winOf(idx);
       const nowWin=w.start+'|'+w.end+'|'+w.shape;
       const wasWin=wkIndexOfDate(l.harvest_start)+'|'+wkIndexOfDate(l.harvest_end)+'|'+(l.harvest_shape||'');
-      if(nowT!==wasT||nowWin!==wasWin){net+=nowT-wasT;rows.push({p:pt.p,v:pt.v,wasT,nowT,tChg:nowT!==wasT,wChg:nowWin!==wasWin,l,w});}
+      if(nowT!==wasT||nowWin!==wasWin){net+=nowT-wasT;rows.push({p:pt.aydi,v:pt.v,wasT,nowT,tChg:nowT!==wasT,wChg:nowWin!==wasWin,l,w});}
     });
     if(!rows.length){det.innerHTML=head+`<div style="color:var(--text3);font-size:12px">No changes — the current plan matches this snapshot.</div>`;return;}
     rows.sort((a,b)=>Math.abs(b.nowT-b.wasT)-Math.abs(a.nowT-a.wasT));
@@ -1342,7 +1346,7 @@ async function boot(){
     const ssr=await SB.from('seasons').select('id,name').eq('active',true).limit(1); SEASON=(ssr.data||[])[0];
     if(!SEASON){document.body.insertAdjacentHTML('afterbegin','<div style=\'padding:14px;font-family:sans-serif\'>No active season set in Land Cloud.</div>');return;}
     const [bR,pR,pdR,adR,tkR,rvR]=await Promise.all([
-      SB.from('farm_blocks').select('id,farm_code,sector_code,plot_code,block_add,total_area_fed,variety_id,farm_id,varieties(name),farms(name)').eq('product_id','citrus').eq('lifecycle','bearing').not('variety_id','is',null).not('farm_id','is',null),
+      SB.from('farm_blocks').select('id,farm_code,sector_code,plot_code,block_add,aydi_block_number,total_area_fed,variety_id,farm_id,varieties(name),farms(name)').eq('product_id','citrus').eq('lifecycle','bearing').not('variety_id','is',null).not('farm_id','is',null),
       SB.from('hp_plan').select('*').eq('season_id',SEASON.id),
       SB.from('hp_plan_day').select('block_id,plan_date,planned_t').eq('season_id',SEASON.id),
       SB.from('hp_actual_day').select('block_id,harvest_date,actual_t,review_status').eq('season_id',SEASON.id),
@@ -1354,7 +1358,7 @@ async function boot(){
     buildWeeks(mins[0]||'2025-12-01', maxs[maxs.length-1]||'2026-04-30');
     const ti=wkIndexOfDate(ymd(new Date())); const beforeSeason=new Date()<WKDATE[0]; CUR=ti>=0?ti:(beforeSeason?0:WK.length-1); CURDAY=ti>=0?new Date().getDay():(beforeSeason?0:3); selWeek=CUR;
     const planBy={},farmName={},varName={}; plan.forEach(p=>planBy[p.block_id]=p);
-    plots=blocks.map(b=>{const code=b.farm_code+'-'+b.sector_code+'-'+b.plot_code+(b.block_add||'');const fn=(b.farms&&b.farms.name)||b.farm_code,vn=(b.varieties&&b.varieties.name)||'—';farmName[b.farm_id]=fn;varName[b.variety_id]=vn;const pl=planBy[b.id]||{};return {blockId:b.id,farmId:b.farm_id,varId:b.variety_id,f:fn,p:code,v:vn,vt:'Citrus',pnp:'P',area:Number(b.total_area_fed||0),latest:Number(pl.planned_t||0),budget:null,jul:null,nov:null,plan:Array(WK.length).fill(0),actual:Array(WK.length).fill(null)};});
+    plots=blocks.map(b=>{const code=b.farm_code+'-'+b.sector_code+'-'+b.plot_code+(b.block_add||'');const fn=(b.farms&&b.farms.name)||b.farm_code,vn=(b.varieties&&b.varieties.name)||'—';farmName[b.farm_id]=fn;varName[b.variety_id]=vn;const pl=planBy[b.id]||{};const aydi=(b.aydi_block_number&&String(b.aydi_block_number).trim())||code;return {blockId:b.id,farmId:b.farm_id,varId:b.variety_id,f:fn,p:code,aydi:aydi,v:vn,vt:'Citrus',pnp:'P',area:Number(b.total_area_fed||0),latest:Number(pl.planned_t||0),budget:null,jul:null,nov:null,plan:Array(WK.length).fill(0),actual:Array(WK.length).fill(null)};});
     farmsList=[...new Set(plots.map(p=>p.f))];
     const idx={}; plots.forEach((pt,i)=>{idx[pt.blockId]=i;const pl=planBy[pt.blockId];if(pl){planStore[i]={area:Number(pl.bearing_area_fed||pt.area||0),yield:Number(pl.plan_yield_t_fed||0)};if(pl.updated_at)planBaseTs[pt.blockId]=pl.updated_at;let ws=wkIndexOfDate(pl.harvest_start),we=wkIndexOfDate(pl.harvest_end),wp=wkIndexOfDate(pl.harvest_peak);if(ws<0)ws=0;if(we<0)we=WK.length-1;if(wp<ws||wp>we)wp=Math.round((ws+we)/2);winStore[i]={start:ws,peak:wp,end:we,shape:pl.harvest_shape||'bell'};}else{planStore[i]={area:pt.area,yield:0};}});
     pd.forEach(r=>{const i=idx[r.block_id];if(i==null)return;const w=wkIndexOfDate(r.plan_date),d=dowOf(r.plan_date);if(w>=0)planDayStore[i+'|'+w+'|'+d]=Number(r.planned_t);});
