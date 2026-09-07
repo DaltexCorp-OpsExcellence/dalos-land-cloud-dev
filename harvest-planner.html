@@ -803,17 +803,17 @@ function renderOv(){
   calBody+=`<tr><td class="rl" style="border-top:1px solid var(--border)">Total</td>`+totW.map((v,i)=>{const h=heatRow(v,tmx);const past=i<=CUR;return `<td class="hcell" style="background:${h.bg};color:${h.c};font-weight:600">${past?`<b>${totA[i]||''}</b><small>/${v||0}</small>`:(v||'')}</td>`}).join('')+`</tr>`;
   document.getElementById('ovCal').innerHTML=calHead+calBody;
   // variety table — this-week columns first, estimates history at the end
-  let vh=`<tr><th class="frozen f0">Variety</th><th>Type</th><th class="num">Plots</th><th class="num">Plan wk</th><th class="num">Actual wk</th><th class="num">Δ wk</th><th class="num">Next 2 wks</th><th class="num">Season plan</th><th class="num">Harvested</th><th class="num">% done</th><th class="num">Pace Δ</th><th class="num">Remaining</th><th class="num">Plan t/fed</th></tr>`;
+  let vh=`<tr><th class="frozen f0">Variety</th><th class="num">Plots</th><th class="num">Plan wk</th><th class="num">Actual wk</th><th class="num">Δ wk</th><th class="num">Next 2 wks</th><th class="num">Season plan</th><th class="num">Harvested</th><th class="num">% done</th><th class="num">Pace Δ</th><th class="num">Remaining</th><th class="num">Plan t/fed</th></tr>`;
   const dchip=(v,base)=>{const on=Math.abs(v)<Math.max(3,base*0.06);const cls=on?'v-on':(v>0?'v-over':'v-under');return `<span class="varcell ${cls}">${on?'on':(v>0?'+':'')+Math.round(v)}</span>`;};
   let vb=A.map(a=>`<tr>
-    <td class="frozen f0"><span class="vname">${a.v}</span></td><td>${a.vt}</td><td class="num">${a.n}</td>
+    <td class="frozen f0"><span class="vname">${a.v}</span></td><td class="num">${a.n}</td>
     <td class="num">${a.planWkTD.toLocaleString()}</td><td class="num"><b style="color:var(--text)">${a.actWk.toLocaleString()}</b></td><td class="num">${dchip(a.actWk-a.planWkTD,a.planWkTD)}</td>
     <td class="num">${a.next2.toLocaleString()}</td>
     <td class="num">${a.latest.toLocaleString()}</td><td class="num">${a.harv.toLocaleString()}</td><td class="num">${a.latest?Math.round(a.harv/a.latest*100):0}%</td>
     <td class="num">${dchip(a.actTD-a.planTD,a.planTD)}</td><td class="num">${a.rem.toLocaleString()}</td><td class="num">${a.rate}</td>
     </tr>`).join('');
   const T={planWkTD:sum(A.map(a=>a.planWkTD)),actWk:sum(A.map(a=>a.actWk)),next2,latest:tPlan,harv:tHarv,rem:tPlan-tHarv,budget:tBud,jul:sum(A.map(a=>a.jul)),nov:sum(A.map(a=>a.nov)),planTD,actTD};
-  vb+=`<tr class="tot"><td class="frozen f0">Total</td><td></td><td class="num">${plots.length}</td><td class="num">${T.planWkTD.toLocaleString()}</td><td class="num">${T.actWk.toLocaleString()}</td><td class="num">${dchip(T.actWk-T.planWkTD,T.planWkTD)}</td><td class="num">${T.next2.toLocaleString()}</td><td class="num">${T.latest.toLocaleString()}</td><td class="num">${T.harv.toLocaleString()}</td><td class="num">${T.latest?Math.round(T.harv/T.latest*100):0}%</td><td class="num">${dchip(T.actTD-T.planTD,T.planTD)}</td><td class="num">${T.rem.toLocaleString()}</td><td></td></tr>`;
+  vb+=`<tr class="tot"><td class="frozen f0">Total</td><td class="num">${plots.length}</td><td class="num">${T.planWkTD.toLocaleString()}</td><td class="num">${T.actWk.toLocaleString()}</td><td class="num">${dchip(T.actWk-T.planWkTD,T.planWkTD)}</td><td class="num">${T.next2.toLocaleString()}</td><td class="num">${T.latest.toLocaleString()}</td><td class="num">${T.harv.toLocaleString()}</td><td class="num">${T.latest?Math.round(T.harv/T.latest*100):0}%</td><td class="num">${dchip(T.actTD-T.planTD,T.planTD)}</td><td class="num">${T.rem.toLocaleString()}</td><td></td></tr>`;
   document.getElementById('ovVar').innerHTML=vh+vb;
   // plot table — from the same model
   let ph=`<tr><th class="frozen f0">Farm</th><th>Plot</th><th>Variety</th><th>P/NP</th><th class="num">Area</th><th class="num">Season plan</th><th class="num">Harvested</th><th class="num">% done</th><th class="num">Remaining</th></tr>`;
