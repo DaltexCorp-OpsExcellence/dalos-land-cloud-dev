@@ -857,7 +857,11 @@ function exportCsv(base, prodMap){
 /* ── Block detail slide-over (§6.3) — identity, area, real production history ── */
 var BAL = { balanced:{c:'var(--green)',t:'balanced'}, breach:{c:'var(--red)',t:'breach'}, residual:{c:'var(--amber)',t:'residual'}, unchecked:{c:'var(--text3)',t:'—'} };
 function BlockDetail(p){
-  var b=p.block;
+  var bstate=useState(p.block); var b=bstate[0],setB=bstate[1];
+  useEffect(function(){ setB(p.block); },[p.block]);   // follow parent's selection; sibling nav is internal
+  function openBlock(id){ if(!id||id===b.id) return;
+    supabase.from('farm_blocks').select('id,operational_block_id,aydi_block_number,product_id,farm_code,sector_code,plot_code,planting_year,total_area_fed,planted_area_fed,aerobotics_area_ha,jde_cost_center_id,rootstock_id,lifecycle,last_producing_season,farms(name),varieties(name),farm_rootstocks(name)')
+      .eq('id',id).maybeSingle().then(function(r){ if(r.data) setB(r.data); }); }
   var aeroFed = b.aerobotics_area_ha==null ? null : Math.round(b.aerobotics_area_ha*2.38095*100)/100;
   var variance = (aeroFed!=null && b.total_area_fed>0) ? Math.round((aeroFed-b.total_area_fed)/b.total_area_fed*1000)/10 : null;
   var h=useState({loading:true,err:null,seasons:[]}); var hist=h[0],setHist=h[1];
@@ -967,14 +971,30 @@ function BlockDetail(p){
   if(!lin.loading && !lineageSection && lin.plantings.length>1){
     var lname3=function(pl){ return (pl.varieties&&pl.varieties.name)||'unknown'; };
     var LCB={planned:['Planned','var(--text3)'],pre_bearing:['Pre-bearing','var(--amber)'],nursery:['Nursery','var(--amber)'],bearing:['Bearing','var(--green)'],retired:['Retired','var(--text3)'],superseded:['Superseded','var(--text3)'],fallow:['Fallow','var(--text3)']};
+    var sTot=function(id){ var s=lin.series[id]||{}; return Object.keys(s).reduce(function(a,y){return a+(s[y]>0?s[y]:0);},0); };
+    var preds=lin.plantings.filter(function(pl){ return pl.id!==b.id && sTot(pl.id)>0; });   // other plantings that actually produced
+    var curPl=lin.plantings.filter(function(pl){ return pl.id===b.id; })[0]; var curName=curPl?lname3(curPl):'this planting';
     replantNote=ce('div',{style:{marginTop:18}},
       ce('div',{className:'section-title'},ce('span',{className:'section-title-bar'}),'Replant lineage'),
       ce('div',{style:{fontSize:11.5,color:'var(--text2)',lineHeight:1.5,marginBottom:9}}, 'This land carries '+lin.plantings.length+' plantings on the same plot — a replant. Production never carries across the replant; each variety keeps its own record.'),
-      lin.plantings.map(function(pl){ var isB=pl.id===b.id; var rel=isB?'this plot':(pl.planting_year<(b.planting_year||0)?'predecessor':(pl.planting_year>(b.planting_year||0)?'successor':'same year')); var lc=LCB[pl.lifecycle]||[pl.lifecycle,'var(--text3)'];
-        return ce('div',{key:pl.id,style:{display:'flex',alignItems:'center',gap:10,padding:'8px 10px',border:'1px solid '+(isB?'var(--accent2)':'var(--border)'),borderRadius:9,marginBottom:7,background:isB?'color-mix(in srgb,var(--accent2) 8%,transparent)':'var(--card)'}},
+      lin.plantings.map(function(pl){ var isB=pl.id===b.id; var rel=isB?'this plot':(pl.planting_year<(b.planting_year||0)?'predecessor':(pl.planting_year>(b.planting_year||0)?'successor':'same year')); var lc=LCB[pl.lifecycle]||[pl.lifecycle,'var(--text3)']; var tot=sTot(pl.id);
+        return ce('div',{key:pl.id, onClick:isB?null:function(){openBlock(pl.id);}, title:isB?null:'Open '+lname3(pl)+'’s full record',
+            style:{display:'flex',alignItems:'center',gap:10,padding:'8px 10px',border:'1px solid '+(isB?'var(--accent2)':'var(--border)'),borderRadius:9,marginBottom:7,background:isB?'color-mix(in srgb,var(--accent2) 8%,transparent)':'var(--card)',cursor:isB?'default':'pointer'}},
           ce('span',{style:{fontSize:13,color:'var(--accent)',flex:'none'}}, isB?'●':'↻'),
-          ce('div',{className:'ar',dir:'auto'}, ce('div',{style:{fontWeight:600,fontSize:14}}, lname3(pl)), ce('div',{style:{fontSize:11.5,color:'var(--text3)'}}, 'planted '+(pl.planting_year||'?')+' · '+rel)),
-          ce('span',{style:{marginLeft:'auto',fontSize:11,fontWeight:600,color:lc[1],flex:'none'}}, lc[0])); }));
+          ce('div',{className:'ar',dir:'auto',style:{minWidth:0}}, ce('div',{style:{fontWeight:600,fontSize:14}}, lname3(pl)), ce('div',{style:{fontSize:11.5,color:'var(--text3)'}}, 'planted '+(pl.planting_year||'?')+' · '+rel+(isB?'':' · tap to open'))),
+          ce('div',{style:{marginLeft:'auto',textAlign:'right',flex:'none'}}, tot>0?ce('div',{style:{fontFamily:'var(--font-mono)',fontSize:14,color:'var(--text2)'}}, fmt(Math.round(tot))+' t'):null, ce('span',{style:{fontSize:11,fontWeight:600,color:lc[1]}}, lc[0]))); }),
+      preds.length?ce('div',{style:{marginTop:14}},
+        ce('div',{className:'section-title'},ce('span',{className:'section-title-bar'}),'Previously on this land'),
+        preds.map(function(pl){ var s=lin.series[pl.id]||{}; var yrs=Object.keys(s).filter(function(y){return s[y]>0;}).map(Number).sort(function(a,c){return a-c;}); var mx=yrs.reduce(function(m,y){return Math.max(m,s[y]);},1);
+          return ce('div',{key:pl.id,style:{marginBottom:12}},
+            ce('div',{style:{fontSize:12,marginBottom:7}}, ce('b',null,lname3(pl)), ce('span',{style:{color:'var(--text3)'}}, ' · '+(yrs[0]||'?')+'–'+(yrs[yrs.length-1]||'?')+' · '+fmt(Math.round(sTot(pl.id)))+' t total')),
+            ce('div',{style:{display:'flex',alignItems:'flex-end',gap:5,height:80,padding:'8px 0',borderBottom:'1px solid var(--border)'}},
+              yrs.map(function(y){ return ce('div',{key:y,title:fmt(Math.round(s[y]))+' t · '+y,style:{flex:1,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'flex-end',height:'100%'}},
+                ce('div',{style:{fontSize:8.5,color:'var(--text2)',fontFamily:'var(--font-mono)',marginBottom:2,lineHeight:1}}, fmt(Math.round(s[y]))),
+                ce('div',{style:{width:'68%',height:Math.max(3,Math.round(s[y]/mx*58))+'px',background:'#b87820',borderRadius:'3px 3px 0 0'}}),
+                ce('div',{style:{fontSize:9,color:'var(--text3)',marginTop:3,fontFamily:'var(--font-mono)'}}, String(y).slice(2))); }))); }),
+        ce('div',{style:{fontSize:11,color:'var(--text3)',marginTop:6,lineHeight:1.5}}, 'Kept on the previous planting’s own record — never added to '+curName+'. Tap a planting above to open its full history.')
+      ):null);
   }
 
   var historySection;
