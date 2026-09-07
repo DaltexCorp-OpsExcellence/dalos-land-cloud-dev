@@ -356,6 +356,7 @@ body.present .diff-row{font-size:15px}
 
     <!-- ===================== PLAN & LOG ===================== -->
     <div class="page pageview active" id="page-log">
+      <div id="startBanner"></div>
       <div class="ctrl-row">
         <div class="seg" id="modeSeg"><b class="active" id="mePlan" onclick="setMode('plan')">✎ Set Plan</b><b id="meHarv" onclick="setMode('harv')">Actual Harvest</b></div>
         <div class="seg" id="viewSeg" style="display:none"><b class="active" id="vwToday" onclick="setView('today')">Today</b><b id="vwWeek" onclick="setView('week')">Week</b></div>
@@ -542,7 +543,7 @@ const WD=["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
 const MON=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 let WK=[], WKDATE=[], CUR=0, CURDAY=3;
 let selWeek=0, page='log', editMode='plan';
-let plots=[], farmsList=[], SEASON=null, SEASONS=[];
+let plots=[], farmsList=[], SEASON=null, SEASONS=[], canWrite=false, seasonHasPlan=true;
 function sum(a){return a.reduce((x,y)=>x+(y||0),0)}
 const jit=[1.03,0.96,1.08,0.94,1.05,0.98,1.12,0.9,1.06,0.97];
 const patterns=[[0.16,0.15,0.14,0.15,0.14,0.13,0.13],[0.10,0.18,0.16,0.14,0.16,0.12,0.14],[0.18,0.10,0.16,0.16,0.12,0.16,0.12],[0.14,0.16,0.14,0.14,0.14,0.14,0.14],[0.12,0.16,0.14,0.16,0.14,0.14,0.14]];
@@ -581,7 +582,7 @@ const planStore={}, actStore={}, planDayStore={}, winStore={}; // area/yield ; a
 const planBaseTs={}; // block_id -> hp_plan.updated_at at load, for optimistic-concurrency checks on save
 const reviewStore={}; // i|w|d -> off-plan review_status: off_plan_confirmed | data_error (unset = needs review)
 function getAY(pi){return planStore[pi]||{area:plots[pi].area,yield:plots[pi].yield};}
-function plannedNow(pi){const a=getAY(pi);return a.area*a.yield;}
+function plannedNow(pi){const a=getAY(pi);return a.area*(a.yield||0);}
 // harvest window: {start,peak,end,shape} — total comes from area×yield
 function winOf(pi){
   if(winStore[pi])return winStore[pi];
@@ -653,7 +654,7 @@ function setGroup(g){groupBy=g;
 }
 let showNP=false; // P (productive) plots only by default — NP = no plan yield and no actuals ("if NP then no production anyway", Ibrahim)
 function hasAnyActual(i){for(const k in actStore){if(k.indexOf(i+'|')===0&&(actStore[k]||0)>0)return true;}return false;}
-function isNP(i){return (getAY(i).yield||0)<=0 && !hasAnyActual(i);}
+function isNP(i){const y=getAY(i).yield; return (typeof y==='number') && y<=0 && !hasAnyActual(i);} // blank (null) yield = not-yet-set, shown; explicit 0 = non-productive, hideable
 function npCount(){let n=0;plots.forEach((p,i)=>{if(isNP(i))n++;});return n;}
 function setShowNP(v){showNP=v;
   const t=document.getElementById('npToggle'); if(t)t.classList.toggle('on',v);
@@ -679,6 +680,7 @@ function renderLog(){
   document.getElementById('mePlan').classList.toggle('active',m==='plan');
   document.getElementById('meHarv').classList.toggle('active',m==='harv');
   ['bulkBtn','pasteBtn','copyLsBtn'].forEach(id=>{const bb=document.getElementById(id); if(bb)bb.style.display=(m==='plan')?'':'none';});
+  renderStartBanner();
   {const t=document.getElementById('npToggle'); if(t){const n=npCount(); t.textContent=showNP?('Hide non-productive ('+n+')'):('Show non-productive ('+n+')'); t.classList.toggle('on',showNP); t.style.display=n>0||showNP?'':'none';}}
   document.getElementById('meHarv').classList.toggle('actmode',m==='harv');
   const vs=document.getElementById('viewSeg'); if(vs){vs.style.display=m==='harv'?'':'none';
@@ -739,7 +741,7 @@ function renderLog(){
         varCell=`<span class="varcell ${vc}" id="vr_${i}">${vt}</span>`;}
       gwk+=wkTot;
       const areaCell = `<span class="rotxt" title="Bearing area from Land Cloud (read-only)">${ay.area}</span>`; // area = farm_blocks bearing area, DB-owned
-      const yldCell  = m==='plan' ? `<input class="cin plan" id="yl_${i}" value="${ay.yield}" oninput="edited(this)">` : `<span class="rotxt">${ay.yield}</span>`;
+      const yldCell  = m==='plan' ? `<input class="cin plan" id="yl_${i}" value="${ay.yield==null?'':ay.yield}" placeholder="—" oninput="edited(this)">` : `<span class="rotxt">${ay.yield==null?'—':ay.yield}</span>`;
       body+=`<tr>
         <td class="frozen f0" title="${p.f}">${p.f}</td><td class="frozen f1"><span class="plot" title="${p.p}">${p.aydi}</span>${groupBy==='farm'?`<div class="vsub" title="${p.v}">${p.v}</div>`:''}</td>
         <td class="frozen f2"><span class="pill p-${p.pnp}">${p.pnp}</span></td>
@@ -1376,6 +1378,7 @@ async function boot(){
   let session=null; try{session=(await SB.auth.getSession()).data.session;}catch(e){}
   if(!session){authGate();return;}
   try{
+    try{canWrite=!!(await SB.rpc('hp_can_write')).data;}catch(e){canWrite=false;}
     const ssr=await SB.from('seasons').select('id,name,active').order('name'); SEASONS=ssr.data||[];
     SEASON=SEASONS.find(s=>s.active)||SEASONS[SEASONS.length-1];
     if(!SEASON){document.body.insertAdjacentHTML('afterbegin','<div style=\'padding:14px;font-family:sans-serif\'>No season set in Land Cloud.</div>');return;}
@@ -1400,6 +1403,26 @@ async function pickSeason(id){
   try{ await loadSeason(s); uiToast('Now viewing '+s.name+(s.active?' (active)':'')); }
   catch(err){ uiToast('Could not load '+s.name+': '+((err&&err.message)||err),'err'); }
 }
+function renderStartBanner(){
+  const b=document.getElementById('startBanner'); if(!b)return;
+  if(seasonHasPlan){ b.innerHTML=''; return; }
+  const nm=SEASON?SEASON.name:'this season';
+  b.innerHTML = canWrite
+    ? `<div class="modebanner plan" style="margin-bottom:12px"><span class="tag">Empty</span><span><b>${nm}</b> hasn't been started yet — no plan grid exists. Start it to create a blank plan for every citrus plot (bearing areas filled in; yields &amp; windows left blank for you to set).</span><button class="btn btn-primary btn-sm" style="margin-left:auto" onclick="startSeason()">Start ${nm}</button></div>`
+    : `<div class="modebanner harv" style="margin-bottom:12px"><span class="tag">Empty</span><span><b>${nm}</b> hasn't been started yet. Ask an agronomy admin to start this season's plan.</span></div>`;
+}
+async function startSeason(){
+  if(!SEASON)return;
+  const ok=await uiConfirm('Start '+SEASON.name+'?','This creates a blank plan for every citrus plot in '+SEASON.name+' — bearing areas are filled from Land Cloud; yields and harvest windows are left blank for the team to set. It won\'t touch any other season.','Start season');
+  if(!ok)return;
+  try{
+    const {data,error}=await SB.rpc('hp_start_season',{p_season_id:SEASON.id});
+    if(error)throw error;
+    if(data&&data.ok===false){ uiToast(data.error==='not_authorized'?'Only agronomy admins can start a season.':'Could not start: '+data.error,'err'); return; }
+    uiToast(SEASON.name+' started — '+((data&&data.created)||0)+' plots.');
+    await loadSeason(SEASON);
+  }catch(err){ uiToast('Could not start season: '+((err&&err.message)||err),'err'); }
+}
 async function loadSeason(season){
   SEASON=season;
   clearSeasonStores();
@@ -1413,6 +1436,7 @@ async function loadSeason(season){
       SB.from('hp_revision').select('*').eq('season_id',SEASON.id).order('captured_at',{ascending:false})
     ]);
     const blocks=bR.data||[],plan=pR.data||[],pd=pdR.data||[],ad=adR.data||[],tk=tkR.data||[],rv=rvR.data||[];
+    seasonHasPlan = plan.length>0;
     const mins=plan.map(p=>p.harvest_start).filter(Boolean).sort(),maxs=plan.map(p=>p.harvest_end).filter(Boolean).sort();
     // Span the full agricultural year of the season (Jul→Jun) derived from the season name, so harvest windows are
     // never capped by the current plan data. The season record has no date range, so we bound to the whole year
@@ -1427,7 +1451,9 @@ async function loadSeason(season){
     const planBy={},farmName={},varName={}; plan.forEach(p=>planBy[p.block_id]=p);
     plots=blocks.map(b=>{const code=b.farm_code+'-'+b.sector_code+'-'+b.plot_code+(b.block_add||'');const fn=(b.farms&&b.farms.name)||b.farm_code,vn=(b.varieties&&b.varieties.name)||'—';farmName[b.farm_id]=fn;varName[b.variety_id]=vn;const pl=planBy[b.id]||{};const aydi=(b.aydi_block_number&&String(b.aydi_block_number).trim())||code;return {blockId:b.id,farmId:b.farm_id,varId:b.variety_id,f:fn,p:code,aydi:aydi,v:vn,vt:'Citrus',pnp:'P',area:Number(b.total_area_fed||0),latest:Number(pl.planned_t||0),budget:null,jul:null,nov:null,plan:Array(WK.length).fill(0),actual:Array(WK.length).fill(null)};});
     farmsList=[...new Set(plots.map(p=>p.f))];
-    const idx={}; plots.forEach((pt,i)=>{idx[pt.blockId]=i;const pl=planBy[pt.blockId];if(pl){planStore[i]={area:Number(pl.bearing_area_fed||pt.area||0),yield:Number(pl.plan_yield_t_fed||0)};if(pl.updated_at)planBaseTs[pt.blockId]=pl.updated_at;let ws=wkIndexOfDate(pl.harvest_start),we=wkIndexOfDate(pl.harvest_end),wp=wkIndexOfDate(pl.harvest_peak);if(ws<0)ws=0;if(we<0)we=WK.length-1;if(wp<ws||wp>we)wp=Math.round((ws+we)/2);winStore[i]={start:ws,peak:wp,end:we,shape:pl.harvest_shape||'bell'};}else{planStore[i]={area:pt.area,yield:0};}});
+    const idx={}; plots.forEach((pt,i)=>{idx[pt.blockId]=i;const pl=planBy[pt.blockId];if(pl){planStore[i]={area:Number(pl.bearing_area_fed||pt.area||0),yield:pl.plan_yield_t_fed==null?null:Number(pl.plan_yield_t_fed)};if(pl.updated_at)planBaseTs[pt.blockId]=pl.updated_at;
+      if(pl.harvest_start){let ws=wkIndexOfDate(pl.harvest_start),we=wkIndexOfDate(pl.harvest_end),wp=wkIndexOfDate(pl.harvest_peak);if(ws<0)ws=0;if(we<0)we=WK.length-1;if(wp<ws||wp>we)wp=Math.round((ws+we)/2);winStore[i]={start:ws,peak:wp,end:we,shape:pl.harvest_shape||'bell'};}
+      }else{planStore[i]={area:pt.area,yield:0};}});
     pd.forEach(r=>{const i=idx[r.block_id];if(i==null)return;const w=wkIndexOfDate(r.plan_date),d=dowOf(r.plan_date);if(w>=0)planDayStore[i+'|'+w+'|'+d]=Number(r.planned_t);});
     ad.forEach(r=>{const i=idx[r.block_id];if(i==null)return;const w=wkIndexOfDate(r.harvest_date),d=dowOf(r.harvest_date);if(w>=0){actStore[i+'|'+w+'|'+d]=Number(r.actual_t);if(r.review_status)reviewStore[i+'|'+w+'|'+d]=r.review_status;}});
     tk.forEach(r=>{const w=wkIndexOfDate(r.plan_date),d=dowOf(r.plan_date),f=farmName[r.farm_id],v=varName[r.variety_id];if(w>=0&&f&&v)truckLog[v+'|'+f+'|'+w+'|'+d]=r.trucks;});
