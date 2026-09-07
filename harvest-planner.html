@@ -308,21 +308,21 @@ body.present .diff-row{font-size:15px}
 <div class="app">
   <div class="sidebar-overlay" id="sideOv" onclick="toggleSide()"></div>
   <aside class="sidebar" id="sidebar">
-    <div class="logo"><div class="name">Land Cloud</div><div class="sub"><span class="dot"></span>Citrus · 2025/26</div></div>
+    <div class="logo" style="cursor:pointer" onclick="location.href='index.html'"><div class="name">Land Cloud</div><div class="sub"><span class="dot"></span>Citrus · 2025/26</div></div>
     <div class="nav-sec">Explore</div>
-    <div class="nav-item"><span class="ic">▤</span>Structure</div>
-    <div class="nav-item"><span class="ic">▦</span>Block Register</div>
-    <div class="nav-item"><span class="ic">≈</span>Production History</div>
-    <div class="nav-item"><span class="ic">▧</span>Yield Heatmap</div>
-    <div class="nav-item"><span class="ic">◫</span>Benchmark</div>
-    <div class="nav-item"><span class="ic">◱</span>Farm Map</div>
+    <div class="nav-item" onclick="location.href='index.html#structure'"><span class="ic">▤</span>Structure</div>
+    <div class="nav-item" onclick="location.href='index.html#register'"><span class="ic">▦</span>Block Register</div>
+    <div class="nav-item" onclick="location.href='index.html#history'"><span class="ic">≈</span>Production History</div>
+    <div class="nav-item" onclick="location.href='index.html#heatmap'"><span class="ic">▧</span>Yield Heatmap</div>
+    <div class="nav-item" onclick="location.href='index.html#bench'"><span class="ic">◫</span>Benchmark</div>
+    <div class="nav-item" onclick="location.href='index.html#map'"><span class="ic">◱</span>Farm Map</div>
     <div class="nav-sec">Manage</div>
     <div class="nav-item active"><span class="ic">◷</span>Harvest Planner</div>
-    <div class="nav-item"><span class="ic">✎</span>Season Entry</div>
-    <div class="nav-item"><span class="ic">⇪</span>Bulk Import</div>
-    <div class="nav-item"><span class="ic">⇄</span>Reconciliation</div>
-    <div class="nav-item"><span class="ic">✚</span>Data Health</div>
-    <div class="nav-item"><span class="ic">⚙</span>Reference Data</div>
+    <div class="nav-item" onclick="location.href='index.html#entry'"><span class="ic">✎</span>Season Entry</div>
+    <div class="nav-item" onclick="location.href='index.html#import'"><span class="ic">⇪</span>Bulk Import</div>
+    <div class="nav-item" onclick="location.href='index.html#recon'"><span class="ic">⇄</span>Reconciliation</div>
+    <div class="nav-item" onclick="location.href='index.html#health'"><span class="ic">✚</span>Data Health</div>
+    <div class="nav-item" onclick="location.href='index.html#reference'"><span class="ic">⚙</span>Reference Data</div>
     <div class="side-foot">
       <div class="acct"><span class="acct-av">TG</span><div><div class="u">Tarek Ghanem</div><div class="r">Admin · Planner</div></div></div>
       <div class="side-ver">Land Cloud · v2025.9</div>
@@ -358,6 +358,7 @@ body.present .diff-row{font-size:15px}
         <button class="btn btn-sec btn-sm" id="copyLsBtn" onclick="openCopyLast()">↧ Copy last season</button>
         <button class="btn btn-sec btn-sm" id="bulkBtn" onclick="openBulk()">⚡ Bulk set variety</button>
         <span class="dirtybadge" id="dirtyBadge" style="display:none"></span>
+        <button class="btn btn-sec btn-sm" id="discardBtn" onclick="discardChanges()" style="display:none">Discard</button>
         <button class="btn btn-primary btn-sm" onclick="saveAll()">Save changes</button>
       </div>
       <div class="modebanner" id="modeBanner"></div>
@@ -515,6 +516,18 @@ body.present .diff-row{font-size:15px}
   </div>
 </div>
 
+<!-- Reusable prompt / confirm / notice modal -->
+<div class="mscrim" id="uiScrim" onclick="if(event.target===this)uiClose(null)">
+  <div class="modal" style="max-width:440px">
+    <div class="mh"><h2 id="uiTitle"></h2><div class="s" id="uiMsg" style="white-space:pre-line"></div></div>
+    <div class="mb" id="uiInputWrap" style="display:none">
+      <input id="uiInput" onkeydown="if(event.key==='Enter')uiOkClick();if(event.key==='Escape')uiClose(null)" style="width:100%;box-sizing:border-box;font-family:var(--font-body);font-size:14px;border:1px solid var(--border2,#bcd);border-radius:8px;padding:9px 11px">
+    </div>
+    <div class="mf"><button class="btn btn-sec" id="uiCancel" onclick="uiClose(null)">Cancel</button><button class="btn btn-primary" id="uiOk" onclick="uiOkClick()">OK</button></div>
+  </div>
+</div>
+<div id="toastWrap" style="position:fixed;left:50%;bottom:22px;transform:translateX(-50%);z-index:9999;display:flex;flex-direction:column;gap:8px;align-items:center;pointer-events:none"></div>
+
 <script>
 const WD=["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
 const MON=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
@@ -526,6 +539,26 @@ const jit=[1.03,0.96,1.08,0.94,1.05,0.98,1.12,0.9,1.06,0.97];
 const patterns=[[0.16,0.15,0.14,0.15,0.14,0.13,0.13],[0.10,0.18,0.16,0.14,0.16,0.12,0.14],[0.18,0.10,0.16,0.16,0.12,0.16,0.12],[0.14,0.16,0.14,0.14,0.14,0.14,0.14],[0.12,0.16,0.14,0.16,0.14,0.14,0.14]];
 const SB_URL='https://sfyjvgjwvtwkrnqrvqyc.supabase.co', SB_ANON='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNmeWp2Z2p3dnR3a3JucXJ2cXljIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ4NzIxNjYsImV4cCI6MjA5MDQ0ODE2Nn0.FjA75XZsp0Kx5Xam_rrnYoAHX4JHKey6vEFCH_zlMuQ';
 const SB=window.supabase.createClient(SB_URL,SB_ANON);
+// ---- in-page dialogs (replace browser prompt/alert/confirm) ----
+let uiResolve=null;
+function uiClose(val){document.getElementById('uiScrim').classList.remove('open');const r=uiResolve;uiResolve=null;if(r)r(val);}
+function uiOkClick(){const inpShown=document.getElementById('uiInputWrap').style.display!=='none';uiClose(inpShown?document.getElementById('uiInput').value:true);}
+function uiModal(o){return new Promise(res=>{uiResolve=res;
+  document.getElementById('uiTitle').textContent=o.title||'';
+  const m=document.getElementById('uiMsg'); m.textContent=o.msg||''; m.style.display=o.msg?'':'none';
+  const w=document.getElementById('uiInputWrap'), inp=document.getElementById('uiInput');
+  if(o.input){w.style.display='';inp.value=o.def||'';inp.placeholder=o.ph||'';setTimeout(()=>{inp.focus();inp.select();},30);} else w.style.display='none';
+  document.getElementById('uiCancel').style.display=o.cancel===false?'none':'';
+  document.getElementById('uiOk').textContent=o.okText||'OK';
+  document.getElementById('uiScrim').classList.add('open');
+});}
+function uiPrompt(title,def,ph){return uiModal({title,input:true,def,ph});}
+async function uiConfirm(title,msg,okText){return !!(await uiModal({title,msg,okText:okText||'OK'}));}
+async function uiNotice(title,msg){await uiModal({title,msg,cancel:false});}
+function uiToast(msg,kind){const w=document.getElementById('toastWrap');if(!w)return;const t=document.createElement('div');t.textContent=msg;
+  t.style.cssText='background:'+(kind==='err'?'#7a1f1f':'#173d3c')+';color:#fff;padding:9px 16px;border-radius:10px;font-size:13px;box-shadow:0 6px 20px rgba(0,0,0,.25);max-width:520px;pointer-events:auto;opacity:0;transition:opacity .25s';
+  w.appendChild(t);requestAnimationFrame(()=>{t.style.opacity='1';});
+  setTimeout(()=>{t.style.opacity='0';setTimeout(()=>t.remove(),400);},kind==='err'?4200:2600);}
 function sundayOf(d){const x=new Date(d);x.setHours(0,0,0,0);x.setDate(x.getDate()-x.getDay());return x;}
 function ymd(dt){return dt.getFullYear()+'-'+String(dt.getMonth()+1).padStart(2,'0')+'-'+String(dt.getDate()).padStart(2,'0');}
 function labelOf(dt){return dt.getDate()+' '+MON[dt.getMonth()];}
@@ -725,7 +758,12 @@ function renderLog(){
 }
 // recompute on edit — stores ONLY the cell that changed (per-cell dirty set); totals recomputed from the model
 const dirty=new Set();
-function updateDirtyBadge(){const b=document.getElementById('dirtyBadge');if(!b)return;const n=dirty.size;b.textContent=n?`${n} unsaved change${n>1?'s':''}`:'';b.style.display=n?'':'none';}
+function updateDirtyBadge(){const b=document.getElementById('dirtyBadge');const db=document.getElementById('discardBtn');const n=dirty.size;if(db)db.style.display=n?'':'none';if(!b)return;b.textContent=n?`${n} unsaved change${n>1?'s':''}`:'';b.style.display=n?'':'none';}
+async function discardChanges(){
+  if(!dirty.size)return;
+  const ok=await uiConfirm('Discard unsaved changes?','This undoes your '+dirty.size+' unsaved change'+(dirty.size>1?'s':'')+' and reloads the last saved plan.','Discard');
+  if(ok)location.reload();
+}
 function edited(el){
   const m=editMode;
   if(el&&el.id){
@@ -829,7 +867,7 @@ function bulkWeights(w){const wts=Array(WK.length).fill(0);let tot=0;
   for(let k=w.start;k<=w.end;k++){let wt; if(w.shape==='flat')wt=1; else if(w.shape==='early')wt=(w.end-k+1); else if(w.shape==='late')wt=(k-w.start+1); else{const sig=Math.max(0.9,(w.end-w.start)/3.2);wt=Math.exp(-((k-w.peak)**2)/(2*sig*sig));} wts[k]=wt;tot+=wt;}
   return wts.map(x=>x/(tot||1));}
 function openBulk(){
-  const vs=bulkVarieties(); if(!vs.length){alert('No plots loaded yet.');return;}
+  const vs=bulkVarieties(); if(!vs.length){uiToast('No plots loaded yet.','err');return;}
   document.getElementById('bkVar').innerHTML=vs.map(v=>`<option value="${v.replace(/"/g,'&quot;')}">${v}</option>`).join('');
   const opt=(sel)=>WK.map((wk,i)=>`<option value="${i}" ${i===sel?'selected':''}>${wk}</option>`).join('');
   // seed window from a representative plot of the first variety
@@ -987,7 +1025,7 @@ async function saveAll(){
     if(error)throw error;
     if(data&&data.conflict){
       const codes=(data.blocks||[]).map(x=>{const p=plots.find(pp=>pp.blockId===x.block_id);return p?p.p:x.block_id;});
-      alert('Someone else saved these plot'+(codes.length>1?'s':'')+' since you opened the planner:\n\n'+codes.join(', ')+'\n\nReload to get their changes, then re-apply yours. (Your other edits were NOT saved to avoid overwriting theirs.)');
+      uiNotice('Save blocked — someone else edited','These plot'+(codes.length>1?'s':'')+' were saved by someone else since you opened the planner:\n\n'+codes.join(', ')+'\n\nReload to get their changes, then re-apply yours. Your other edits were NOT saved, to avoid overwriting theirs.');
       if(b){b.textContent='Save blocked — conflict';b.style.display='';}
       return;
     }
@@ -996,10 +1034,10 @@ async function saveAll(){
     const ts=data.updated_at||{}; Object.keys(ts).forEach(bid=>{planBaseTs[bid]=ts[bid];});
     dirty.clear();document.querySelectorAll('.daycell.dirty').forEach(td=>td.classList.remove('dirty'));
     if(b){const s=data.saved||{};b.textContent='Saved ✓'+(s.events?(' · '+s.events+' change'+(s.events>1?'s':'')+' logged'):'');b.style.display='';setTimeout(updateDirtyBadge,1800);}
-  }catch(err){alert('Save failed: '+((err&&err.message)||err));if(b){b.textContent='Save failed';b.style.display='';}}
+  }catch(err){uiToast('Save failed: '+((err&&err.message)||err),'err');if(b){b.textContent='Save failed';b.style.display='';}}
 }
 async function truckCellEdit(el){trucksEdited();try{const q=el.id.split('_'),gi=+q[1],fi=+q[2],di=+q[3];const g=truckGroups()[gi];if(!g)return;const row=g.rows[fi];if(!row)return;const plot=plots.find(p=>p.v===row.v&&p.f===row.f);if(!plot)return;const val=el.value===''?0:parseInt(el.value)||0;const {error}=await SB.from('hp_truck').upsert({product_id:'citrus',season_id:SEASON.id,farm_id:plot.farmId,variety_id:plot.varId,plan_date:dateOf(selWeek,di),trucks:val},{onConflict:'product_id,season_id,farm_id,variety_id,plan_date'});if(error)throw error;el.style.borderColor='';el.title='';}catch(err){el.style.borderColor='var(--red,#b03030)';el.title='Not saved: '+((err&&err.message)||err);console.warn('truck save failed',err);}}
-async function captureSnapshot(){const name=prompt('Name this snapshot:', 'Weekly — '+labelOf(new Date()));if(!name)return;try{const {data:r,error}=await SB.from('hp_revision').insert({product_id:'citrus',season_id:SEASON.id,name:name,kind:'weekly',note:'Captured from Harvest Planner'}).select().single();if(error)throw error;const lines=plots.map((pt,i)=>{const w=winStore[i]||winOf(i),ay=getAY(i);return {revision_id:r.id,block_id:pt.blockId,bearing_area_fed:ay.area,plan_yield_t_fed:ay.yield,planned_t:Math.round(plannedNow(i)),harvest_start:dateOf(w.start,0),harvest_peak:dateOf(w.peak,0),harvest_end:dateOf(w.end,6),harvest_shape:w.shape};});await SB.from('hp_revision_line').insert(lines);revs.unshift({id:r.id,t:name,d:new Date().toLocaleDateString('en-GB'),who:'you',in:'HP',locked:false,note:'Captured from Harvest Planner',diff:[]});renderRevList();alert('Snapshot “'+name+'” captured.');}catch(err){alert('Snapshot failed: '+((err&&err.message)||err));}}
+async function captureSnapshot(){const name=await uiPrompt('Name this snapshot','Weekly — '+labelOf(new Date()),'e.g. Before 12 Apr meeting');if(!name)return;try{const {data:r,error}=await SB.from('hp_revision').insert({product_id:'citrus',season_id:SEASON.id,name:name,kind:'weekly',note:'Captured from Harvest Planner'}).select().single();if(error)throw error;const lines=plots.map((pt,i)=>{const w=winStore[i]||winOf(i),ay=getAY(i);return {revision_id:r.id,block_id:pt.blockId,bearing_area_fed:ay.area,plan_yield_t_fed:ay.yield,planned_t:Math.round(plannedNow(i)),harvest_start:dateOf(w.start,0),harvest_peak:dateOf(w.peak,0),harvest_end:dateOf(w.end,6),harvest_shape:w.shape};});await SB.from('hp_revision_line').insert(lines);revs.unshift({id:r.id,t:name,d:new Date().toLocaleDateString('en-GB'),who:'you',in:'HP',locked:false,note:'Captured from Harvest Planner',diff:[]});renderRevList();uiToast('Snapshot “'+name+'” captured.');}catch(err){uiToast('Snapshot failed: '+((err&&err.message)||err),'err');}}
 
 // ---------- SEASON OVERVIEW page (everything derived from the SAME daily model as the grid) ----------
 const YDAY=CURDAY-1; // actuals are complete through yesterday
@@ -1054,7 +1092,7 @@ async function reviewOffPlan(i,w,d,status){
     const {error}=await SB.from('hp_actual_day').update({review_status:status})
       .eq('block_id',plots[i].blockId).eq('season_id',SEASON.id).eq('harvest_date',dateOf(w,d)).eq('seq',1);
     if(error)throw error;
-  }catch(err){ if(prev)reviewStore[key]=prev; else delete reviewStore[key]; offPlanRender(); alert('Could not save review: '+((err&&err.message)||err)); }
+  }catch(err){ if(prev)reviewStore[key]=prev; else delete reviewStore[key]; offPlanRender(); uiToast('Could not save review: '+((err&&err.message)||err),'err'); }
 }
 function offPlanRender(){
   const box=document.getElementById('ovOffplan'); if(!box)return;

@@ -489,7 +489,8 @@ var IC = {
   health:    icon(['M12 2l9 4v6c0 5-3.8 9.3-9 10-5.2-.7-9-5-9-10V6z','M9 12l2 2 4-4']),
   reference: icon(['M4 5a2 2 0 0 1 2-2h13v18H6a2 2 0 0 1-2-2z','M9 7h7','M9 11h7']),
   heatmap:   icon(['M3 3h7v7H3z','M14 3h7v7h-7z','M3 14h7v7H3z','M14 14h7v7h-7z']),
-  bench:     icon(['M4 20V10','M10 20V4','M16 20v-7','M22 20H2'])
+  bench:     icon(['M4 20V10','M10 20V4','M16 20v-7','M22 20H2']),
+  planner:   icon(['M4 5h16v15H4z','M4 9h16','M8 3v4','M16 3v4','M9 14l2 2 4-4'])
 };
 /* Nav mirrors the agreed mockup: Explore / Manage, with post-v1 screens badged v2. */
 var NAV = [
@@ -501,6 +502,7 @@ var NAV = [
     {k:'bench',     label:'Benchmark',         Icon:IC.bench,    phase:'L2'},
     {k:'map',       label:'Farm Map',          Icon:IC.map,       phase:'P6'} ]},
   {sec:'Manage', items:[
+    {k:'planner',   label:'Harvest Planner',    Icon:IC.planner,  href:'harvest-planner.html'},
     {k:'entry',     label:'Season Entry',       Icon:IC.entry,    phase:'P3'},
     {k:'import',    label:'Bulk Import',        Icon:IC.import,   phase:'P4'},
     {k:'recon',     label:'Reconciliation',     Icon:IC.recon,    phase:'P7', need:'read'},
@@ -3045,7 +3047,7 @@ function wsGridIcon(){ return ce('svg',{viewBox:'0 0 16 16',fill:'currentColor',
 /* ── Access gate: farm_can_read() decides entry; users.role gates writes. ── */
 function App(){
   var a=useState({phase:'boot',session:null,role:null,canRead:false}); var auth=a[0], setAuth=a[1];
-  var n=useState('structure'); var screen=n[0], setScreen=n[1];
+  var n=useState((function(){var h=(location.hash||'').replace('#','');return SCREENS[h]?h:'structure';})()); var screen=n[0], setScreen=n[1];
   var c=useState('all'); var crop=c[0], setCrop=c[1];
   var y=useState(2025); var season=y[0], setSeason=y[1];
   var p=useState([]); var products=p[0], setProducts=p[1];
@@ -3108,7 +3110,7 @@ function App(){
         return ce('div',{key:g.sec},
           ce('div',{className:'nav-section'}, g.sec),
           g.items.filter(visible).map(function(it){
-            return ce('button',{key:it.k,className:'nav-item'+(screen===it.k?' active':''),onClick:function(){setScreen(it.k);setMenu(false);}},
+            return ce('button',{key:it.k,className:'nav-item'+(screen===it.k?' active':''),onClick:function(){ if(it.href){window.location.href=it.href;return;} setScreen(it.k);setMenu(false);}},
               ce(it.Icon,null), ce('span',null, it.label),
               it.v2?ce('span',{style:{marginLeft:'auto',fontSize:9,opacity:.6}},'v2'):null);
           }),
