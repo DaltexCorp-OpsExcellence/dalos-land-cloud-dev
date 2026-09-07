@@ -184,7 +184,9 @@ th.frozen{z-index:3}
 .cal{border-collapse:separate;border-spacing:3px;min-width:820px}
 .cal th{position:static;background:none;font-size:10px;padding:2px 4px;text-transform:uppercase;color:var(--text3);border:none;text-align:center}
 .cal th.cur{color:var(--accent);font-weight:700}
-.cal td.rl{font-size:12px;font-weight:600;color:var(--text);text-align:left;padding-right:10px;white-space:nowrap;border:none;background:none}
+.cal td.rl{font-size:12px;font-weight:600;color:var(--text);text-align:left;padding-right:10px;white-space:nowrap;border:none}
+/* keep the variety row-label visible when the 53-week season-shape heatmap scrolls right */
+.cal td.rl,.cal th.rl{position:sticky;left:0;z-index:2;background:var(--card);box-shadow:6px 0 6px -4px rgba(0,0,0,.10)}
 .hcell{width:48px;height:30px;border-radius:5px;font-family:var(--font-mono);font-size:10px;text-align:center;color:var(--text2);vertical-align:middle;border:1px solid var(--border);line-height:1.1}
 .wbtn{cursor:pointer;display:inline-flex;align-items:center;gap:4px;border-radius:5px;padding:2px 5px}
 .wbtn:hover{background:var(--bg2)}
