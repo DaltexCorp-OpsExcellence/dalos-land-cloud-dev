@@ -89,6 +89,7 @@ th.num{text-align:center}
 .plot{font-family:var(--font-mono);font-size:11px;background:var(--bg2);border-radius:4px;padding:1px 6px;color:var(--text)}
 .vname{font-weight:600;color:var(--text)}
 .grp td{z-index:3;background:var(--bg2);font-weight:600;color:var(--text);font-size:11px;text-transform:uppercase;letter-spacing:.05em;position:sticky;top:47px}
+.grp td .grplbl{position:sticky;left:12px;display:inline-block}
 tr.subtot td{background:#edeae4;font-weight:600;font-size:11px;color:#4a4840;padding:3px 10px}
 tr.subtot .num{text-align:right}
 tr.subtot .stlab{position:sticky;left:0;background:#edeae4;text-transform:uppercase;letter-spacing:.04em;font-size:10px;color:#5a564a}
@@ -687,8 +688,11 @@ function pickDay(dateStr){ if(!dateStr)return; const w=wkIndexOfDate(dateStr); i
 function colOf(w,di,wkStart){ const dl=dayLabels(w)[di]; return {w:w,di:di,wd:dl.wd,d:dl.d,mon:dl.mon,wkStart:!!wkStart}; }
 function viewCols(){
   const m=editMode;
-  if(m==='harv'&&actView==='today') return [colOf(CUR,CURDAY)];
-  if(m==='harv'&&actView==='day'){ const s=daySel||{w:CUR,di:CURDAY}; return [colOf(s.w,s.di)]; }
+  const present=document.body.classList.contains('present');
+  if(!present){ // present always shows the full 2 weeks (single-day Today/Day views are edit-only)
+    if(m==='harv'&&actView==='today') return [colOf(CUR,CURDAY)];
+    if(m==='harv'&&actView==='day'){ const s=daySel||{w:CUR,di:CURDAY}; return [colOf(s.w,s.di)]; }
+  }
   const cols=[]; for(let k=0;k<2;k++){ const w=selWeek+k; if(w>WK.length-1)break; for(let di=0;di<7;di++) cols.push(colOf(w,di,di===0&&k>0)); }
   return cols;
 }
@@ -736,7 +740,7 @@ function renderLog(){
   groups.forEach((g,gi)=>{
     const idxs = isToday ? g.idxs.filter(i=>dayPlan(i,CUR,CURDAY)>0 || (getActual(i,CUR,CURDAY)||0)>0) : g.idxs;
     if(!idxs.length) return;
-    body+=`<tr class="grp"><td colspan="${NCOL}">${g.label}</td></tr>`;
+    body+=`<tr class="grp"><td colspan="${NCOL}"><span class="grplbl">${g.label}</span></td></tr>`;
     let gsum=cols.map(()=>0), gwk=0;
     idxs.forEach(i=>{
       const p=plots[i], ay=getAY(i);
@@ -1288,7 +1292,7 @@ function renderTrucks(){
   const groups=truckGroups();
   let body='', grand=cols.map(()=>0), grandWk=0;
   groups.forEach((g,gi)=>{
-    body+=`<tr class="grp"><td colspan="${NCOL}">${g.label}</td></tr>`;
+    body+=`<tr class="grp"><td colspan="${NCOL}"><span class="grplbl">${g.label}</span></td></tr>`;
     let gsum=cols.map(()=>0), gwk=0;
     g.rows.forEach((row,fi)=>{
       let rowWk=0;
@@ -1399,6 +1403,8 @@ function setPresent(on){
   const b=document.getElementById('present'); if(b)b.textContent=on?'✕ Exit Present':'⛶ Present';
   if(on){ try{if(document.documentElement.requestFullscreen)document.documentElement.requestFullscreen();}catch(e){} }
   else { try{if(document.fullscreenElement&&document.exitFullscreen)document.exitFullscreen();}catch(e){} }
+  // present forces the 2-week grid (viewCols reads the present class), so re-render the active page
+  if(page==='log')renderLog(); else if(page==='trk')renderTrucks();
 }
 function togglePresent(){ setPresent(!document.body.classList.contains('present')); }
 // leaving fullscreen (Esc, or the OS control) must also drop present mode — otherwise the view stays broken inside the window
