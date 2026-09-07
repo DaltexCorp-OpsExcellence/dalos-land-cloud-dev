@@ -129,6 +129,7 @@ th.dayh{text-align:center}
 .celllegend .demo .sm .tg{color:var(--text3);font-size:8px;text-transform:uppercase;margin-right:2px}
 .daycell .dp{font-family:var(--font-mono);font-size:12px;color:var(--text2);display:block;line-height:1.15;margin-top:1px;border-top:1px dotted var(--border2);padding-top:2px}
 .daycell .dp .tg{color:var(--text3);font-size:10px;text-transform:uppercase;letter-spacing:.04em;margin-right:2px}
+#npToggle.on{background:var(--accent);color:#fff;border-color:var(--accent)}
 .daycell.off{background:#ece0ff;box-shadow:inset 3px 0 0 var(--violet)}
 .daycell.off .cin{color:var(--violet);font-weight:700}
 .daycell.off .cin{color:var(--violet);font-weight:600}
@@ -351,6 +352,7 @@ body.present .diff-row{font-size:15px}
         <div class="seg" id="viewSeg" style="display:none"><b class="active" id="vwToday" onclick="setView('today')">Today</b><b id="vwWeek" onclick="setView('week')">Week</b></div>
         <div class="wkstep"><div class="nav" onclick="stepWeek(-1)">‹</div><div class="lbl" id="wkLbl"></div><div class="nav" onclick="stepWeek(1)">›</div></div>
         <div class="grpby"><span class="gl">Group by</span><div class="seg"><b class="active" id="gbVar" onclick="setGroup('variety')">Variety</b><b id="gbFarm" onclick="setGroup('farm')">Farm</b></div></div>
+        <button class="btn btn-sec btn-sm" id="npToggle" onclick="setShowNP(!showNP)" title="Non-productive = no plan yield and no harvest (Ibrahim: if NP then no production anyway)"></button>
         <div class="spacer"></div>
         <button class="btn btn-sec btn-sm" id="pasteBtn" onclick="openPaste()">⎘ Paste from Excel</button>
         <button class="btn btn-sec btn-sm" id="copyLsBtn" onclick="openCopyLast()">↧ Copy last season</button>
@@ -374,6 +376,9 @@ body.present .diff-row{font-size:15px}
     <div class="page pageview" id="page-ov">
       <div id="ovWeek"></div>
       <div class="kpi-grid" id="ovKpis"></div>
+
+      <div class="sec-title">Off-plan picks <span class="r">harvested where the plan said 0 — confirm each is genuine (kept as-is, plan unchanged) or flag a data error</span></div>
+      <div id="ovOffplan"></div>
 
       <div class="sec-title">Watch list <span class="r">late start · stalled · off-plan · overrunning — auto-derived, top 10</span></div>
       <div class="table-wrap"><table id="ovWatch"></table></div>
@@ -532,6 +537,7 @@ function dateOf(w,d){const x=new Date(WKDATE[w]);x.setDate(x.getDate()+d);return
 // per-plot editable overrides
 const planStore={}, actStore={}, planDayStore={}, winStore={}; // area/yield ; actual ; day-plan override ; harvest window
 const planBaseTs={}; // block_id -> hp_plan.updated_at at load, for optimistic-concurrency checks on save
+const reviewStore={}; // i|w|d -> off-plan review_status: off_plan_confirmed | data_error (unset = needs review)
 function getAY(pi){return planStore[pi]||{area:plots[pi].area,yield:plots[pi].yield};}
 function plannedNow(pi){const a=getAY(pi);return a.area*a.yield;}
 // harvest window: {start,peak,end,shape} — total comes from area×yield
@@ -603,9 +609,17 @@ function setGroup(g){groupBy=g;
   document.getElementById('gbFarm').classList.toggle('active',g==='farm');
   renderLog();
 }
+let showNP=false; // P (productive) plots only by default — NP = no plan yield and no actuals ("if NP then no production anyway", Ibrahim)
+function hasAnyActual(i){for(const k in actStore){if(k.indexOf(i+'|')===0&&(actStore[k]||0)>0)return true;}return false;}
+function isNP(i){return (getAY(i).yield||0)<=0 && !hasAnyActual(i);}
+function npCount(){let n=0;plots.forEach((p,i)=>{if(isNP(i))n++;});return n;}
+function setShowNP(v){showNP=v;
+  const t=document.getElementById('npToggle'); if(t)t.classList.toggle('on',v);
+  renderLog();
+}
 function logGroups(){
   const byFarm=groupBy==='farm';
-  const sorted=plots.map((p,i)=>({p,i})).sort((a,b)=> byFarm
+  const sorted=plots.map((p,i)=>({p,i})).filter(x=>showNP||!isNP(x.i)).sort((a,b)=> byFarm
     ? (a.p.f.localeCompare(b.p.f)||a.p.v.localeCompare(b.p.v)||a.p.p.localeCompare(b.p.p))
     : (a.p.v.localeCompare(b.p.v)||a.p.f.localeCompare(b.p.f)));
   const gs=[], map={};
@@ -623,6 +637,7 @@ function renderLog(){
   document.getElementById('mePlan').classList.toggle('active',m==='plan');
   document.getElementById('meHarv').classList.toggle('active',m==='harv');
   ['bulkBtn','pasteBtn','copyLsBtn'].forEach(id=>{const bb=document.getElementById(id); if(bb)bb.style.display=(m==='plan')?'':'none';});
+  {const t=document.getElementById('npToggle'); if(t){const n=npCount(); t.textContent=showNP?('Hide non-productive ('+n+')'):('Show non-productive ('+n+')'); t.classList.toggle('on',showNP); t.style.display=n>0||showNP?'':'none';}}
   document.getElementById('meHarv').classList.toggle('actmode',m==='harv');
   const vs=document.getElementById('viewSeg'); if(vs){vs.style.display=m==='harv'?'':'none';
     document.getElementById('vwToday').classList.toggle('active',today);document.getElementById('vwWeek').classList.toggle('active',!today);}
@@ -1021,6 +1036,45 @@ function watchList(){
   rows.sort((a,b)=>Math.abs(b.delta)-Math.abs(a.delta));
   return rows;
 }
+function dowLabel(w,d){const dt=new Date(WKDATE[w]);dt.setDate(dt.getDate()+d);return WD[d]+' '+labelOf(dt);}
+function offPlanPicks(){
+  const out=[];
+  plots.forEach((p,i)=>{for(let w=0;w<WK.length;w++)for(let d=0;d<7;d++){
+    const a=getActual(i,w,d);
+    if((a||0)>0 && dayPlan(i,w,d)===0) out.push({i,w,d,p:p.p,v:p.v,f:p.f,t:a,status:reviewStore[i+'|'+w+'|'+d]||'unreviewed'});
+  }});
+  out.sort((a,b)=>((a.status==='unreviewed'?0:1)-(b.status==='unreviewed'?0:1))||(b.t-a.t));
+  return out;
+}
+async function reviewOffPlan(i,w,d,status){
+  const key=i+'|'+w+'|'+d, prev=reviewStore[key];
+  if(status==='clear'){delete reviewStore[key];status=null;} else reviewStore[key]=status;
+  offPlanRender();
+  try{
+    const {error}=await SB.from('hp_actual_day').update({review_status:status})
+      .eq('block_id',plots[i].blockId).eq('season_id',SEASON.id).eq('harvest_date',dateOf(w,d)).eq('seq',1);
+    if(error)throw error;
+  }catch(err){ if(prev)reviewStore[key]=prev; else delete reviewStore[key]; offPlanRender(); alert('Could not save review: '+((err&&err.message)||err)); }
+}
+function offPlanRender(){
+  const box=document.getElementById('ovOffplan'); if(!box)return;
+  const picks=offPlanPicks();
+  if(!picks.length){box.innerHTML=`<div class="card" style="color:var(--text3);font-size:13px">No off-plan picks — every logged harvest fell on a planned day.</div>`;return;}
+  const nUn=picks.filter(x=>x.status==='unreviewed').length;
+  const chip=s=> s==='off_plan_confirmed'?'<span class="varcell v-on">genuine</span>'
+    : s==='data_error'?'<span class="varcell v-under">data error</span>'
+    : '<span class="varcell v-off">needs review</span>';
+  const rows=picks.map(x=>{
+    const btns = x.status==='unreviewed'
+      ? `<button class="btn btn-sec btn-sm" onclick="reviewOffPlan(${x.i},${x.w},${x.d},'off_plan_confirmed')">✓ Genuine</button> <button class="btn btn-sec btn-sm" onclick="reviewOffPlan(${x.i},${x.w},${x.d},'data_error')">⚑ Error</button>`
+      : `<button class="btn btn-sec btn-sm" onclick="reviewOffPlan(${x.i},${x.w},${x.d},'clear')">Undo</button>`;
+    return `<tr><td>${chip(x.status)}</td><td><span class="plot">${x.p}</span></td><td>${x.v}</td><td>${x.f}</td><td>${dowLabel(x.w,x.d)}</td><td class="num">${x.t} t</td><td style="text-align:right">${btns}</td></tr>`;
+  }).join('');
+  box.innerHTML=`<div class="table-wrap"><table>
+    <tr><th>Status</th><th>Plot</th><th>Variety</th><th>Farm</th><th>Day</th><th class="num">Picked</th><th></th></tr>
+    ${rows}</table></div>
+    <div class="hint" style="margin:6px 0 0">${nUn} awaiting review · confirming keeps the plan unchanged (the pick is recorded as genuine); flagging marks a likely logging error.</div>`;
+}
 function renderOv(){
   const A=agg();
   const tPlan=sum(A.map(a=>a.latest)), tHarv=sum(A.map(a=>a.harv)), tBud=sum(A.map(a=>a.budget)), tArea=sum(A.map(a=>a.area));
@@ -1054,6 +1108,7 @@ function renderOv(){
   const wb=WL.length?WL.slice(0,10).map(r=>`<tr><td><span class="varcell ${r.cls}">${r.status}</span></td><td>${r.f}</td><td><span class="plot">${r.p}</span></td><td>${r.v}</td><td class="num">${Math.round(r.planTD)}</td><td class="num">${Math.round(r.harvTot)}</td><td class="num">${r.delta>0?'+':''}${Math.round(r.delta)} t</td></tr>`).join('')
     :`<tr><td colspan="7" style="color:var(--text3)">Nothing flagged — all plots on schedule.</td></tr>`;
   document.getElementById('ovWatch').innerHTML=wh+wb+(WL.length>10?`<tr><td colspan="7" style="color:var(--text3);font-size:11px">${WL.length-10} more…</td></tr>`:'');
+  offPlanRender();
   // season shape heatmap — per-variety binning, past weeks show actual/plan, plus Total row
   function heatRow(v,mx){if(!v)return{bg:'#eef1f0',c:'var(--border2)'};const r=v/(mx||1);if(r<0.34)return{bg:'#cfe6e4',c:'var(--text2)'};if(r<0.67)return{bg:'#5fb0ab',c:'#06322f'};return{bg:'#0d6a68',c:'#fff'};}
   let calHead=`<tr><th class="rl"></th>`+WK.map((w,i)=>`<th class="${i===CUR?'cur':''}">${w}</th>`).join('')+`</tr>`;
@@ -1252,7 +1307,7 @@ async function boot(){
       SB.from('farm_blocks').select('id,farm_code,sector_code,plot_code,block_add,total_area_fed,variety_id,farm_id,varieties(name),farms(name)').eq('product_id','citrus').eq('lifecycle','bearing').not('variety_id','is',null).not('farm_id','is',null),
       SB.from('hp_plan').select('*').eq('season_id',SEASON.id),
       SB.from('hp_plan_day').select('block_id,plan_date,planned_t').eq('season_id',SEASON.id),
-      SB.from('hp_actual_day').select('block_id,harvest_date,actual_t').eq('season_id',SEASON.id),
+      SB.from('hp_actual_day').select('block_id,harvest_date,actual_t,review_status').eq('season_id',SEASON.id),
       SB.from('hp_truck').select('*').eq('season_id',SEASON.id),
       SB.from('hp_revision').select('*').eq('season_id',SEASON.id).order('captured_at',{ascending:false})
     ]);
@@ -1265,7 +1320,7 @@ async function boot(){
     farmsList=[...new Set(plots.map(p=>p.f))];
     const idx={}; plots.forEach((pt,i)=>{idx[pt.blockId]=i;const pl=planBy[pt.blockId];if(pl){planStore[i]={area:Number(pl.bearing_area_fed||pt.area||0),yield:Number(pl.plan_yield_t_fed||0)};if(pl.updated_at)planBaseTs[pt.blockId]=pl.updated_at;let ws=wkIndexOfDate(pl.harvest_start),we=wkIndexOfDate(pl.harvest_end),wp=wkIndexOfDate(pl.harvest_peak);if(ws<0)ws=0;if(we<0)we=WK.length-1;if(wp<ws||wp>we)wp=Math.round((ws+we)/2);winStore[i]={start:ws,peak:wp,end:we,shape:pl.harvest_shape||'bell'};}else{planStore[i]={area:pt.area,yield:0};}});
     pd.forEach(r=>{const i=idx[r.block_id];if(i==null)return;const w=wkIndexOfDate(r.plan_date),d=dowOf(r.plan_date);if(w>=0)planDayStore[i+'|'+w+'|'+d]=Number(r.planned_t);});
-    ad.forEach(r=>{const i=idx[r.block_id];if(i==null)return;const w=wkIndexOfDate(r.harvest_date),d=dowOf(r.harvest_date);if(w>=0)actStore[i+'|'+w+'|'+d]=Number(r.actual_t);});
+    ad.forEach(r=>{const i=idx[r.block_id];if(i==null)return;const w=wkIndexOfDate(r.harvest_date),d=dowOf(r.harvest_date);if(w>=0){actStore[i+'|'+w+'|'+d]=Number(r.actual_t);if(r.review_status)reviewStore[i+'|'+w+'|'+d]=r.review_status;}});
     tk.forEach(r=>{const w=wkIndexOfDate(r.plan_date),d=dowOf(r.plan_date),f=farmName[r.farm_id],v=varName[r.variety_id];if(w>=0&&f&&v)truckLog[v+'|'+f+'|'+w+'|'+d]=r.trucks;});
     revs = rv.length?rv.map(r=>({id:r.id,t:r.name,d:new Date(r.captured_at).toLocaleDateString('en-GB'),who:'—',in:'HP',locked:r.is_locked,note:r.note||'',diff:[]})):[{id:null,t:'No snapshots yet',d:'',who:'—',in:'HP',locked:false,note:'Use “Capture snapshot” to start the history.',diff:[]}];
     try{const sp=document.querySelector('.season-sel');if(sp&&sp.childNodes[0])sp.childNodes[0].textContent=SEASON.name+' ';}catch(e){}
