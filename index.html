@@ -3070,7 +3070,7 @@ function App(){
   var n=useState((function(){var h=(location.hash||'').replace('#','');return SCREENS[h]?h:'structure';})()); var screen=n[0], setScreen=n[1];
   /* page-view capture (platform usage report) — log each screen change for a signed-in
      user; 15s de-dupe; fire-and-forget (.then() required, lazy builder). */
-  var _pvRef=useRef({});
+  var _pvRef=React.useRef({});
   useEffect(function(){
     if(!(auth&&auth.session)||!screen) return;
     var now=Date.now(); if(_pvRef.current[screen]&&now-_pvRef.current[screen]<15000) return; _pvRef.current[screen]=now;
