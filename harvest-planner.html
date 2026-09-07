@@ -87,12 +87,12 @@ tr:last-child td{border-bottom:none}
 th.num{text-align:right}
 .plot{font-family:var(--font-mono);font-size:11px;background:var(--bg2);border-radius:4px;padding:1px 6px;color:var(--text)}
 .vname{font-weight:600;color:var(--text)}
-.grp td{background:var(--bg2);font-weight:600;color:var(--text);font-size:11px;text-transform:uppercase;letter-spacing:.05em;position:sticky;left:0}
+.grp td{z-index:1;background:var(--bg2);font-weight:600;color:var(--text);font-size:11px;text-transform:uppercase;letter-spacing:.05em;position:sticky;left:0}
 tr.subtot td{background:#edeae4;font-weight:600;font-size:11px;color:#4a4840;padding:3px 10px}
-tr.subtot .num{text-align:center}
-tr.subtot .stlab{position:sticky;left:0;background:#edeae4;text-transform:uppercase;letter-spacing:.04em;font-size:10px;color:#7a7668}
+tr.subtot .num{text-align:right}
+tr.subtot .stlab{position:sticky;left:0;background:#edeae4;text-transform:uppercase;letter-spacing:.04em;font-size:10px;color:#5a564a}
 tr.grandtot td{background:#38352f;font-weight:700;color:#fff;font-size:12px;padding:4px 10px}
-tr.grandtot .num{text-align:center;color:#fff}
+tr.grandtot .num{text-align:right;color:#fff}
 tr.grandtot .stlab{position:sticky;left:0;background:#38352f;color:#fff;text-transform:uppercase;letter-spacing:.04em;font-size:10px}
 .tot td{background:var(--bg2);font-weight:600;color:var(--text)}
 .pill{display:inline-flex;align-items:center;border-radius:20px;padding:1px 7px;font-size:10px;font-weight:500;border:1px solid;white-space:nowrap}
@@ -127,9 +127,10 @@ th.dayh{text-align:center}
 .celllegend .demo .big{font-family:var(--font-mono);font-size:12px;color:var(--text);font-weight:500}
 .celllegend .demo .sm{font-family:var(--font-mono);font-size:9px;color:var(--text2)}
 .celllegend .demo .sm .tg{color:var(--text3);font-size:8px;text-transform:uppercase;margin-right:2px}
-.daycell .dp{font-family:var(--font-mono);font-size:10px;color:var(--text2);display:block;line-height:1.15;margin-top:1px;border-top:1px dotted var(--border2);padding-top:2px}
-.daycell .dp .tg{color:var(--text3);font-size:8px;text-transform:uppercase;letter-spacing:.04em;margin-right:2px}
-.daycell.off{background:#f5efff}
+.daycell .dp{font-family:var(--font-mono);font-size:12px;color:var(--text2);display:block;line-height:1.15;margin-top:1px;border-top:1px dotted var(--border2);padding-top:2px}
+.daycell .dp .tg{color:var(--text3);font-size:10px;text-transform:uppercase;letter-spacing:.04em;margin-right:2px}
+.daycell.off{background:#ece0ff;box-shadow:inset 3px 0 0 var(--violet)}
+.daycell.off .cin{color:var(--violet);font-weight:700}
 .daycell.off .cin{color:var(--violet);font-weight:600}
 .daycell.fut{background:repeating-linear-gradient(45deg,#faf8f3,#faf8f3 4px,#f2efe8 4px,#f2efe8 8px)}
 .daycell.fut .cin{background:transparent;border-color:var(--border);color:var(--text3)}
@@ -153,7 +154,7 @@ th.frozen{z-index:3}
 .varcell{font-family:var(--font-mono);font-size:11px;padding:1px 7px;border-radius:20px;border:1px solid;font-weight:500}
 .v-over{background:var(--green-bg);color:var(--green);border-color:var(--green-border)}
 .v-under{background:var(--red-bg);color:var(--red);border-color:var(--red-border)}
-.v-on{background:var(--bg2);color:var(--text3);border-color:var(--border2)}
+.v-on{background:var(--bg2);color:var(--text2);border-color:var(--border2)}
 .v-off{background:#f0e8ff;color:var(--violet);border-color:#c090e0}
 /* overview */
 .kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:16px}
@@ -226,7 +227,7 @@ th.frozen{z-index:3}
 .trk{width:70px;text-align:center;vertical-align:middle}
 .trk .n{font-family:var(--font-mono);font-size:16px;font-weight:600;color:var(--text)}
 .trk .n.zero{color:var(--border2);font-weight:400}
-.trk .t{font-family:var(--font-mono);font-size:9px;color:var(--text3);display:block}
+.trk .t{font-family:var(--font-mono);font-size:11px;color:var(--text3);display:block}
 .trk.peak{background:var(--amber-bg)}
 .trow-tot td{background:var(--bg2);font-weight:600}
 .trk .trkin{width:46px;text-align:center;margin:0 auto;font-size:14px}
@@ -257,6 +258,20 @@ th.frozen{z-index:3}
   .mobnav a .mi{font-size:18px}
   .mobnav a.active{color:#fff}
 }
+
+body.present .cin{width:60px;font-size:17px;padding:6px 5px}
+body.present th{font-size:13px}
+body.present td{font-size:15px}
+body.present .daycell .dp{display:none}
+body.present .varcell,body.present .pill{font-size:14px}
+body.present .kpi .val{font-size:34px}
+body.present .kpi .lab,body.present .kpi .sub{font-size:13px}
+body.present .cal .hcell{width:60px;height:42px;font-size:13px}
+body.present .cal .hcell small{font-size:11px}
+body.present tr.subtot td,body.present tr.subtot .stlab,body.present tr.grandtot td{font-size:14px}
+body.present .trk .t{font-size:13px}
+body.present .hint,body.present .celllegend,body.present .modebanner{font-size:14px}
+body.present #present{background:var(--accent);color:#fff}
 </style>
 
 <div class="app">
@@ -287,7 +302,7 @@ th.frozen{z-index:3}
     <div class="topbar">
       <div class="menu-btn" onclick="toggleSide()">☰</div>
       <h1>Harvest Planner</h1>
-      <div class="pageswitch"><b class="active" id="swLog" onclick="setPage('log')">Harvest Plan / Actual</b><b id="swTrk" onclick="setPage('trk')">Trucks</b><b id="swOv" onclick="setPage('ov')">Season Overview</b><b id="swRev" onclick="setPage('rev')">Revisions</b></div>
+      <button id="present" class="btn btn-sec btn-sm" onclick="togglePresent(this)" style="margin-right:8px">⛶ Present</button><div class="pageswitch"><b class="active" id="swLog" onclick="setPage('log')">Harvest Plan / Actual</b><b id="swTrk" onclick="setPage('trk')">Trucks</b><b id="swOv" onclick="setPage('ov')">Season Overview</b><b id="swRev" onclick="setPage('rev')">Revisions</b></div>
       <div class="spacer"></div>
       <div class="season-sel">2025/26 <span class="tag">ACTIVE</span> ▾</div>
     </div>
@@ -765,13 +780,13 @@ function renderOv(){
     <div class="kpi-grid">
       <div class="card kpi"><div class="lab">This week vs plan</div><div class="val">${actWk.toLocaleString()} <span class="un">/ ${planWkTD.toLocaleString()} t</span></div><div class="sub ${actWk>=planWkTD?'up':'down'}">${planWkTD?Math.round(actWk/planWkTD*100):0}% of plan-to-date · full-week plan ${planWk.toLocaleString()} t</div></div>
       <div class="card kpi"><div class="lab">Season pace</div><div class="val">${pacePct}<span class="un">% of schedule</span></div><div class="sub ${pace>=0?'up':'down'}">${pace>=0?'▲ ahead':'▼ behind'} ${Math.abs(pace).toLocaleString()} t · through ${WD[YDAY]}</div></div>
-      <div class="card kpi"><div class="lab">Next 2 weeks</div><div class="val">${next2.toLocaleString()} <span class="un">t</span></div><div class="sub flat">peak ${WD[pk.d]} ${WK[pk.w]} · ${pk.t} t</div></div>
+      <div class="card kpi"><div class="lab">Next 2 weeks</div><div class="val">${next2.toLocaleString()} <span class="un">t</span></div><div class="sub flat">${next2>0&&WK[pk.w]?('peak '+WD[pk.d]+' '+WK[pk.w]+' · '+pk.t+' t'):'no planned load ahead'}</div></div>
       <div class="card kpi"><div class="lab">Watch list</div><div class="val">${wlN} <span class="un">plots</span></div><div class="sub ${wlN?'down':'flat'}">${wlN?`${WL[0].f} ${WL[0].p} · ${WL[0].v} · ${WL[0].status}`:'nothing flagged'}</div></div>
       <div class="card kpi"><div class="lab">Changed since snapshot</div><div class="val">${chgRows.length} <span class="un">plots</span></div><div class="sub ${net>=0?'up':'down'}">net ${net>=0?'+':''}${net} t${top?` · top: ${top.p} ${top.now-top.was>0?'+':''}${top.now-top.was} t`:''}</div></div>
     </div>`;
   document.getElementById('ovKpis').innerHTML=`
     <div class="card kpi"><div class="lab">Planted area</div><div class="val">${tArea.toFixed(0)} <span class="un">fed</span></div><div class="sub flat">${plots.length} plots · ${A.length} varieties</div></div>
-    <div class="card kpi"><div class="lab">Latest plan</div><div class="val">${tPlan.toLocaleString()} <span class="un">t</span></div><div class="sub ${budDelta>=0?'up':'down'}">${budDelta>=0?'▲':'▼'} ${Math.abs(budDelta).toFixed(0)}% vs budget ${tBud.toLocaleString()} t</div></div>
+    <div class="card kpi"><div class="lab">Latest plan</div><div class="val">${tPlan.toLocaleString()} <span class="un">t</span></div><div class="sub flat">season total · field harvest</div></div>
     <div class="card kpi"><div class="lab">Harvested to date</div><div class="val">${tHarv.toLocaleString()} <span class="un">t</span></div><div class="sub flat">${tPlan?Math.round(tHarv/tPlan*100):0}% of season plan · through ${WD[CURDAY]}</div></div>
     <div class="card kpi"><div class="lab">Remaining</div><div class="val">${(tPlan-tHarv).toLocaleString()} <span class="un">t</span></div><div class="sub flat">on the trees</div></div>`;
   // watch list table
@@ -788,7 +803,7 @@ function renderOv(){
   calBody+=`<tr><td class="rl" style="border-top:1px solid var(--border)">Total</td>`+totW.map((v,i)=>{const h=heatRow(v,tmx);const past=i<=CUR;return `<td class="hcell" style="background:${h.bg};color:${h.c};font-weight:600">${past?`<b>${totA[i]||''}</b><small>/${v||0}</small>`:(v||'')}</td>`}).join('')+`</tr>`;
   document.getElementById('ovCal').innerHTML=calHead+calBody;
   // variety table — this-week columns first, estimates history at the end
-  let vh=`<tr><th class="frozen f0">Variety</th><th>Type</th><th class="num">Plots</th><th class="num">Plan wk</th><th class="num">Actual wk</th><th class="num">Δ wk</th><th class="num">Next 2 wks</th><th class="num">Season plan</th><th class="num">Harvested</th><th class="num">% done</th><th class="num">Pace Δ</th><th class="num">Remaining</th><th class="num">Plan t/fed</th><th class="num">Budget</th><th class="num">Jul est</th><th class="num">Nov est</th></tr>`;
+  let vh=`<tr><th class="frozen f0">Variety</th><th>Type</th><th class="num">Plots</th><th class="num">Plan wk</th><th class="num">Actual wk</th><th class="num">Δ wk</th><th class="num">Next 2 wks</th><th class="num">Season plan</th><th class="num">Harvested</th><th class="num">% done</th><th class="num">Pace Δ</th><th class="num">Remaining</th><th class="num">Plan t/fed</th></tr>`;
   const dchip=(v,base)=>{const on=Math.abs(v)<Math.max(3,base*0.06);const cls=on?'v-on':(v>0?'v-over':'v-under');return `<span class="varcell ${cls}">${on?'on':(v>0?'+':'')+Math.round(v)}</span>`;};
   let vb=A.map(a=>`<tr>
     <td class="frozen f0"><span class="vname">${a.v}</span></td><td>${a.vt}</td><td class="num">${a.n}</td>
@@ -796,12 +811,12 @@ function renderOv(){
     <td class="num">${a.next2.toLocaleString()}</td>
     <td class="num">${a.latest.toLocaleString()}</td><td class="num">${a.harv.toLocaleString()}</td><td class="num">${a.latest?Math.round(a.harv/a.latest*100):0}%</td>
     <td class="num">${dchip(a.actTD-a.planTD,a.planTD)}</td><td class="num">${a.rem.toLocaleString()}</td><td class="num">${a.rate}</td>
-    <td class="num" style="color:var(--text3)">${a.budget.toLocaleString()}</td><td class="num" style="color:var(--text3)">${a.jul.toLocaleString()}</td><td class="num" style="color:var(--text3)">${a.nov.toLocaleString()}</td></tr>`).join('');
+    </tr>`).join('');
   const T={planWkTD:sum(A.map(a=>a.planWkTD)),actWk:sum(A.map(a=>a.actWk)),next2,latest:tPlan,harv:tHarv,rem:tPlan-tHarv,budget:tBud,jul:sum(A.map(a=>a.jul)),nov:sum(A.map(a=>a.nov)),planTD,actTD};
-  vb+=`<tr class="tot"><td class="frozen f0">Total</td><td></td><td class="num">${plots.length}</td><td class="num">${T.planWkTD.toLocaleString()}</td><td class="num">${T.actWk.toLocaleString()}</td><td class="num">${dchip(T.actWk-T.planWkTD,T.planWkTD)}</td><td class="num">${T.next2.toLocaleString()}</td><td class="num">${T.latest.toLocaleString()}</td><td class="num">${T.harv.toLocaleString()}</td><td class="num">${T.latest?Math.round(T.harv/T.latest*100):0}%</td><td class="num">${dchip(T.actTD-T.planTD,T.planTD)}</td><td class="num">${T.rem.toLocaleString()}</td><td></td><td class="num">${T.budget.toLocaleString()}</td><td class="num">${T.jul.toLocaleString()}</td><td class="num">${T.nov.toLocaleString()}</td></tr>`;
+  vb+=`<tr class="tot"><td class="frozen f0">Total</td><td></td><td class="num">${plots.length}</td><td class="num">${T.planWkTD.toLocaleString()}</td><td class="num">${T.actWk.toLocaleString()}</td><td class="num">${dchip(T.actWk-T.planWkTD,T.planWkTD)}</td><td class="num">${T.next2.toLocaleString()}</td><td class="num">${T.latest.toLocaleString()}</td><td class="num">${T.harv.toLocaleString()}</td><td class="num">${T.latest?Math.round(T.harv/T.latest*100):0}%</td><td class="num">${dchip(T.actTD-T.planTD,T.planTD)}</td><td class="num">${T.rem.toLocaleString()}</td><td></td></tr>`;
   document.getElementById('ovVar').innerHTML=vh+vb;
   // plot table — from the same model
-  let ph=`<tr><th class="frozen f0">Farm</th><th>Plot</th><th>Variety</th><th>P/NP</th><th class="num">Area</th><th class="num">Season plan</th><th class="num">Harvested</th><th class="num">% done</th><th class="num">Remaining</th><th class="num">Budget</th><th class="num">Nov est</th></tr>`;
+  let ph=`<tr><th class="frozen f0">Farm</th><th>Plot</th><th>Variety</th><th>P/NP</th><th class="num">Area</th><th class="num">Season plan</th><th class="num">Harvested</th><th class="num">% done</th><th class="num">Remaining</th></tr>`;
   const psorted=plots.map((p,i)=>({p,i})).sort((a,b)=>a.p.v.localeCompare(b.p.v)||a.p.f.localeCompare(b.p.f));
   let pb=psorted.map(({p,i})=>{const latest=sum(WK.map((_,w)=>sum(WD.map((__,d)=>dayPlan(i,w,d))))); const harv=sumTo(getActual,i,CUR,CURDAY);
     return `<tr>
@@ -810,7 +825,7 @@ function renderOv(){
     <td class="num">${p.area.toFixed(1)}</td>
     <td class="num"><b style="color:var(--text)">${latest.toLocaleString()}</b></td>
     <td class="num">${harv.toLocaleString()}</td><td class="num">${latest?Math.round(harv/latest*100):0}%</td><td class="num">${(latest-harv).toLocaleString()}</td>
-    <td class="num" style="color:var(--text3)">${p.budget.toLocaleString()}</td><td class="num" style="color:var(--text3)">${p.nov.toLocaleString()}</td></tr>`;}).join('');
+    </tr>`;}).join('');
   document.getElementById('ovPlot').innerHTML=ph+pb;
 }
 
@@ -943,6 +958,7 @@ function pickRev(i){
   document.getElementById('revDetail').innerHTML=`<div class="note-box"><span>“</span><div><b>${r.who}</b> — ${r.note}</div></div><div style="font-size:11px;color:var(--text3);margin-bottom:6px">CHANGES IN THIS REVISION</div>${rows}`;
 }
 /* live: no seed */
+function togglePresent(b){document.body.classList.toggle('present');b.textContent=document.body.classList.contains('present')?'✕ Exit Present':'⛶ Present';}
 function toggleSide(){const s=document.getElementById('sidebar'),o=document.getElementById('sideOv');const open=!s.classList.contains('open');s.classList.toggle('open',open);o.classList.toggle('open',open);}
 function authGate(){document.body.innerHTML=`<div style="max-width:440px;margin:14vh auto;text-align:center;font-family:'Instrument Sans',sans-serif;color:#3b4b4a;padding:0 20px"><h2 style="font-family:'DM Serif Display',serif;font-weight:400;font-size:24px;margin-bottom:8px">Harvest Planner</h2><p style="color:#6a7a79;margin-bottom:18px">This page shows live Land Cloud data, so it needs your Land Cloud sign-in. Open Land Cloud, sign in, then reopen this page.</p><a href="/dalos-land-cloud-dev/" style="display:inline-block;background:#0d6a68;color:#fff;padding:9px 18px;border-radius:8px;text-decoration:none;font-weight:500">Open Land Cloud →</a></div>`;}
 async function boot(){
@@ -962,7 +978,7 @@ async function boot(){
     const blocks=bR.data||[],plan=pR.data||[],pd=pdR.data||[],ad=adR.data||[],tk=tkR.data||[],rv=rvR.data||[];
     const mins=plan.map(p=>p.harvest_start).filter(Boolean).sort(),maxs=plan.map(p=>p.harvest_end).filter(Boolean).sort();
     buildWeeks(mins[0]||'2025-12-01', maxs[maxs.length-1]||'2026-04-30');
-    const ti=wkIndexOfDate(ymd(new Date())); CUR=ti>=0?ti:WK.length-1; CURDAY=ti>=0?new Date().getDay():3; selWeek=CUR;
+    const ti=wkIndexOfDate(ymd(new Date())); const beforeSeason=new Date()<WKDATE[0]; CUR=ti>=0?ti:(beforeSeason?0:WK.length-1); CURDAY=ti>=0?new Date().getDay():(beforeSeason?0:3); selWeek=CUR;
     const planBy={},farmName={},varName={}; plan.forEach(p=>planBy[p.block_id]=p);
     plots=blocks.map(b=>{const code=b.farm_code+'-'+b.sector_code+'-'+b.plot_code+(b.block_add||'');const fn=(b.farms&&b.farms.name)||b.farm_code,vn=(b.varieties&&b.varieties.name)||'—';farmName[b.farm_id]=fn;varName[b.variety_id]=vn;const pl=planBy[b.id]||{};return {blockId:b.id,farmId:b.farm_id,varId:b.variety_id,f:fn,p:code,v:vn,vt:'Citrus',pnp:'P',area:Number(b.total_area_fed||0),latest:Number(pl.planned_t||0),budget:null,jul:null,nov:null,plan:Array(WK.length).fill(0),actual:Array(WK.length).fill(null)};});
     farmsList=[...new Set(plots.map(p=>p.f))];
