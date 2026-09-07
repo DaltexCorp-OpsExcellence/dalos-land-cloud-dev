@@ -113,7 +113,7 @@ tr.grandtot .stlab{position:sticky;left:0;background:#38352f;color:#fff;text-tra
 .wchip.auto{border-style:dashed;border-color:var(--amber-border);background:var(--amber-bg);color:var(--amber)}
 .daycell{text-align:center;padding:3px 2px;border-left:1px solid var(--border)}
 th.dayh{text-align:center;padding:8px 4px}
-/* keep day columns compact — size the grid to its content instead of stretching every day column to fill the card */
+/* keep day columns compact — size the grid to its content (trailing space becomes normal card padding) instead of stretching every day column */
 #logTable,#trkTable{width:auto}
 #logTable .daycell,#trkTable .daycell,#logTable th.dayh,#trkTable th.dayh{width:46px}
 .modebanner{display:flex;align-items:center;gap:10px;border-radius:8px;padding:9px 14px;margin-bottom:10px;font-size:13px;font-weight:600;border:1px solid;border-left-width:4px}
@@ -695,7 +695,7 @@ function renderLog(){
     `<span><b style="color:var(--text2)">big</b> = ${m==='plan'?'planned tonnes you\'re setting':'harvest tonnes you\'re logging'} · <b style="color:var(--text2)">small</b> = ${m==='plan'?'actual harvest, for reference':'the plan, for reference'} · <b style="color:var(--text2)">all values in tonnes (t)</b></span>`;
   let head=`<tr>
     <th class="frozen f0">Farm</th><th class="frozen f1">Plot</th><th class="frozen f2">Var.</th>
-    <th class="num hidecol">Area</th><th class="num hidecol">Yield</th><th class="num hidecol">Planned</th><th class="hidecol">Harvest window</th>`
+    <th class="num hidecol">Area</th><th class="num hidecol">Yield</th><th class="num hidecol">Planned</th><th class="hidecol wincol">Harvest window</th>`
     +days.map(d=>`<th class="dayh ${today?'todayh':''}" style="border-left:1px solid var(--border)">${today?'Today · ':''}${d.wd}<br>${d.d}</th>`).join('')
     +`<th class="num">${wkLbl}</th><th class="num">${varLbl}</th></tr>`;
   const groups=logGroups();
@@ -740,7 +740,7 @@ function renderLog(){
         <td class="num hidecol">${areaCell}</td>
         <td class="num hidecol">${yldCell}</td>
         <td class="num hidecol"><span class="plancell" id="pl_${i}">${Math.round(plannedNow(i))}</span></td>
-        <td class="hidecol">${wchip}</td>
+        <td class="hidecol wincol">${wchip}</td>
         ${cells}
         <td class="num" id="wp_${i}">${wkTot}</td>
         <td class="num">${m==='plan'?'':varCell}</td>
