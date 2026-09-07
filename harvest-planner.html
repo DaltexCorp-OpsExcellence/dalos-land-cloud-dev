@@ -531,6 +531,7 @@ function dateOf(w,d){const x=new Date(WKDATE[w]);x.setDate(x.getDate()+d);return
 
 // per-plot editable overrides
 const planStore={}, actStore={}, planDayStore={}, winStore={}; // area/yield ; actual ; day-plan override ; harvest window
+const planBaseTs={}; // block_id -> hp_plan.updated_at at load, for optimistic-concurrency checks on save
 function getAY(pi){return planStore[pi]||{area:plots[pi].area,yield:plots[pi].yield};}
 function plannedNow(pi){const a=getAY(pi);return a.area*a.yield;}
 // harvest window: {start,peak,end,shape} — total comes from area×yield
@@ -957,24 +958,32 @@ function applyCopyLast(){
   const b=document.getElementById('dirtyBadge'); if(b){b.textContent=`${n} plot${n!==1?'s':''} seeded from last season — review & Save`;b.style.display='';setTimeout(updateDirtyBadge,2400);}
 }
 async function saveAll(){
-  const rowsPlan=[],rowsDay=[],rowsAct=[],delAct=[];
+  const plan=[],plan_day=[],actual_day=[],actual_del=[];
   dirty.forEach(k=>{
     if(k.indexOf('plan-total|')===0){const i=+k.split('|')[1];const ay=getAY(i),w=winStore[i]||winOf(i);
-      rowsPlan.push({block_id:plots[i].blockId,season_id:SEASON.id,bearing_area_fed:ay.area,plan_yield_t_fed:ay.yield,harvest_start:dateOf(w.start,0),harvest_peak:dateOf(w.peak,0),harvest_end:dateOf(w.end,6),harvest_shape:w.shape});
+      plan.push({block_id:plots[i].blockId,area:ay.area,yield:ay.yield,start:dateOf(w.start,0),peak:dateOf(w.peak,0),end:dateOf(w.end,6),shape:w.shape,base_updated_at:planBaseTs[plots[i].blockId]||null});
     } else {const q=k.split('|'),i=+q[0],w=+q[1],d=+q[2],mode=q[3];
-      if(mode==='plan'){const v=planDayStore[i+'|'+w+'|'+d];if(v!=null)rowsDay.push({block_id:plots[i].blockId,season_id:SEASON.id,plan_date:dateOf(w,d),planned_t:v,source:'manual'});}
-      else {const v=actStore[i+'|'+w+'|'+d];if(v!=null&&!isNaN(v))rowsAct.push({block_id:plots[i].blockId,season_id:SEASON.id,harvest_date:dateOf(w,d),seq:1,actual_t:v});else delAct.push({block_id:plots[i].blockId,date:dateOf(w,d)});}
+      if(mode==='plan'){const v=planDayStore[i+'|'+w+'|'+d];if(v!=null)plan_day.push({block_id:plots[i].blockId,plan_date:dateOf(w,d),planned_t:v,source:'manual'});}
+      else {const v=actStore[i+'|'+w+'|'+d];if(v!=null&&!isNaN(v))actual_day.push({block_id:plots[i].blockId,harvest_date:dateOf(w,d),seq:1,actual_t:v});else actual_del.push({block_id:plots[i].blockId,harvest_date:dateOf(w,d)});}
     }});
+  const b=document.getElementById('dirtyBadge');
   try{
-    if(rowsPlan.length)await SB.from('hp_plan').upsert(rowsPlan,{onConflict:'block_id,season_id'});
-    if(rowsDay.length)await SB.from('hp_plan_day').upsert(rowsDay,{onConflict:'block_id,season_id,plan_date'});
-    if(rowsAct.length)await SB.from('hp_actual_day').upsert(rowsAct,{onConflict:'block_id,season_id,harvest_date,seq'});
-    for(const del of delAct){await SB.from('hp_actual_day').delete().eq('block_id',del.block_id).eq('season_id',SEASON.id).eq('harvest_date',del.date);}
+    const {data,error}=await SB.rpc('hp_save_plan',{p_payload:{season_id:SEASON.id,plan,plan_day,actual_day,actual_del}});
+    if(error)throw error;
+    if(data&&data.conflict){
+      const codes=(data.blocks||[]).map(x=>{const p=plots.find(pp=>pp.blockId===x.block_id);return p?p.p:x.block_id;});
+      alert('Someone else saved these plot'+(codes.length>1?'s':'')+' since you opened the planner:\n\n'+codes.join(', ')+'\n\nReload to get their changes, then re-apply yours. (Your other edits were NOT saved to avoid overwriting theirs.)');
+      if(b){b.textContent='Save blocked — conflict';b.style.display='';}
+      return;
+    }
+    if(!data||!data.ok)throw new Error((data&&data.error)||'unknown error');
+    // refresh base timestamps so the next save in this session doesn't self-conflict
+    const ts=data.updated_at||{}; Object.keys(ts).forEach(bid=>{planBaseTs[bid]=ts[bid];});
     dirty.clear();document.querySelectorAll('.daycell.dirty').forEach(td=>td.classList.remove('dirty'));
-    const b=document.getElementById('dirtyBadge');if(b){b.textContent='Saved ✓';b.style.display='';setTimeout(updateDirtyBadge,1600);}
-  }catch(err){alert('Save failed: '+((err&&err.message)||err));}
+    if(b){const s=data.saved||{};b.textContent='Saved ✓'+(s.events?(' · '+s.events+' change'+(s.events>1?'s':'')+' logged'):'');b.style.display='';setTimeout(updateDirtyBadge,1800);}
+  }catch(err){alert('Save failed: '+((err&&err.message)||err));if(b){b.textContent='Save failed';b.style.display='';}}
 }
-async function truckCellEdit(el){trucksEdited();try{const q=el.id.split('_'),gi=+q[1],fi=+q[2],di=+q[3];const g=truckGroups()[gi];if(!g)return;const row=g.rows[fi];if(!row)return;const plot=plots.find(p=>p.v===row.v&&p.f===row.f);if(!plot)return;const val=el.value===''?0:parseInt(el.value)||0;await SB.from('hp_truck').upsert({product_id:'citrus',season_id:SEASON.id,farm_id:plot.farmId,variety_id:plot.varId,plan_date:dateOf(selWeek,di),trucks:val},{onConflict:'product_id,season_id,farm_id,variety_id,plan_date'});}catch(err){}}
+async function truckCellEdit(el){trucksEdited();try{const q=el.id.split('_'),gi=+q[1],fi=+q[2],di=+q[3];const g=truckGroups()[gi];if(!g)return;const row=g.rows[fi];if(!row)return;const plot=plots.find(p=>p.v===row.v&&p.f===row.f);if(!plot)return;const val=el.value===''?0:parseInt(el.value)||0;const {error}=await SB.from('hp_truck').upsert({product_id:'citrus',season_id:SEASON.id,farm_id:plot.farmId,variety_id:plot.varId,plan_date:dateOf(selWeek,di),trucks:val},{onConflict:'product_id,season_id,farm_id,variety_id,plan_date'});if(error)throw error;el.style.borderColor='';el.title='';}catch(err){el.style.borderColor='var(--red,#b03030)';el.title='Not saved: '+((err&&err.message)||err);console.warn('truck save failed',err);}}
 async function captureSnapshot(){const name=prompt('Name this snapshot:', 'Weekly — '+labelOf(new Date()));if(!name)return;try{const {data:r,error}=await SB.from('hp_revision').insert({product_id:'citrus',season_id:SEASON.id,name:name,kind:'weekly',note:'Captured from Harvest Planner'}).select().single();if(error)throw error;const lines=plots.map((pt,i)=>{const w=winStore[i]||winOf(i),ay=getAY(i);return {revision_id:r.id,block_id:pt.blockId,bearing_area_fed:ay.area,plan_yield_t_fed:ay.yield,planned_t:Math.round(plannedNow(i)),harvest_start:dateOf(w.start,0),harvest_peak:dateOf(w.peak,0),harvest_end:dateOf(w.end,6),harvest_shape:w.shape};});await SB.from('hp_revision_line').insert(lines);revs.unshift({id:r.id,t:name,d:new Date().toLocaleDateString('en-GB'),who:'you',in:'HP',locked:false,note:'Captured from Harvest Planner',diff:[]});renderRevList();alert('Snapshot “'+name+'” captured.');}catch(err){alert('Snapshot failed: '+((err&&err.message)||err));}}
 
 // ---------- SEASON OVERVIEW page (everything derived from the SAME daily model as the grid) ----------
@@ -1254,7 +1263,7 @@ async function boot(){
     const planBy={},farmName={},varName={}; plan.forEach(p=>planBy[p.block_id]=p);
     plots=blocks.map(b=>{const code=b.farm_code+'-'+b.sector_code+'-'+b.plot_code+(b.block_add||'');const fn=(b.farms&&b.farms.name)||b.farm_code,vn=(b.varieties&&b.varieties.name)||'—';farmName[b.farm_id]=fn;varName[b.variety_id]=vn;const pl=planBy[b.id]||{};return {blockId:b.id,farmId:b.farm_id,varId:b.variety_id,f:fn,p:code,v:vn,vt:'Citrus',pnp:'P',area:Number(b.total_area_fed||0),latest:Number(pl.planned_t||0),budget:null,jul:null,nov:null,plan:Array(WK.length).fill(0),actual:Array(WK.length).fill(null)};});
     farmsList=[...new Set(plots.map(p=>p.f))];
-    const idx={}; plots.forEach((pt,i)=>{idx[pt.blockId]=i;const pl=planBy[pt.blockId];if(pl){planStore[i]={area:Number(pl.bearing_area_fed||pt.area||0),yield:Number(pl.plan_yield_t_fed||0)};let ws=wkIndexOfDate(pl.harvest_start),we=wkIndexOfDate(pl.harvest_end),wp=wkIndexOfDate(pl.harvest_peak);if(ws<0)ws=0;if(we<0)we=WK.length-1;if(wp<ws||wp>we)wp=Math.round((ws+we)/2);winStore[i]={start:ws,peak:wp,end:we,shape:pl.harvest_shape||'bell'};}else{planStore[i]={area:pt.area,yield:0};}});
+    const idx={}; plots.forEach((pt,i)=>{idx[pt.blockId]=i;const pl=planBy[pt.blockId];if(pl){planStore[i]={area:Number(pl.bearing_area_fed||pt.area||0),yield:Number(pl.plan_yield_t_fed||0)};if(pl.updated_at)planBaseTs[pt.blockId]=pl.updated_at;let ws=wkIndexOfDate(pl.harvest_start),we=wkIndexOfDate(pl.harvest_end),wp=wkIndexOfDate(pl.harvest_peak);if(ws<0)ws=0;if(we<0)we=WK.length-1;if(wp<ws||wp>we)wp=Math.round((ws+we)/2);winStore[i]={start:ws,peak:wp,end:we,shape:pl.harvest_shape||'bell'};}else{planStore[i]={area:pt.area,yield:0};}});
     pd.forEach(r=>{const i=idx[r.block_id];if(i==null)return;const w=wkIndexOfDate(r.plan_date),d=dowOf(r.plan_date);if(w>=0)planDayStore[i+'|'+w+'|'+d]=Number(r.planned_t);});
     ad.forEach(r=>{const i=idx[r.block_id];if(i==null)return;const w=wkIndexOfDate(r.harvest_date),d=dowOf(r.harvest_date);if(w>=0)actStore[i+'|'+w+'|'+d]=Number(r.actual_t);});
     tk.forEach(r=>{const w=wkIndexOfDate(r.plan_date),d=dowOf(r.plan_date),f=farmName[r.farm_id],v=varName[r.variety_id];if(w>=0&&f&&v)truckLog[v+'|'+f+'|'+w+'|'+d]=r.trucks;});
