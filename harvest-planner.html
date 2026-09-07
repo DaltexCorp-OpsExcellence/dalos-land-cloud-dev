@@ -1423,18 +1423,19 @@ function renderStartBanner(){
   if(seasonHasPlan){ b.innerHTML=''; return; }
   const nm=SEASON?SEASON.name:'this season';
   b.innerHTML = canWrite
-    ? `<div class="modebanner plan" style="margin-bottom:12px"><span class="tag">Empty</span><span><b>${nm}</b> hasn't been started yet — no plan grid exists. Start it to create a blank plan for every citrus plot (bearing areas filled in; yields &amp; windows left blank for you to set).</span><button class="btn btn-primary btn-sm" style="margin-left:auto" onclick="startSeason()">Start ${nm}</button></div>`
+    ? `<div class="modebanner plan" style="margin-bottom:12px"><span class="tag">Empty</span><span><b>${nm}</b> hasn't been started for <b>${(PRODUCT_LABEL[product]||product)}</b> yet — no plan grid exists. Start it to create a blank plan for every ${(PRODUCT_LABEL[product]||product).toLowerCase()} plot (bearing areas filled in; yields &amp; windows left blank for you to set).</span><button class="btn btn-primary btn-sm" style="margin-left:auto" onclick="startSeason()">Start ${(PRODUCT_LABEL[product]||product)} ${nm}</button></div>`
     : `<div class="modebanner harv" style="margin-bottom:12px"><span class="tag">Empty</span><span><b>${nm}</b> hasn't been started yet. Ask an agronomy admin to start this season's plan.</span></div>`;
 }
 async function startSeason(){
   if(!SEASON)return;
-  const ok=await uiConfirm('Start '+SEASON.name+'?','This creates a blank plan for every citrus plot in '+SEASON.name+' — bearing areas are filled from Land Cloud; yields and harvest windows are left blank for the team to set. It won\'t touch any other season.','Start season');
+  const pl=(PRODUCT_LABEL[product]||product);
+  const ok=await uiConfirm('Start '+pl+' '+SEASON.name+'?','This creates a blank plan for every '+pl.toLowerCase()+' plot in '+SEASON.name+' — bearing areas are filled from Land Cloud; yields and harvest windows are left blank for the team to set. It won\'t touch any other crop or season.','Start season');
   if(!ok)return;
   try{
     const {data,error}=await SB.rpc('hp_start_season',{p_season_id:SEASON.id,p_product:product});
     if(error)throw error;
     if(data&&data.ok===false){ uiToast(data.error==='not_authorized'?'Only agronomy admins can start a season.':'Could not start: '+data.error,'err'); return; }
-    uiToast(SEASON.name+' started — '+((data&&data.created)||0)+' plots.');
+    uiToast(pl+' '+SEASON.name+' started — '+((data&&data.created)||0)+' plots.');
     await loadSeason(SEASON);
   }catch(err){ uiToast('Could not start season: '+((err&&err.message)||err),'err'); }
 }
