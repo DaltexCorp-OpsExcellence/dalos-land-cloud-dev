@@ -352,7 +352,7 @@ body.present .diff-row{font-size:15px}
         <div class="wkstep"><div class="nav" onclick="stepWeek(-1)">‹</div><div class="lbl" id="wkLbl"></div><div class="nav" onclick="stepWeek(1)">›</div></div>
         <div class="grpby"><span class="gl">Group by</span><div class="seg"><b class="active" id="gbVar" onclick="setGroup('variety')">Variety</b><b id="gbFarm" onclick="setGroup('farm')">Farm</b></div></div>
         <div class="spacer"></div>
-        <button class="btn btn-sec btn-sm" onclick="alert('Concept: opens the plan revision history for this plot.')">History</button>
+        <button class="btn btn-sec btn-sm" id="bulkBtn" onclick="openBulk()">⚡ Bulk set variety</button>
         <span class="dirtybadge" id="dirtyBadge" style="display:none"></span>
         <button class="btn btn-primary btn-sm" onclick="saveAll()">Save changes</button>
       </div>
@@ -443,6 +443,39 @@ body.present .diff-row{font-size:15px}
       <div class="hint" style="margin:10px 0 0">The tool draws the curve from these four inputs; you can still hand-edit any week's days afterward. Total comes from Area × Yield.</div>
     </div>
     <div class="mf"><button class="btn btn-sec" onclick="closeWin()">Cancel</button><button class="btn btn-primary" onclick="applyWin()">Apply window</button></div>
+  </div>
+</div>
+
+<!-- Bulk variety setter modal -->
+<div class="mscrim" id="bulkScrim" onclick="if(event.target===this)closeBulk()">
+  <div class="modal">
+    <div class="mh"><span class="x" onclick="closeBulk()">✕</span><h2>Bulk set a variety</h2><div class="s">Set the yield and harvest window once — it applies to every plot of that variety in one go.</div></div>
+    <div class="mb">
+      <div class="wrow">
+        <div class="wf"><label>Variety</label><select id="bkVar" onchange="bulkVarChanged()"></select></div>
+        <div class="wf"><label>Farm scope</label><select id="bkFarm" onchange="bulkPrev()"></select></div>
+      </div>
+      <div class="wrow">
+        <div class="wf"><label>Yield · t/fed</label><input id="bkYield" type="number" min="0" step="0.5" placeholder="keep current" oninput="bulkPrev()"></div>
+        <div class="wf"><label>Start week</label><select id="bkStart" onchange="bulkPrev()"></select></div>
+        <div class="wf"><label>Peak week</label><select id="bkPeak" onchange="bulkPrev()"></select></div>
+        <div class="wf"><label>End week</label><select id="bkEnd" onchange="bulkPrev()"></select></div>
+      </div>
+      <div class="wf" style="margin-bottom:6px"><label>Curve shape</label>
+        <select id="bkShape" onchange="bulkPrev()" style="max-width:200px">
+          <option value="bell">Bell — peak in the middle</option>
+          <option value="early">Early — front-loaded</option>
+          <option value="late">Late — back-loaded</option>
+          <option value="flat">Flat — even across weeks</option>
+        </select></div>
+      <div class="wprev">
+        <div class="cap"><span>Combined plan · raw t per week</span><span id="bkSum"></span></div>
+        <div class="wbars" id="bkBars"></div>
+        <div class="wlabs" id="bkLabs"></div>
+      </div>
+      <div class="hint" id="bkNote" style="margin:10px 0 0"></div>
+    </div>
+    <div class="mf"><button class="btn btn-sec" onclick="closeBulk()">Cancel</button><button class="btn btn-primary" id="bkApply" onclick="applyBulk()">Apply to plots</button></div>
   </div>
 </div>
 
@@ -557,6 +590,7 @@ function renderLog(){
   if(today) selWeek=CUR; // "Today" always lives in the current week
   document.getElementById('mePlan').classList.toggle('active',m==='plan');
   document.getElementById('meHarv').classList.toggle('active',m==='harv');
+  {const bb=document.getElementById('bulkBtn'); if(bb)bb.style.display=(m==='plan')?'':'none';}
   document.getElementById('meHarv').classList.toggle('actmode',m==='harv');
   const vs=document.getElementById('viewSeg'); if(vs){vs.style.display=m==='harv'?'':'none';
     document.getElementById('vwToday').classList.toggle('active',today);document.getElementById('vwWeek').classList.toggle('active',!today);}
@@ -735,6 +769,67 @@ function winPrev(){
 function applyWin(){winStore[winPi]=readWin();
   for(let wk=0;wk<14;wk++)for(let d=0;d<7;d++)delete planDayStore[winPi+'|'+wk+'|'+d]; // let the drawn curve take over
   closeWin();renderLog();}
+
+// ---- Bulk set a whole variety (yield + window) across all its plots at once ----
+function bulkVarieties(){return [...new Set(plots.map(p=>p.v))].sort((a,b)=>a.localeCompare(b));}
+function bulkAffected(){
+  const v=document.getElementById('bkVar').value, f=document.getElementById('bkFarm').value;
+  const out=[]; plots.forEach((p,i)=>{ if(p.v===v && (f==='*'||p.f===f)) out.push(i); }); return out;
+}
+function bulkReadWin(){let w={start:+document.getElementById('bkStart').value,peak:+document.getElementById('bkPeak').value,end:+document.getElementById('bkEnd').value,shape:document.getElementById('bkShape').value};
+  if(w.end<w.start)w.end=w.start; if(w.peak<w.start)w.peak=w.start; if(w.peak>w.end)w.peak=w.end; return w;}
+function bulkWeights(w){const wts=Array(WK.length).fill(0);let tot=0;
+  for(let k=w.start;k<=w.end;k++){let wt; if(w.shape==='flat')wt=1; else if(w.shape==='early')wt=(w.end-k+1); else if(w.shape==='late')wt=(k-w.start+1); else{const sig=Math.max(0.9,(w.end-w.start)/3.2);wt=Math.exp(-((k-w.peak)**2)/(2*sig*sig));} wts[k]=wt;tot+=wt;}
+  return wts.map(x=>x/(tot||1));}
+function openBulk(){
+  const vs=bulkVarieties(); if(!vs.length){alert('No plots loaded yet.');return;}
+  document.getElementById('bkVar').innerHTML=vs.map(v=>`<option value="${v.replace(/"/g,'&quot;')}">${v}</option>`).join('');
+  const opt=(sel)=>WK.map((wk,i)=>`<option value="${i}" ${i===sel?'selected':''}>${wk}</option>`).join('');
+  // seed window from a representative plot of the first variety
+  const first=plots.findIndex(p=>p.v===vs[0]); const w=first>=0?winOf(first):{start:CUR,peak:Math.min(WK.length-1,CUR+2),end:Math.min(WK.length-1,CUR+4),shape:'bell'};
+  document.getElementById('bkStart').innerHTML=opt(w.start);
+  document.getElementById('bkPeak').innerHTML=opt(w.peak);
+  document.getElementById('bkEnd').innerHTML=opt(w.end);
+  document.getElementById('bkShape').value=w.shape;
+  document.getElementById('bkYield').value='';
+  bulkVarChanged();
+  document.getElementById('bulkScrim').classList.add('open');
+}
+function bulkVarChanged(){
+  // rebuild farm scope options for the chosen variety, and reseed the window/yield from a representative plot
+  const v=document.getElementById('bkVar').value;
+  const farms=[...new Set(plots.filter(p=>p.v===v).map(p=>p.f))].sort((a,b)=>a.localeCompare(b));
+  document.getElementById('bkFarm').innerHTML=`<option value="*">All farms (${farms.length})</option>`+farms.map(f=>`<option value="${f.replace(/"/g,'&quot;')}">${f}</option>`).join('');
+  bulkPrev();
+}
+function bulkPrev(){
+  const aff=bulkAffected(), w=bulkReadWin();
+  const yIn=document.getElementById('bkYield').value; const yOverride=yIn===''?null:(parseFloat(yIn)||0);
+  const total=aff.reduce((s,i)=>{const ay=getAY(i); const y=yOverride==null?ay.yield:yOverride; return s+ay.area*y;},0);
+  const wts=bulkWeights(w); const c=wts.map(x=>Math.round(total*x)); const mx=Math.max(...c,1);
+  document.getElementById('bkBars').innerHTML=c.map((val,i)=>{const cls=i===w.peak?'pk':(val===0?'out':'');return `<div class="wb ${cls}" style="height:${Math.max(2,val/mx*66)}px" title="${WK[i]}: ${val} t"></div>`;}).join('');
+  document.getElementById('bkLabs').innerHTML=WK.map((wk,i)=>`<span>${(i%2===0)?wk.split(' ')[0]:''}</span>`).join('');
+  document.getElementById('bkSum').textContent=Math.round(total).toLocaleString()+' t · '+(w.end-w.start+1)+' wks';
+  const note=yOverride==null?`Window only — each plot keeps its current yield. <b>${aff.length}</b> plot${aff.length!==1?'s':''} will be updated.`
+    :`Sets yield to <b>${yOverride} t/fed</b> and the window on <b>${aff.length}</b> plot${aff.length!==1?'s':''}, combining to <b>${Math.round(total).toLocaleString()} t</b>.`;
+  document.getElementById('bkNote').innerHTML=note+' Existing hand-typed day cells for these plots are cleared so the drawn curve takes over.';
+  const btn=document.getElementById('bkApply'); btn.disabled=!aff.length; btn.style.opacity=aff.length?'':'0.5';
+}
+function applyBulk(){
+  const aff=bulkAffected(), w=bulkReadWin();
+  if(!aff.length){closeBulk();return;}
+  const yIn=document.getElementById('bkYield').value; const yOverride=yIn===''?null:(parseFloat(yIn)||0);
+  aff.forEach(i=>{
+    const ay=getAY(i);
+    if(yOverride!=null)planStore[i]={area:ay.area,yield:yOverride};
+    winStore[i]={start:w.start,peak:w.peak,end:w.end,shape:w.shape};
+    for(let wk=0;wk<WK.length;wk++)for(let d=0;d<7;d++)delete planDayStore[i+'|'+wk+'|'+d];
+    dirty.add('plan-total|'+i);
+  });
+  closeBulk(); renderLog(); updateDirtyBadge();
+  const b=document.getElementById('dirtyBadge'); if(b){b.textContent=`${aff.length} plot${aff.length!==1?'s':''} set — review & Save`;b.style.display='';setTimeout(updateDirtyBadge,2200);}
+}
+function closeBulk(){document.getElementById('bulkScrim').classList.remove('open');}
 async function saveAll(){
   const rowsPlan=[],rowsDay=[],rowsAct=[],delAct=[];
   dirty.forEach(k=>{
