@@ -204,7 +204,8 @@ th.frozen{z-index:3}
 .wbars .wb.pk{background:var(--accent)}
 .wbars .wb.out{background:var(--bg3)}
 .wlabs{display:flex;gap:3px;margin-top:4px}
-.wlabs span{flex:1;text-align:center;font-size:8px;color:var(--text3);overflow:hidden}
+.wlabs span{flex:1;text-align:center;font-size:9px;color:var(--text3);white-space:nowrap}
+.wlabs span.pk{color:var(--accent);font-weight:600}
 /* revisions */
 .rev{display:grid;grid-template-columns:196px 1fr;gap:0}
 .rev-list{border-right:1px solid var(--border);padding-right:2px}
@@ -849,14 +850,28 @@ function openWin(pi){winPi=pi;const p=plots[pi],w=winOf(pi);
 }
 function closeWin(){document.getElementById('winScrim').classList.remove('open');}
 function readWin(){return{start:+document.getElementById('winStart').value,peak:+document.getElementById('winPeak').value,end:+document.getElementById('winEnd').value,shape:document.getElementById('winShape').value};}
+// Focused curve preview: only show the harvest window ± a couple of weeks, with real week-date labels
+// (the full 53-week year is far too wide to label; this zooms to where the curve actually lives).
+function curvePreview(barsId, labsId, c, w){
+  const off=2;
+  const lo=Math.max(0, w.start-off), hi=Math.min(WK.length-1, w.end+off);
+  const idxs=[]; for(let i=lo;i<=hi;i++) idxs.push(i);
+  const mx=Math.max(...c,1);
+  document.getElementById(barsId).innerHTML=idxs.map(i=>{
+    const v=c[i], cls=i===w.peak?'pk':(v===0?'out':'');
+    return `<div class="wb ${cls}" style="height:${Math.max(2,v/mx*66)}px" title="${WK[i]}: ${v} t"></div>`;
+  }).join('');
+  const n=idxs.length, step=Math.max(1,Math.round((n-1)/5));
+  document.getElementById(labsId).innerHTML=idxs.map((i,k)=>{
+    const show = k===0 || k===n-1 || i===w.peak || (k%step===0);
+    return `<span class="${i===w.peak?'pk':''}">${show?WK[i]:''}</span>`;
+  }).join('');
+}
 function winPrev(){
   let w=readWin(); if(w.end<w.start)w.end=w.start; if(w.peak<w.start)w.peak=w.start; if(w.peak>w.end)w.peak=w.end;
   winStore[winPi]=w; // temp for preview
-  const c=genCurve(winPi), mx=Math.max(...c,1);
-  document.getElementById('winBars').innerHTML=c.map((v,i)=>{
-    const cls=i===w.peak?'pk':(v===0?'out':'');
-    return `<div class="wb ${cls}" style="height:${Math.max(2,v/mx*66)}px" title="${WK[i]}: ${v} t"></div>`;}).join('');
-  document.getElementById('winLabs').innerHTML=WK.map((wk,i)=>`<span>${(i%2===0)?wk.split(' ')[0]:''}</span>`).join('');
+  const c=genCurve(winPi);
+  curvePreview('winBars','winLabs',c,w);
   document.getElementById('winSum').textContent=sum(c).toLocaleString()+' t · '+(w.end-w.start+1)+' wks';
 }
 function applyWin(){winStore[winPi]=readWin();
@@ -899,9 +914,8 @@ function bulkPrev(){
   const aff=bulkAffected(), w=bulkReadWin();
   const yIn=document.getElementById('bkYield').value; const yOverride=yIn===''?null:(parseFloat(yIn)||0);
   const total=aff.reduce((s,i)=>{const ay=getAY(i); const y=yOverride==null?ay.yield:yOverride; return s+ay.area*y;},0);
-  const wts=bulkWeights(w); const c=wts.map(x=>Math.round(total*x)); const mx=Math.max(...c,1);
-  document.getElementById('bkBars').innerHTML=c.map((val,i)=>{const cls=i===w.peak?'pk':(val===0?'out':'');return `<div class="wb ${cls}" style="height:${Math.max(2,val/mx*66)}px" title="${WK[i]}: ${val} t"></div>`;}).join('');
-  document.getElementById('bkLabs').innerHTML=WK.map((wk,i)=>`<span>${(i%2===0)?wk.split(' ')[0]:''}</span>`).join('');
+  const wts=bulkWeights(w); const c=wts.map(x=>Math.round(total*x));
+  curvePreview('bkBars','bkLabs',c,w);
   document.getElementById('bkSum').textContent=Math.round(total).toLocaleString()+' t · '+(w.end-w.start+1)+' wks';
   const note=yOverride==null?`Window only — each plot keeps its current yield. <b>${aff.length}</b> plot${aff.length!==1?'s':''} will be updated.`
     :`Sets yield to <b>${yOverride} t/fed</b> and the window on <b>${aff.length}</b> plot${aff.length!==1?'s':''}, combining to <b>${Math.round(total).toLocaleString()} t</b>.`;
