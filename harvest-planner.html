@@ -1372,7 +1372,14 @@ async function boot(){
     ]);
     const blocks=bR.data||[],plan=pR.data||[],pd=pdR.data||[],ad=adR.data||[],tk=tkR.data||[],rv=rvR.data||[];
     const mins=plan.map(p=>p.harvest_start).filter(Boolean).sort(),maxs=plan.map(p=>p.harvest_end).filter(Boolean).sort();
-    buildWeeks(mins[0]||'2025-12-01', maxs[maxs.length-1]||'2026-04-30');
+    // Span a full citrus season (Nov→Jun) derived from the season name, so harvest windows can extend well past the
+    // current plan data. The season record has no date range, so we bound generously and include any plan dates outside it.
+    let y1=2025,y2=2026; const nm=(SEASON.name||'').match(/(\d{4})\s*[\/\-]\s*(\d{2,4})/);
+    if(nm){y1=+nm[1]; y2=+(nm[2].length===2?('20'+nm[2]):nm[2]);}
+    const seasonStart=y1+'-11-01', seasonEnd=y2+'-06-30';
+    const lo=[seasonStart,mins[0]].filter(Boolean).sort()[0];
+    const hi=[seasonEnd,maxs[maxs.length-1]].filter(Boolean).sort().slice(-1)[0];
+    buildWeeks(lo, hi);
     const ti=wkIndexOfDate(ymd(new Date())); const beforeSeason=new Date()<WKDATE[0]; CUR=ti>=0?ti:(beforeSeason?0:WK.length-1); CURDAY=ti>=0?new Date().getDay():(beforeSeason?0:3); selWeek=CUR;
     const planBy={},farmName={},varName={}; plan.forEach(p=>planBy[p.block_id]=p);
     plots=blocks.map(b=>{const code=b.farm_code+'-'+b.sector_code+'-'+b.plot_code+(b.block_add||'');const fn=(b.farms&&b.farms.name)||b.farm_code,vn=(b.varieties&&b.varieties.name)||'—';farmName[b.farm_id]=fn;varName[b.variety_id]=vn;const pl=planBy[b.id]||{};const aydi=(b.aydi_block_number&&String(b.aydi_block_number).trim())||code;return {blockId:b.id,farmId:b.farm_id,varId:b.variety_id,f:fn,p:code,aydi:aydi,v:vn,vt:'Citrus',pnp:'P',area:Number(b.total_area_fed||0),latest:Number(pl.planned_t||0),budget:null,jul:null,nov:null,plan:Array(WK.length).fill(0),actual:Array(WK.length).fill(null)};});
