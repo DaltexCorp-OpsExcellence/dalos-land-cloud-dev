@@ -117,6 +117,9 @@ th.dayh{text-align:center;padding:8px 4px}
 /* keep day columns compact — size the grid to its content (trailing space becomes normal card padding) instead of stretching every day column */
 #logTable,#trkTable{width:auto}
 #logTable .daycell,#trkTable .daycell,#logTable th.dayh,#trkTable th.dayh{width:46px}
+/* separator between the two weeks in the 2-week view */
+.daycell.wkstart,th.dayh.wkstart,td.num.wkstart{border-left:2px solid var(--text3)!important}
+#daySelInp{font-family:var(--font-body);font-size:12px;border:1px solid var(--border2);border-radius:var(--r);padding:5px 8px;color:var(--text);background:var(--card)}
 .modebanner{display:flex;align-items:center;gap:10px;border-radius:8px;padding:9px 14px;margin-bottom:10px;font-size:13px;font-weight:600;border:1px solid;border-left-width:4px}
 .modebanner .tag{font-size:10px;text-transform:uppercase;letter-spacing:.08em;font-weight:700;padding:2px 8px;border-radius:20px}
 .modebanner.plan{background:#eaf3f2;border-color:var(--accent2);color:#0b3f3d}
@@ -359,7 +362,8 @@ body.present .diff-row{font-size:15px}
       <div id="startBanner"></div>
       <div class="ctrl-row">
         <div class="seg" id="modeSeg"><b class="active" id="mePlan" onclick="setMode('plan')">✎ Set Plan</b><b id="meHarv" onclick="setMode('harv')">Actual Harvest</b></div>
-        <div class="seg" id="viewSeg" style="display:none"><b class="active" id="vwToday" onclick="setView('today')">Today</b><b id="vwWeek" onclick="setView('week')">Week</b></div>
+        <div class="seg" id="viewSeg" style="display:none"><b class="active" id="vwToday" onclick="setView('today')">Today</b><b id="vwDay" onclick="setView('day')">Day</b><b id="vwWeek" onclick="setView('weeks')">2 Weeks</b></div>
+        <span id="daySelWrap" style="display:none"><input type="date" id="daySelInp" onchange="pickDay(this.value)" title="Pick a day to log"></span>
         <div class="wkstep"><div class="nav" onclick="stepWeek(-1)">‹</div><div class="lbl" id="wkLbl"></div><div class="nav" onclick="stepWeek(1)">›</div></div>
         <div class="grpby"><span class="gl">Group by</span><div class="seg"><b class="active" id="gbVar" onclick="setGroup('variety')">Variety</b><b id="gbFarm" onclick="setGroup('farm')">Farm</b></div></div>
         <button class="btn btn-sec btn-sm" id="npToggle" onclick="setShowNP(!showNP)" title="Non-productive = no plan yield and no harvest (Ibrahim: if NP then no production anyway)"></button>
@@ -672,13 +676,29 @@ function logGroups(){
     if(!map[key]){map[key]={key,label,idxs:[]};gs.push(map[key]);}map[key].idxs.push(i);});
   return gs;
 }
-let todayMode=true; // Actual Harvest defaults to the single-column Today view
-let curDays=[];
-function setView(v){todayMode=(v==='today');renderLog();}
+// Actual Harvest view: 'today' (single col = today) | 'day' (single col, date-picked) | 'weeks' (2-week grid).
+// Plan mode is always the 2-week grid. Plan/Actual now shows TWO weeks with a separator between them.
+let actView='today';
+let daySel=null;   // {w,di} for the 'day' view
+let curCols=[];    // rendered day columns: [{w,di,wd,d,mon,wkStart}]
+let todayMode=true; // kept for the today-completeness counter (= actView==='today' in harv)
+function setView(v){ actView=v; if(v==='day'&&!daySel)daySel={w:CUR,di:CURDAY}; renderLog(); }
+function pickDay(dateStr){ if(!dateStr)return; const w=wkIndexOfDate(dateStr); if(w<0){uiToast('That date is outside the season.','err');return;} daySel={w,di:dowOf(dateStr)}; actView='day'; renderLog(); }
+function colOf(w,di,wkStart){ const dl=dayLabels(w)[di]; return {w:w,di:di,wd:dl.wd,d:dl.d,mon:dl.mon,wkStart:!!wkStart}; }
+function viewCols(){
+  const m=editMode;
+  if(m==='harv'&&actView==='today') return [colOf(CUR,CURDAY)];
+  if(m==='harv'&&actView==='day'){ const s=daySel||{w:CUR,di:CURDAY}; return [colOf(s.w,s.di)]; }
+  const cols=[]; for(let k=0;k<2;k++){ const w=selWeek+k; if(w>WK.length-1)break; for(let di=0;di<7;di++) cols.push(colOf(w,di,di===0&&k>0)); }
+  return cols;
+}
 function renderLog(){
   const m=editMode; // 'plan' | 'harv'
-  const today=(m==='harv'&&todayMode);
-  if(today) selWeek=CUR; // "Today" always lives in the current week
+  const single=(m==='harv'&&(actView==='today'||actView==='day'));
+  const isToday=(m==='harv'&&actView==='today');
+  if(isToday) selWeek=CUR; // "Today" always lives in the current week
+  const cols=viewCols(); curCols=cols;
+  todayMode=isToday;
   document.getElementById('mePlan').classList.toggle('active',m==='plan');
   document.getElementById('meHarv').classList.toggle('active',m==='harv');
   ['bulkBtn','pasteBtn','copyLsBtn'].forEach(id=>{const bb=document.getElementById(id); if(bb)bb.style.display=(m==='plan')?'':'none';});
@@ -686,18 +706,21 @@ function renderLog(){
   {const t=document.getElementById('npToggle'); if(t){const n=npCount(); t.textContent=showNP?('Hide non-productive ('+n+')'):('Show non-productive ('+n+')'); t.classList.toggle('on',showNP); t.style.display=n>0||showNP?'':'none';}}
   document.getElementById('meHarv').classList.toggle('actmode',m==='harv');
   const vs=document.getElementById('viewSeg'); if(vs){vs.style.display=m==='harv'?'':'none';
-    document.getElementById('vwToday').classList.toggle('active',today);document.getElementById('vwWeek').classList.toggle('active',!today);}
+    document.getElementById('vwToday').classList.toggle('active',actView==='today');
+    const vd=document.getElementById('vwDay'); if(vd)vd.classList.toggle('active',actView==='day');
+    document.getElementById('vwWeek').classList.toggle('active',actView==='weeks');}
+  {const dw=document.getElementById('daySelWrap'); if(dw){dw.style.display=(m==='harv'&&actView==='day')?'':'none'; const inp=document.getElementById('daySelInp'); if(inp&&daySel)inp.value=dateOf(daySel.w,daySel.di);}}
   document.getElementById('modeBanner').className='modebanner '+(m==='plan'?'plan':'harv');
-  document.getElementById('wkLbl').textContent='Week of '+WK[selWeek];
+  document.getElementById('wkLbl').textContent = single
+    ? (isToday?'Today · ':'')+cols[0].wd+' '+cols[0].d+' '+cols[0].mon
+    : (cols.length>7?('Weeks of '+WK[selWeek]+' – '+WK[Math.min(selWeek+1,WK.length-1)]):('Week of '+WK[selWeek]));
   document.getElementById('logHint').innerHTML=
-    m==='plan' ? '<b>Setting the plan.</b> Set the <b>Yield</b> (t/fed) — area is the bearing area from Land Cloud (read-only); season total = Area × Yield. Then click the <b>harvest-window</b> chip to set start/peak/end/shape — the tool draws the curve. Day cells can be hand-tweaked (edited cells get a green outline). Faint number = actual harvest.'
-  : today ? '<b>Logging today.</b> One column: type each plot\'s tonnes and press <b>Enter</b> (or ↓) to move to the next plot. <b>Blank = not logged yet</b>; type <b>0</b> for “no pick”. Rows = plots in window today or already logged today. Plan fields are read-only here.'
-  :         '<b>Logging harvest</b> (actual production). Type tonnes per plot-day; faint number = plan; blank = not logged; Enter/↓ moves down a column. A pick on a 0-plan day turns <b style="color:var(--violet)">purple</b> (off-plan). Future days are locked. Plan fields are read-only here.';
-  let days=dayLabels(selWeek).map((l,i)=>({wd:l.wd,d:l.d,di:i}));
-  if(today) days=[days[CURDAY]];
-  curDays=days;
-  const NCOL=7+days.length+2;
-  const wkLbl = m==='plan'?'Wk plan':'Wk harv';
+    m==='plan' ? '<b>Setting the plan.</b> Set the <b>Yield</b> (t/fed) — area is the bearing area from Land Cloud (read-only); season total = Area × Yield. Then click the <b>harvest-window</b> chip to set start/peak/end/shape — the tool draws the curve. Two weeks shown; day cells can be hand-tweaked (edited cells get a green outline). Faint number = actual harvest.'
+  : isToday ? '<b>Logging today.</b> One column: type each plot\'s tonnes and press <b>Enter</b> (or ↓) to move to the next plot. <b>Blank = not logged yet</b>; type <b>0</b> for “no pick”. Rows = plots in window today or already logged today. Plan fields are read-only here.'
+  : actView==='day' ? '<b>Logging a day.</b> Pick any date on the right; one column — type each plot\'s tonnes and press <b>Enter</b> (or ↓) for the next plot. Blank = not logged; 0 = no pick. Plan fields are read-only here.'
+  :         '<b>Logging harvest</b> (actual production) — two weeks. Type tonnes per plot-day; faint number = plan; blank = not logged; Enter/↓ moves down a column. A pick on a 0-plan day turns <b style="color:var(--violet)">purple</b> (off-plan). Future days are locked. Plan fields are read-only here.';
+  const NCOL=7+cols.length+2;
+  const wkLbl = (cols.length>7?'2-wk ':'')+(m==='plan'?'plan':'harv');
   const varLbl= m==='plan'?'':'vs plan';
   document.getElementById('cellLegend').innerHTML=
     `<span>Each day cell:</span>`+
@@ -706,40 +729,41 @@ function renderLog(){
   let head=`<tr>
     <th class="frozen f0">Farm</th><th class="frozen f1">Plot</th><th class="frozen f2">Var.</th>
     <th class="num hidecol">Area</th><th class="num hidecol">Yield</th><th class="num hidecol">Planned</th><th class="hidecol wincol">Harvest window</th>`
-    +days.map(d=>`<th class="dayh ${today?'todayh':''}" style="border-left:1px solid var(--border)">${today?'Today · ':''}${d.wd}<br>${d.d}</th>`).join('')
+    +cols.map(c=>`<th class="dayh${c.wkStart?' wkstart':''}${isToday?' todayh':''}">${isToday?'Today · ':''}${c.wd}<br>${c.d}</th>`).join('')
     +`<th class="num">${wkLbl}</th><th class="num">${varLbl}</th></tr>`;
   const groups=logGroups();
-  let body='', grand=days.map(()=>0), grandWk=0, rowsN=0, loggedN=0;
+  let body='', grand=cols.map(()=>0), grandWk=0, rowsN=0, loggedN=0;
   groups.forEach((g,gi)=>{
-    const idxs = today ? g.idxs.filter(i=>dayPlan(i,CUR,CURDAY)>0 || (getActual(i,CUR,CURDAY)||0)>0) : g.idxs;
+    const idxs = isToday ? g.idxs.filter(i=>dayPlan(i,CUR,CURDAY)>0 || (getActual(i,CUR,CURDAY)||0)>0) : g.idxs;
     if(!idxs.length) return;
     body+=`<tr class="grp"><td colspan="${NCOL}">${g.label}</td></tr>`;
-    let gsum=days.map(()=>0), gwk=0;
+    let gsum=cols.map(()=>0), gwk=0;
     idxs.forEach(i=>{
       const p=plots[i], ay=getAY(i);
-      let wkPlan=0,wkHarv=0;
-      for(let di=0;di<7;di++){wkPlan+=dayPlan(i,selWeek,di);wkHarv+=(getActual(i,selWeek,di)||0);}
-      const cells=days.map((d,c)=>{
-        const di=d.di;
-        const dp=dayPlan(i,selWeek,di), h=getActual(i,selWeek,di);
-        const val=m==='plan'?dp:(h||0); gsum[c]+=val; grand[c]+=val;
-        const isFut=(selWeek>CUR)||(selWeek===CUR&&di>CURDAY);
+      let tPlan=0,tHarv=0;
+      cols.forEach(c=>{tPlan+=dayPlan(i,c.w,c.di);tHarv+=(getActual(i,c.w,c.di)||0);});
+      const cells=cols.map((c,ci)=>{
+        const w=c.w, di=c.di;
+        const dp=dayPlan(i,w,di), h=getActual(i,w,di);
+        const val=m==='plan'?dp:(h||0); gsum[ci]+=val; grand[ci]+=val;
+        const isFut=(w>CUR)||(w===CUR&&di>CURDAY);
         let editVal, refVal, cinCls, extra='', dis='';
         if(m==='plan'){editVal=dp; refVal=(h==null?'':('<span class="tg">act</span>'+h)); cinCls='plan'; if(dp===0&&(h||0)>0)extra=' off';}
         else {editVal=(h==null?'':h); refVal=(dp?('<span class="tg">plan</span>'+dp):''); cinCls='harv'; if(dp===0&&(h||0)>0)extra=' off'; if(isFut){extra+=' fut';dis=' disabled';} else if(h==null){extra+=' unlogged';}}
-        if(dirty.has(i+'|'+selWeek+'|'+di+'|'+m))extra+=' dirty';
-        return `<td class="daycell${extra}"><input class="cin ${cinCls}" id="c_${i}_${di}" value="${editVal===0&&m==='plan'?0:editVal}"${dis} placeholder="${m==='harv'&&!isFut?'—':''}" oninput="edited(this)"><span class="dp">${refVal}</span></td>`;
+        if(dirty.has(i+'|'+w+'|'+di+'|'+m))extra+=' dirty';
+        if(c.wkStart)extra+=' wkstart';
+        return `<td class="daycell${extra}"><input class="cin ${cinCls}" id="c_${i}_${w}_${di}" value="${editVal===0&&m==='plan'?0:editVal}"${dis} placeholder="${m==='harv'&&!isFut?'—':''}" oninput="edited(this)"><span class="dp">${refVal}</span></td>`;
       }).join('');
-      if(today){rowsN++; if(getActual(i,CUR,CURDAY)!=null)loggedN++;}
+      if(isToday){rowsN++; if(getActual(i,CUR,CURDAY)!=null)loggedN++;}
       const wset=!!winStore[i], w=winOf(i);
       const wchip = m==='plan'
         ? `<span class="wchip ${wset?'':'auto'}" onclick="openWin(${i})" title="Set harvest window"><span class="wk">◷</span>${wset?`${WK[w.start]}→${WK[w.end]} · ${w.shape}`:'Auto — set window'}</span>`
         : `<span class="wchip ro" title="Plan is read-only in Actual Harvest mode"><span class="wk">◷</span>${WK[w.start]}→${WK[w.end]} · ${w.shape}</span>`;
       let wkTot, varCell='';
-      if(m==='plan'){wkTot=wkPlan;}
-      else {wkTot=wkHarv;const v=wkHarv-wkPlan,off=wkPlan===0&&wkHarv>0;
-        const vc=off?'v-off':(Math.abs(v)<Math.max(3,wkPlan*0.06)?'v-on':(v>0?'v-over':'v-under'));
-        const vt=off?`+${wkHarv} off`:(Math.abs(v)<Math.max(3,wkPlan*0.06)?'on plan':`${v>0?'+':''}${v} t`);
+      if(m==='plan'){wkTot=tPlan;}
+      else {wkTot=tHarv;const v=tHarv-tPlan,off=tPlan===0&&tHarv>0;
+        const vc=off?'v-off':(Math.abs(v)<Math.max(3,tPlan*0.06)?'v-on':(v>0?'v-over':'v-under'));
+        const vt=off?`+${tHarv} off`:(Math.abs(v)<Math.max(3,tPlan*0.06)?'on plan':`${v>0?'+':''}${v} t`);
         varCell=`<span class="varcell ${vc}" id="vr_${i}">${vt}</span>`;}
       gwk+=wkTot;
       const areaCell = `<span class="rotxt" title="Bearing area from Land Cloud (read-only)">${ay.area}</span>`; // area = farm_blocks bearing area, DB-owned
@@ -757,16 +781,18 @@ function renderLog(){
       </tr>`;
     });
     grandWk+=gwk;
-    body+=`<tr class="subtot"><td class="stlab" colspan="3">${g.key} — subtotal</td><td class="hidecol"></td><td class="hidecol"></td><td class="hidecol"></td><td class="hidecol"></td>`+gsum.map((s,c)=>`<td class="num" id="st_${gi}_${c}">${s}</td>`).join('')+`<td class="num" id="stwk_${gi}">${gwk}</td><td></td></tr>`;
+    body+=`<tr class="subtot"><td class="stlab" colspan="3">${g.key} — subtotal</td><td class="hidecol"></td><td class="hidecol"></td><td class="hidecol"></td><td class="hidecol"></td>`+gsum.map((s,c)=>`<td class="num${cols[c].wkStart?' wkstart':''}" id="st_${gi}_${c}">${s}</td>`).join('')+`<td class="num" id="stwk_${gi}">${gwk}</td><td></td></tr>`;
   });
-  body+=`<tr class="grandtot"><td class="stlab" colspan="3">All plots — total per day</td><td class="hidecol"></td><td class="hidecol"></td><td class="hidecol"></td><td class="hidecol"></td>`+grand.map((s,c)=>`<td class="num" id="gt_${c}">${s}</td>`).join('')+`<td class="num" id="gtwk">${grandWk}</td><td></td></tr>`;
+  body+=`<tr class="grandtot"><td class="stlab" colspan="3">All plots — total per day</td><td class="hidecol"></td><td class="hidecol"></td><td class="hidecol"></td><td class="hidecol"></td>`+grand.map((s,c)=>`<td class="num${cols[c].wkStart?' wkstart':''}" id="gt_${c}">${s}</td>`).join('')+`<td class="num" id="gtwk">${grandWk}</td><td></td></tr>`;
   document.getElementById('logTable').innerHTML='<thead>'+head+'</thead><tbody>'+body+'</tbody>';
   // banner (structural mode statement + today completeness)
   document.getElementById('modeBanner').innerHTML= m==='plan'
     ? `<span class="tag">Planning</span><span>Set Plan — you're editing the <b>planned</b> harvest. Actuals are shown greyed for reference and are not editable here.</span>`
-    : today
-      ? `<span class="tag">Actual Harvest</span><span>Today · ${days[0].wd} ${days[0].d} — <b><span id="todayCnt">${loggedN} of ${rowsN}</span></b> in-window plots logged. Blank = not logged · 0 = no pick. Plan fields are read-only.</span>`
-      : `<span class="tag">Actual Harvest</span><span>Actual Harvest — you're logging <b>what was actually picked</b>. Plan is shown greyed for reference and is read-only here.</span>`;
+    : isToday
+      ? `<span class="tag">Actual Harvest</span><span>Today · ${cols[0].wd} ${cols[0].d} — <b><span id="todayCnt">${loggedN} of ${rowsN}</span></b> in-window plots logged. Blank = not logged · 0 = no pick. Plan fields are read-only.</span>`
+      : actView==='day'
+        ? `<span class="tag">Actual Harvest</span><span>Logging <b>${cols[0].wd} ${cols[0].d} ${cols[0].mon}</b> — pick any date. Blank = not logged · 0 = no pick. Plan fields are read-only.</span>`
+        : `<span class="tag">Actual Harvest</span><span>Actual Harvest · two weeks — you're logging <b>what was actually picked</b>. Plan is shown greyed for reference and is read-only here.</span>`;
   updateDirtyBadge();
 }
 // recompute on edit — stores ONLY the cell that changed (per-cell dirty set); totals recomputed from the model
@@ -786,53 +812,53 @@ function edited(el){
       if(yl){ // area is read-only (DB bearing area); only yield is editable here
         planStore[i]={area: ar?(parseFloat(ar.value)||0):(getAY(i).area||plots[i].area||0), yield:parseFloat(yl.value)||0};
         const pc=document.getElementById('pl_'+i); if(pc)pc.textContent=Math.round(plannedNow(i)); dirty.add('plan-total|'+i);
-        // curve rescales for untouched days; refresh their inputs in place
-        for(let di=0;di<7;di++){const inp=document.getElementById('c_'+i+'_'+di); if(inp&&!(i+'|'+selWeek+'|'+di in planDayStore)&&m==='plan')inp.value=dayPlan(i,selWeek,di);}}
+        // curve rescales for untouched days; refresh their inputs in place across the visible columns
+        curCols.forEach(c=>{const inp=document.getElementById('c_'+i+'_'+c.w+'_'+c.di); if(inp&&!(i+'|'+c.w+'|'+c.di in planDayStore)&&m==='plan')inp.value=dayPlan(i,c.w,c.di);});}
     } else if(id.startsWith('c_')){
-      const parts=id.split('_'); const i=+parts[1], di=+parts[2]; const k=i+'|'+selWeek+'|'+di;
+      const parts=id.split('_'); const i=+parts[1], w=+parts[2], di=+parts[3]; const k=i+'|'+w+'|'+di;
       const val=el.value===''?null:parseFloat(el.value);
       if(m==='plan'){ if(val!=null&&!isNaN(val))planDayStore[k]=val; else delete planDayStore[k]; }
       else { if(val!=null&&!isNaN(val))actStore[k]=val; else actStore[k]=null; } // blank = not logged
       dirty.add(k+'|'+m); el.parentElement.classList.add('dirty');
-      const dp=dayPlan(i,selWeek,di), h=getActual(i,selWeek,di);
+      const dp=dayPlan(i,w,di), h=getActual(i,w,di);
       el.parentElement.classList.toggle('off',dp===0&&(h||0)>0);
       if(m==='harv')el.parentElement.classList.toggle('unlogged',h==null);
     }
   }
-  const days=curDays.length?curDays:WD.map((wd,i)=>({di:i}));
-  // row totals + variance (from the model, not by re-reading every input)
+  const cols=curCols.length?curCols:viewCols();
+  const cid=(i,c)=>'c_'+i+'_'+c.w+'_'+c.di;
+  // row totals + variance over the visible columns
   plots.forEach((p,i)=>{
-    if(!document.getElementById('c_'+i+'_'+days[0].di))return; // row not rendered (filtered)
-    let wkPlan=0,wkHarv=0; for(let di=0;di<7;di++){wkPlan+=dayPlan(i,selWeek,di);wkHarv+=(getActual(i,selWeek,di)||0);}
-    const wp=document.getElementById('wp_'+i); if(wp)wp.textContent=m==='plan'?wkPlan:wkHarv;
+    if(!document.getElementById(cid(i,cols[0])))return; // row not rendered (filtered)
+    let tPlan=0,tHarv=0; cols.forEach(c=>{tPlan+=dayPlan(i,c.w,c.di);tHarv+=(getActual(i,c.w,c.di)||0);});
+    const wp=document.getElementById('wp_'+i); if(wp)wp.textContent=m==='plan'?tPlan:tHarv;
     const vr=document.getElementById('vr_'+i);
-    if(vr&&m==='harv'){const v=wkHarv-wkPlan,off=wkPlan===0&&wkHarv>0;
-      const vc=off?'v-off':(Math.abs(v)<Math.max(3,wkPlan*0.06)?'v-on':(v>0?'v-over':'v-under'));
-      vr.className='varcell '+vc; vr.textContent=off?`+${wkHarv} off`:(Math.abs(v)<Math.max(3,wkPlan*0.06)?'on plan':`${v>0?'+':''}${v} t`);}
+    if(vr&&m==='harv'){const v=tHarv-tPlan,off=tPlan===0&&tHarv>0;
+      const vc=off?'v-off':(Math.abs(v)<Math.max(3,tPlan*0.06)?'v-on':(v>0?'v-over':'v-under'));
+      vr.className='varcell '+vc; vr.textContent=off?`+${tHarv} off`:(Math.abs(v)<Math.max(3,tPlan*0.06)?'on plan':`${v>0?'+':''}${v} t`);}
   });
-  // subtotals + grand
-  const groups=logGroups(); const grand=days.map(()=>0); let grandWk=0;
+  // subtotals + grand over the visible columns
+  const groups=logGroups(); const grand=cols.map(()=>0); let grandWk=0;
   groups.forEach((g,gi)=>{
-    const gsum=days.map(()=>0); let gwk=0, any=false;
-    g.idxs.forEach(i=>{ if(!document.getElementById('c_'+i+'_'+days[0].di))return; any=true;
-      days.forEach((d,c)=>{const v=m==='plan'?dayPlan(i,selWeek,d.di):(getActual(i,selWeek,d.di)||0);gsum[c]+=v;grand[c]+=v;});
-      for(let di=0;di<7;di++)gwk+= m==='plan'?dayPlan(i,selWeek,di):(getActual(i,selWeek,di)||0); });
+    const gsum=cols.map(()=>0); let gwk=0, any=false;
+    g.idxs.forEach(i=>{ if(!document.getElementById(cid(i,cols[0])))return; any=true;
+      cols.forEach((c,ci)=>{const v=m==='plan'?dayPlan(i,c.w,c.di):(getActual(i,c.w,c.di)||0);gsum[ci]+=v;grand[ci]+=v;gwk+=v;}); });
     if(!any)return; grandWk+=gwk;
-    days.forEach((d,c)=>{const cell=document.getElementById('st_'+gi+'_'+c);if(cell)cell.textContent=gsum[c];});
+    cols.forEach((c,ci)=>{const cell=document.getElementById('st_'+gi+'_'+ci);if(cell)cell.textContent=gsum[ci];});
     const w=document.getElementById('stwk_'+gi);if(w)w.textContent=gwk;
   });
-  days.forEach((d,c)=>{const cell=document.getElementById('gt_'+c);if(cell)cell.textContent=grand[c];});
+  cols.forEach((c,ci)=>{const cell=document.getElementById('gt_'+ci);if(cell)cell.textContent=grand[ci];});
   const gw=document.getElementById('gtwk');if(gw)gw.textContent=grandWk;
   // today completeness
-  if(m==='harv'&&todayMode){let rowsN=0,loggedN=0;plots.forEach((p,i)=>{if(document.getElementById('c_'+i+'_'+CURDAY)){rowsN++;if(getActual(i,CUR,CURDAY)!=null)loggedN++;}});const c=document.getElementById('todayCnt');if(c)c.textContent=`${loggedN} of ${rowsN}`;}
+  if(m==='harv'&&actView==='today'){let rowsN=0,loggedN=0;plots.forEach((p,i)=>{if(document.getElementById('c_'+i+'_'+CUR+'_'+CURDAY)){rowsN++;if(getActual(i,CUR,CURDAY)!=null)loggedN++;}});const c=document.getElementById('todayCnt');if(c)c.textContent=`${loggedN} of ${rowsN}`;}
   updateDirtyBadge();
 }
 // keyboard: Enter / ↓ = next plot in the same day column, ↑ or Shift+Enter = previous
 document.getElementById('logTable').addEventListener('keydown',e=>{
   const t=e.target; if(!t||!t.classList||!t.classList.contains('cin')||!String(t.id).startsWith('c_'))return;
   if(e.key==='Enter'||e.key==='ArrowDown'||e.key==='ArrowUp'){e.preventDefault();
-    const di=t.id.split('_')[2];
-    const col=[...document.querySelectorAll('#logTable input.cin')].filter(x=>x.id.startsWith('c_')&&x.id.split('_')[2]===di&&!x.disabled);
+    const q=t.id.split('_'); const key=q[2]+'_'+q[3];
+    const col=[...document.querySelectorAll('#logTable input.cin')].filter(x=>{const p=x.id.split('_');return x.id.startsWith('c_')&&p[2]+'_'+p[3]===key&&!x.disabled;});
     const idx=col.indexOf(t); const back=(e.key==='ArrowUp')||(e.key==='Enter'&&e.shiftKey);
     const nxt=col[idx+(back?-1:1)]; if(nxt){nxt.focus(); if(nxt.select)nxt.select();}
   }
