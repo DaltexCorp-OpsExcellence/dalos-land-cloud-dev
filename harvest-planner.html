@@ -352,6 +352,8 @@ body.present .diff-row{font-size:15px}
         <div class="wkstep"><div class="nav" onclick="stepWeek(-1)">‹</div><div class="lbl" id="wkLbl"></div><div class="nav" onclick="stepWeek(1)">›</div></div>
         <div class="grpby"><span class="gl">Group by</span><div class="seg"><b class="active" id="gbVar" onclick="setGroup('variety')">Variety</b><b id="gbFarm" onclick="setGroup('farm')">Farm</b></div></div>
         <div class="spacer"></div>
+        <button class="btn btn-sec btn-sm" id="pasteBtn" onclick="openPaste()">⎘ Paste from Excel</button>
+        <button class="btn btn-sec btn-sm" id="copyLsBtn" onclick="openCopyLast()">↧ Copy last season</button>
         <button class="btn btn-sec btn-sm" id="bulkBtn" onclick="openBulk()">⚡ Bulk set variety</button>
         <span class="dirtybadge" id="dirtyBadge" style="display:none"></span>
         <button class="btn btn-primary btn-sm" onclick="saveAll()">Save changes</button>
@@ -479,6 +481,35 @@ body.present .diff-row{font-size:15px}
   </div>
 </div>
 
+<!-- Paste from Excel modal -->
+<div class="mscrim" id="pasteScrim" onclick="if(event.target===this)closePaste()">
+  <div class="modal" style="max-width:640px">
+    <div class="mh"><span class="x" onclick="closePaste()">✕</span><h2>Paste from Excel / Sheets</h2><div class="s">Paste plot rows straight from your planning sheet — matched to plots by plot code.</div></div>
+    <div class="mb">
+      <div class="hint" style="margin:0 0 8px">Columns, tab- or comma-separated, one plot per line:<br><b>Plot code</b> · <b>Yield t/fed</b> · <span style="color:var(--text3)">Start</span> · <span style="color:var(--text3)">End</span> &nbsp;<span style="color:var(--text3)">(start/end optional — a date like <code>2026-02-01</code> or a week label like <code>1 Feb</code>). A header row is ignored.</span></div>
+      <textarea id="pasteBox" spellcheck="false" oninput="pastePrev()" placeholder="KH-09-02A&#9;15&#9;30 Nov&#9;12 Apr&#10;KH-09-03A&#9;15&#10;BD-02-01A&#9;18&#9;2026-01-04&#9;2026-04-12" style="width:100%;height:150px;font-family:var(--font-mono,'DM Mono',monospace);font-size:12px;border:1px solid var(--border2,#bcd);border-radius:8px;padding:8px;resize:vertical;box-sizing:border-box"></textarea>
+      <div id="pastePrev" class="hint" style="margin:8px 0 0"></div>
+      <div id="pasteUnmatched" style="margin:6px 0 0;font-size:11px;color:var(--red,#b03030)"></div>
+    </div>
+    <div class="mf"><button class="btn btn-sec" onclick="closePaste()">Cancel</button><button class="btn btn-primary" id="pasteApply" onclick="applyPaste()" disabled style="opacity:.5">Apply matched rows</button></div>
+  </div>
+</div>
+
+<!-- Copy last season modal -->
+<div class="mscrim" id="copyScrim" onclick="if(event.target===this)closeCopyLast()">
+  <div class="modal" style="max-width:600px">
+    <div class="mh"><span class="x" onclick="closeCopyLast()">✕</span><h2>Copy yields from last season</h2><div class="s">Seed each plot's plan yield from its actual t/fed harvested last season.</div></div>
+    <div class="mb">
+      <div class="wrow">
+        <div class="wf"><label>Source season</label><select id="clsSeason" onchange="copyLastPrev()"></select></div>
+      </div>
+      <div class="hint" id="clsNote" style="margin:8px 0 0">Loading last season's actuals…</div>
+      <div id="clsPrev" style="margin:8px 0 0;font-size:12px;max-height:180px;overflow:auto"></div>
+    </div>
+    <div class="mf"><button class="btn btn-sec" onclick="closeCopyLast()">Cancel</button><button class="btn btn-primary" id="clsApply" onclick="applyCopyLast()" disabled style="opacity:.5">Copy yields</button></div>
+  </div>
+</div>
+
 <script>
 const WD=["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
 const MON=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
@@ -590,7 +621,7 @@ function renderLog(){
   if(today) selWeek=CUR; // "Today" always lives in the current week
   document.getElementById('mePlan').classList.toggle('active',m==='plan');
   document.getElementById('meHarv').classList.toggle('active',m==='harv');
-  {const bb=document.getElementById('bulkBtn'); if(bb)bb.style.display=(m==='plan')?'':'none';}
+  ['bulkBtn','pasteBtn','copyLsBtn'].forEach(id=>{const bb=document.getElementById(id); if(bb)bb.style.display=(m==='plan')?'':'none';});
   document.getElementById('meHarv').classList.toggle('actmode',m==='harv');
   const vs=document.getElementById('viewSeg'); if(vs){vs.style.display=m==='harv'?'':'none';
     document.getElementById('vwToday').classList.toggle('active',today);document.getElementById('vwWeek').classList.toggle('active',!today);}
@@ -830,6 +861,101 @@ function applyBulk(){
   const b=document.getElementById('dirtyBadge'); if(b){b.textContent=`${aff.length} plot${aff.length!==1?'s':''} set — review & Save`;b.style.display='';setTimeout(updateDirtyBadge,2200);}
 }
 function closeBulk(){document.getElementById('bulkScrim').classList.remove('open');}
+
+// ---- Paste from Excel: match rows to plots by code, set yield (+ optional window) ----
+function normCode(s){return (s||'').toUpperCase().replace(/\s+/g,'').replace(/[–—]/g,'-');}
+function codeIndex(){const m={};plots.forEach((p,i)=>{const k=normCode(p.p);if(!(k in m))m[k]=i;});return m;}
+function weekIdxFromCell(s){s=(s||'').trim();if(!s)return null;
+  const norm=s.toLowerCase().replace(/\s+/g,'');
+  const li=WK.findIndex(w=>w.toLowerCase().replace(/\s+/g,'')===norm); if(li>=0)return li;
+  let d=new Date(s);
+  if(isNaN(d)){const m=s.match(/^(\d{1,2})\s*([A-Za-z]{3,})/);
+    if(m){const mi=MON.findIndex(x=>x.toLowerCase()===m[2].slice(0,3).toLowerCase());
+      if(mi>=0){const yr=mi>=6?WKDATE[0].getFullYear():WKDATE[WKDATE.length-1].getFullYear();d=new Date(yr,mi,+m[1]);}}}
+  if(isNaN(d))return null;
+  const sun=sundayOf(d).getTime(); const idx=WKDATE.findIndex(x=>x.getTime()===sun);
+  if(idx>=0)return idx; if(d<WKDATE[0])return 0; return WK.length-1;
+}
+function parsePaste(){
+  const raw=document.getElementById('pasteBox').value; const idxByCode=codeIndex();
+  const lines=raw.split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
+  const matched=[], unmatched=[]; let skippedHeader=false;
+  lines.forEach((ln,li)=>{
+    const cells=(ln.indexOf('\t')>=0?ln.split('\t'):ln.split(',')).map(c=>c.trim());
+    const code=normCode(cells[0]);
+    // skip a header row: first line whose 2nd cell isn't a number
+    if(li===0 && cells[1]!==undefined && cells[1]!=='' && isNaN(parseFloat(cells[1].replace(/[^0-9.\-]/g,'')))){skippedHeader=true;return;}
+    if(!code)return;
+    const i=idxByCode[code];
+    if(i===undefined){unmatched.push(cells[0]||'(blank)');return;}
+    const yv=cells[1]!==undefined&&cells[1]!==''?parseFloat(cells[1].replace(/[^0-9.\-]/g,'')):NaN;
+    const ws=weekIdxFromCell(cells[2]), we=weekIdxFromCell(cells[3]);
+    matched.push({i,yield:isNaN(yv)?null:yv,ws,we});
+  });
+  return {matched,unmatched,skippedHeader};
+}
+function openPaste(){document.getElementById('pasteBox').value='';document.getElementById('pastePrev').innerHTML='';document.getElementById('pasteUnmatched').innerHTML='';const b=document.getElementById('pasteApply');b.disabled=true;b.style.opacity='.5';document.getElementById('pasteScrim').classList.add('open');}
+function closePaste(){document.getElementById('pasteScrim').classList.remove('open');}
+function pastePrev(){
+  const {matched,unmatched,skippedHeader}=parsePaste();
+  const nY=matched.filter(m=>m.yield!=null).length, nW=matched.filter(m=>m.ws!=null&&m.we!=null).length;
+  document.getElementById('pastePrev').innerHTML=matched.length
+    ? `<b>${matched.length}</b> plot${matched.length!==1?'s':''} matched · ${nY} yield${nY!==1?'s':''}, ${nW} window${nW!==1?'s':''} to set.${skippedHeader?' <span style="color:var(--text3)">(header row skipped)</span>':''}`
+    : `<span style="color:var(--text3)">No plots matched yet — paste rows above.</span>`;
+  document.getElementById('pasteUnmatched').innerHTML=unmatched.length?`${unmatched.length} code${unmatched.length!==1?'s':''} not found: ${unmatched.slice(0,8).join(', ')}${unmatched.length>8?'…':''}`:'';
+  const b=document.getElementById('pasteApply');b.disabled=!matched.length;b.style.opacity=matched.length?'':'.5';
+}
+function applyPaste(){
+  const {matched}=parsePaste(); if(!matched.length){closePaste();return;}
+  matched.forEach(m=>{
+    const ay=getAY(m.i);
+    if(m.yield!=null)planStore[m.i]={area:ay.area,yield:m.yield};
+    if(m.ws!=null&&m.we!=null){let s=m.ws,e=m.we;if(e<s)e=s;const peak=Math.round((s+e)/2);const cur=winStore[m.i]||winOf(m.i);winStore[m.i]={start:s,peak,end:e,shape:cur.shape||'bell'};
+      for(let wk=0;wk<WK.length;wk++)for(let d=0;d<7;d++)delete planDayStore[m.i+'|'+wk+'|'+d];}
+    dirty.add('plan-total|'+m.i);
+  });
+  closePaste(); renderLog(); updateDirtyBadge();
+  const b=document.getElementById('dirtyBadge'); if(b){b.textContent=`${matched.length} plot${matched.length!==1?'s':''} pasted — review & Save`;b.style.display='';setTimeout(updateDirtyBadge,2200);}
+}
+
+// ---- Copy last season: seed plan yield from a prior season's actual t/fed ----
+const clsCache={}; let clsMap=null;
+async function openCopyLast(){
+  const sel=document.getElementById('clsSeason'); sel.innerHTML='<option>Loading…</option>';
+  document.getElementById('clsPrev').innerHTML=''; document.getElementById('clsNote').textContent='Loading last season’s actuals…';
+  const b=document.getElementById('clsApply'); b.disabled=true; b.style.opacity='.5';
+  document.getElementById('copyScrim').classList.add('open');
+  try{
+    const {data,error}=await SB.rpc('hp_prior_year_list'); if(error)throw error;
+    const years=data||[];
+    if(!years.length){sel.innerHTML='<option>—</option>';document.getElementById('clsNote').textContent='No prior-season actuals found for citrus.';return;}
+    sel.innerHTML=years.map(y=>`<option value="${y.season_year}">${y.season_year} · ${y.blocks} plots · ${Number(y.total_t).toLocaleString()} t</option>`).join('');
+    await copyLastPrev();
+  }catch(err){document.getElementById('clsNote').textContent='Could not load prior seasons: '+((err&&err.message)||err);}
+}
+function closeCopyLast(){document.getElementById('copyScrim').classList.remove('open');}
+async function copyLastPrev(){
+  const yr=+document.getElementById('clsSeason').value; if(!yr)return;
+  const note=document.getElementById('clsNote'); note.textContent='Loading '+yr+' yields…';
+  try{
+    if(!clsCache[yr]){const {data,error}=await SB.rpc('hp_prior_yields',{p_season_year:yr});if(error)throw error;
+      const m={};(data||[]).forEach(r=>{if(r.yield!=null)m[r.block_id]=Number(r.yield);});clsCache[yr]=m;}
+    clsMap=clsCache[yr];
+  }catch(err){note.textContent='Could not load '+yr+' yields: '+((err&&err.message)||err);clsMap=null;return;}
+  const hist=plots.map((p,i)=>({i,p,y:clsMap[p.blockId]})).filter(x=>x.y!=null);
+  const avg=hist.length?(hist.reduce((s,x)=>s+x.y,0)/hist.length):0;
+  note.innerHTML=`<b>${hist.length}</b> of ${plots.length} plots have ${yr} history · avg <b>${avg.toFixed(1)}</b> t/fed. Plots without history keep their current yield. Area is unchanged — only the yield rate is copied.`;
+  const sample=hist.slice(0,6).map(x=>{const cur=getAY(x.i).yield;return `<div style="display:flex;justify-content:space-between;padding:2px 0;border-bottom:1px solid var(--border,#e2e2e2)"><span style="font-family:var(--font-mono,monospace)">${x.p.p}</span><span style="color:var(--text3)">${x.p.v}</span><span><span class="was" style="color:var(--text3)">${cur}</span> → <b>${x.y}</b> t/fed</span></div>`;}).join('');
+  document.getElementById('clsPrev').innerHTML=sample+(hist.length>6?`<div style="color:var(--text3);padding:4px 0">…and ${hist.length-6} more</div>`:'');
+  const b=document.getElementById('clsApply'); b.disabled=!hist.length; b.style.opacity=hist.length?'':'.5';
+}
+function applyCopyLast(){
+  if(!clsMap)return; let n=0;
+  plots.forEach((p,i)=>{const y=clsMap[p.blockId]; if(y==null)return; // no history → keep current yield
+    const ay=getAY(i); planStore[i]={area:ay.area,yield:y}; dirty.add('plan-total|'+i); n++;});
+  closeCopyLast(); renderLog(); updateDirtyBadge();
+  const b=document.getElementById('dirtyBadge'); if(b){b.textContent=`${n} plot${n!==1?'s':''} seeded from last season — review & Save`;b.style.display='';setTimeout(updateDirtyBadge,2400);}
+}
 async function saveAll(){
   const rowsPlan=[],rowsDay=[],rowsAct=[],delAct=[];
   dirty.forEach(k=>{
