@@ -50,8 +50,8 @@ body{font-family:var(--font-body);background:var(--bg);color:var(--text);font-si
 .pageswitch{display:inline-flex;border:1px solid var(--border2);border-radius:var(--r);overflow:hidden}
 .pageswitch b{padding:6px 16px;font-size:13px;font-weight:500;cursor:pointer;color:var(--text2);background:var(--card)}
 .pageswitch b.active{background:var(--accent);color:#fff}
-.season-sel{display:flex;align-items:center;gap:7px;background:var(--card);border:1px solid var(--border2);border-radius:var(--r);padding:5px 11px;font-size:12px;cursor:pointer}
-.season-sel .tag{font-size:9px;background:var(--green-bg);color:var(--green);border:1px solid var(--green-border);border-radius:20px;padding:1px 6px;font-weight:600}
+.season-sel{display:inline-block;background:var(--card);color:var(--text);border:1px solid var(--border2);border-radius:var(--r);padding:5px 26px 5px 11px;font-size:12px;font-weight:500;font-family:var(--font-body);cursor:pointer;appearance:none;-webkit-appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='7' viewBox='0 0 10 7'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23666' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 9px center}
+.season-sel:focus{outline:none;border-color:var(--accent)}
 .crop-bar{display:flex;align-items:center;gap:8px;padding:9px 18px;background:var(--bg);border-bottom:1px solid var(--border);overflow-x:auto;flex-shrink:0;position:sticky;top:52px;z-index:15}
 .crop-bar .cb-lbl{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--text3);font-weight:600;flex-shrink:0;margin-right:2px}
 .crop-chip{display:inline-flex;align-items:center;gap:7px;padding:6px 13px;border-radius:20px;border:1px solid var(--border2);background:#fff;color:var(--text2);font-size:12.5px;font-weight:500;cursor:pointer;white-space:nowrap;flex-shrink:0;transition:.12s}
@@ -344,7 +344,7 @@ body.present .diff-row{font-size:15px}
       <h1>Harvest Planner</h1>
       <button id="present" class="btn btn-sec btn-sm" onclick="togglePresent()" style="margin-right:8px">⛶ Present</button><div class="pageswitch"><b class="active" id="swLog" onclick="setPage('log')">Harvest Plan / Actual</b><b id="swTrk" onclick="setPage('trk')">Trucks</b><b id="swOv" onclick="setPage('ov')">Season Overview</b><b id="swRev" onclick="setPage('rev')">Revisions</b></div>
       <div class="spacer"></div>
-      <div class="season-sel">2025/26 <span class="tag">ACTIVE</span> ▾</div>
+      <select class="season-sel" id="seasonSel" title="Switch season" onchange="pickSeason(this.value)"></select>
     </div>
 
     <div class="crop-bar">
@@ -542,7 +542,7 @@ const WD=["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
 const MON=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 let WK=[], WKDATE=[], CUR=0, CURDAY=3;
 let selWeek=0, page='log', editMode='plan';
-let plots=[], farmsList=[], SEASON=null;
+let plots=[], farmsList=[], SEASON=null, SEASONS=[];
 function sum(a){return a.reduce((x,y)=>x+(y||0),0)}
 const jit=[1.03,0.96,1.08,0.94,1.05,0.98,1.12,0.9,1.06,0.97];
 const patterns=[[0.16,0.15,0.14,0.15,0.14,0.13,0.13],[0.10,0.18,0.16,0.14,0.16,0.12,0.14],[0.18,0.10,0.16,0.16,0.12,0.16,0.12],[0.14,0.16,0.14,0.14,0.14,0.14,0.14],[0.12,0.16,0.14,0.16,0.14,0.14,0.14]];
@@ -1376,8 +1376,34 @@ async function boot(){
   let session=null; try{session=(await SB.auth.getSession()).data.session;}catch(e){}
   if(!session){authGate();return;}
   try{
-    const ssr=await SB.from('seasons').select('id,name').eq('active',true).limit(1); SEASON=(ssr.data||[])[0];
-    if(!SEASON){document.body.insertAdjacentHTML('afterbegin','<div style=\'padding:14px;font-family:sans-serif\'>No active season set in Land Cloud.</div>');return;}
+    const ssr=await SB.from('seasons').select('id,name,active').order('name'); SEASONS=ssr.data||[];
+    SEASON=SEASONS.find(s=>s.active)||SEASONS[SEASONS.length-1];
+    if(!SEASON){document.body.insertAdjacentHTML('afterbegin','<div style=\'padding:14px;font-family:sans-serif\'>No season set in Land Cloud.</div>');return;}
+    buildSeasonPicker();
+    await loadSeason(SEASON);
+  }catch(err){document.body.insertAdjacentHTML('afterbegin','<div style=\'position:fixed;top:0;left:0;right:0;z-index:9999;background:#faeaea;color:#7a2020;padding:8px 14px;font-family:sans-serif;font-size:13px\'>Live-data load error: '+((err&&err.message)||err)+' — refresh if you just signed in; your account may lack Land Cloud read access.</div>');}
+}
+function buildSeasonPicker(){
+  const sel=document.getElementById('seasonSel'); if(!sel)return;
+  sel.innerHTML=SEASONS.map(s=>`<option value="${s.id}"${SEASON&&s.id===SEASON.id?' selected':''}>${s.name}${s.active?' · Active':''}</option>`).join('');
+}
+function clearSeasonStores(){
+  [planStore,actStore,planDayStore,winStore,planBaseTs,reviewStore,truckLog].forEach(o=>Object.keys(o).forEach(k=>delete o[k]));
+  dirty.clear();
+}
+async function pickSeason(id){
+  if(!SEASON||id===SEASON.id)return;
+  if(dirty.size){const ok=await uiConfirm('Switch season?','You have '+dirty.size+' unsaved change'+(dirty.size>1?'s':'')+' in '+SEASON.name+'. Switching seasons will discard them.','Switch');
+    if(!ok){document.getElementById('seasonSel').value=SEASON.id;return;}}
+  const s=SEASONS.find(x=>x.id===id);
+  if(!s){document.getElementById('seasonSel').value=(SEASON&&SEASON.id)||'';return;}
+  try{ await loadSeason(s); uiToast('Now viewing '+s.name+(s.active?' (active)':'')); }
+  catch(err){ uiToast('Could not load '+s.name+': '+((err&&err.message)||err),'err'); }
+}
+async function loadSeason(season){
+  SEASON=season;
+  clearSeasonStores();
+  {
     const [bR,pR,pdR,adR,tkR,rvR]=await Promise.all([
       SB.from('farm_blocks').select('id,farm_code,sector_code,plot_code,block_add,aydi_block_number,total_area_fed,variety_id,farm_id,varieties(name),farms(name)').eq('product_id','citrus').eq('lifecycle','bearing').not('variety_id','is',null).not('farm_id','is',null),
       SB.from('hp_plan').select('*').eq('season_id',SEASON.id),
@@ -1406,9 +1432,11 @@ async function boot(){
     ad.forEach(r=>{const i=idx[r.block_id];if(i==null)return;const w=wkIndexOfDate(r.harvest_date),d=dowOf(r.harvest_date);if(w>=0){actStore[i+'|'+w+'|'+d]=Number(r.actual_t);if(r.review_status)reviewStore[i+'|'+w+'|'+d]=r.review_status;}});
     tk.forEach(r=>{const w=wkIndexOfDate(r.plan_date),d=dowOf(r.plan_date),f=farmName[r.farm_id],v=varName[r.variety_id];if(w>=0&&f&&v)truckLog[v+'|'+f+'|'+w+'|'+d]=r.trucks;});
     revs = rv.length?rv.map(r=>({id:r.id,t:r.name,d:new Date(r.captured_at).toLocaleDateString('en-GB'),who:'—',in:'HP',locked:r.is_locked,note:r.note||'',diff:[]})):[{id:null,t:'No snapshots yet',d:'',who:'—',in:'HP',locked:false,note:'Use “Capture snapshot” to start the history.',diff:[]}];
-    try{const sp=document.querySelector('.season-sel');if(sp&&sp.childNodes[0])sp.childNodes[0].textContent=SEASON.name+' ';}catch(e){}
-    renderLog();
-  }catch(err){document.body.insertAdjacentHTML('afterbegin','<div style=\'position:fixed;top:0;left:0;right:0;z-index:9999;background:#faeaea;color:#7a2020;padding:8px 14px;font-family:sans-serif;font-size:13px\'>Live-data load error: '+((err&&err.message)||err)+' — refresh if you just signed in; your account may lack Land Cloud read access.</div>');}
+  }
+  buildSeasonPicker();
+  renderLog();
+  if(page==='ov')renderOv(); else if(page==='trk')renderTrucks(); else if(page==='rev')renderRevList();
+  updateDirtyBadge();
 }
 boot();
 </script>
