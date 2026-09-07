@@ -1372,11 +1372,12 @@ async function boot(){
     ]);
     const blocks=bR.data||[],plan=pR.data||[],pd=pdR.data||[],ad=adR.data||[],tk=tkR.data||[],rv=rvR.data||[];
     const mins=plan.map(p=>p.harvest_start).filter(Boolean).sort(),maxs=plan.map(p=>p.harvest_end).filter(Boolean).sort();
-    // Span a full citrus season (Nov→Jun) derived from the season name, so harvest windows can extend well past the
-    // current plan data. The season record has no date range, so we bound generously and include any plan dates outside it.
+    // Span the full agricultural year of the season (Jul→Jun) derived from the season name, so harvest windows are
+    // never capped by the current plan data. The season record has no date range, so we bound to the whole year
+    // and still include any plan dates outside it.
     let y1=2025,y2=2026; const nm=(SEASON.name||'').match(/(\d{4})\s*[\/\-]\s*(\d{2,4})/);
     if(nm){y1=+nm[1]; y2=+(nm[2].length===2?('20'+nm[2]):nm[2]);}
-    const seasonStart=y1+'-11-01', seasonEnd=y2+'-06-30';
+    const seasonStart=y1+'-07-01', seasonEnd=y2+'-06-30';
     const lo=[seasonStart,mins[0]].filter(Boolean).sort()[0];
     const hi=[seasonEnd,maxs[maxs.length-1]].filter(Boolean).sort().slice(-1)[0];
     buildWeeks(lo, hi);
