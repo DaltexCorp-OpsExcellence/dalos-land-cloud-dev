@@ -259,19 +259,41 @@ th.frozen{z-index:3}
   .mobnav a.active{color:#fff}
 }
 
-body.present .cin{width:60px;font-size:17px;padding:6px 5px}
-body.present th{font-size:13px}
-body.present td{font-size:15px}
-body.present .daycell .dp{display:none}
-body.present .varcell,body.present .pill{font-size:14px}
-body.present .kpi .val{font-size:34px}
-body.present .kpi .lab,body.present .kpi .sub{font-size:13px}
-body.present .cal .hcell{width:60px;height:42px;font-size:13px}
-body.present .cal .hcell small{font-size:11px}
-body.present tr.subtot td,body.present tr.subtot .stlab,body.present tr.grandtot td{font-size:14px}
-body.present .trk .t{font-size:13px}
-body.present .hint,body.present .celllegend,body.present .modebanner{font-size:14px}
+/* PRESENT / projection mode — clean, large, read-only, full-bleed */
+body.present{background:#f4f6f6}
+body.present .sidebar,body.present .crop-bar,body.present .hint,body.present .celllegend{display:none}
+body.present .topbar{height:auto;padding:12px 26px;position:static}
+body.present .topbar h1{font-size:23px}
 body.present #present{background:var(--accent);color:#fff}
+body.present #modeSeg,body.present #viewSeg,body.present .grpby,body.present #dirtyBadge,body.present [onclick*="saveAll"],body.present [onclick*="History"]{display:none}
+body.present .ctrl-row{margin-bottom:6px}
+body.present .page{padding:22px 30px 70px;max-width:1600px;margin:0 auto}
+/* editable cells become clean read-only numbers */
+body.present .cin{border:none;background:transparent;font-size:19px;font-weight:600;width:auto;min-width:32px;text-align:right;color:var(--text);pointer-events:none;box-shadow:none}
+body.present .daycell .dp,body.present .wchip .wk{display:none}
+body.present .wchip{border:none;background:transparent;font-size:13px;color:var(--text3)}
+body.present th{font-size:14px;padding:11px 12px}
+body.present td{font-size:16px;padding:10px 12px}
+body.present .plot{font-size:13px}
+body.present .varcell,body.present .pill{font-size:15px;padding:3px 11px}
+body.present tr.grp td{font-size:14px}
+body.present tr.subtot td,body.present tr.subtot .stlab,body.present tr.grandtot td{font-size:17px}
+body.present .trk .t{font-size:14px}.body.present .trk .n{font-size:20px}
+body.present .modebanner{font-size:16px;padding:14px 20px;margin-bottom:14px}
+/* KPI + overview scaled up */
+body.present .kpi-grid{gap:14px;margin-bottom:20px}
+body.present .kpi .val{font-size:42px}
+body.present .kpi .lab{font-size:14px}
+body.present .kpi .sub{font-size:15px}
+body.present .card{padding:18px 20px}
+body.present .sec-title{font-size:14px;margin:28px 0 14px}
+body.present .wkhead{font-size:16px;margin-bottom:14px}
+body.present .cal-wrap{padding:16px 18px}
+body.present .cal .hcell{width:66px;height:48px;font-size:14px}
+body.present .cal .hcell small{font-size:11px}
+body.present .cal th,body.present .cal td.rl{font-size:13px}
+body.present .rev-item .rt{font-size:15px}
+body.present .diff-row{font-size:15px}
 </style>
 
 <div class="app">
@@ -948,17 +970,38 @@ function renderRevList(){
     </div>`).join('');
   pickRev(0);
 }
-function pickRev(i){
+const revLineCache={};
+function md2(x){return x?labelOf(new Date(x+'T00:00:00')):'—';}
+async function pickRev(i){
   document.querySelectorAll('.rev-item').forEach((e,j)=>e.classList.toggle('active',j===i));
-  const r=revs[i];
-  const rows=r.diff.map(d=>{
-    const vals=d.txt?`<span class="now">${d.txt}</span>`:`<span class="was">${d.was.toLocaleString()}</span><span class="arw">→</span><span class="now">${d.now.toLocaleString()} t</span> ${chgChip(d.was,d.now)}`;
-    return `<div class="diff-row"><span class="diff-plot">${d.p}</span><span class="diff-vals">${vals}</span></div>`;
-  }).join('');
-  document.getElementById('revDetail').innerHTML=`<div class="note-box"><span>“</span><div><b>${r.who}</b> — ${r.note}</div></div><div style="font-size:11px;color:var(--text3);margin-bottom:6px">CHANGES IN THIS REVISION</div>${rows}`;
+  const r=revs[i], det=document.getElementById('revDetail');
+  const head=`<div class="note-box"><span>“</span><div><b>${r.who||''}</b> — ${r.note||''}</div></div>`;
+  if(!r.id){det.innerHTML=head+`<div style="color:var(--text3);font-size:12px">No snapshot yet — use “Capture snapshot” to start the history.</div>`;return;}
+  det.innerHTML=head+`<div style="color:var(--text3);font-size:12px">Loading changes…</div>`;
+  try{
+    let lines=revLineCache[r.id];
+    if(!lines){const {data}=await SB.from('hp_revision_line').select('block_id,planned_t,harvest_start,harvest_peak,harvest_end,harvest_shape').eq('revision_id',r.id);lines=data||[];revLineCache[r.id]=lines;}
+    const byBlock={}; lines.forEach(l=>byBlock[l.block_id]=l);
+    const rows=[]; let net=0;
+    plots.forEach((pt,idx)=>{const l=byBlock[pt.blockId]; if(!l)return;
+      const nowT=Math.round(plannedNow(idx)), wasT=Math.round(Number(l.planned_t||0));
+      const w=winStore[idx]||winOf(idx);
+      const nowWin=dateOf(w.start,0)+'|'+dateOf(w.end,6)+'|'+w.shape;
+      const wasWin=(l.harvest_start||'')+'|'+(l.harvest_end||'')+'|'+(l.harvest_shape||'');
+      if(nowT!==wasT||nowWin!==wasWin){net+=nowT-wasT;rows.push({p:pt.p,v:pt.v,wasT,nowT,tChg:nowT!==wasT,wChg:nowWin!==wasWin,l,w});}
+    });
+    if(!rows.length){det.innerHTML=head+`<div style="color:var(--text3);font-size:12px">No changes — the current plan matches this snapshot.</div>`;return;}
+    rows.sort((a,b)=>Math.abs(b.nowT-b.wasT)-Math.abs(a.nowT-a.wasT));
+    const body=rows.slice(0,80).map(d=>{
+      const t=d.tChg?`<span class="was">${d.wasT.toLocaleString()}</span><span class="arw">→</span><span class="now">${d.nowT.toLocaleString()} t</span> ${chgChip(d.wasT,d.nowT)}`:`<span class="now">${d.nowT.toLocaleString()} t</span>`;
+      const win=d.wChg?` <span style="font-size:11px;color:var(--amber)">window ${md2(d.l.harvest_start)}→${md2(d.l.harvest_end)} ⇒ ${md2(dateOf(d.w.start,0))}→${md2(dateOf(d.w.end,6))}${(d.l.harvest_shape||'')!==d.w.shape?' · '+(d.l.harvest_shape||'?')+'→'+d.w.shape:''}</span>`:'';
+      return `<div class="diff-row"><span class="diff-plot">${d.p} · ${d.v}</span><span class="diff-vals">${t}${win}</span></div>`;
+    }).join('');
+    det.innerHTML=head+`<div style="font-size:11px;color:var(--text3);margin-bottom:6px">CHANGES SINCE THIS SNAPSHOT · ${rows.length} plot${rows.length>1?'s':''} · net ${net>=0?'+':''}${net} t</div>${body}${rows.length>80?`<div style="color:var(--text3);font-size:11px;padding:6px 10px">${rows.length-80} more…</div>`:''}`;
+  }catch(err){det.innerHTML=head+`<div style="color:var(--red);font-size:12px">Diff load error: ${(err&&err.message)||err}</div>`;}
 }
 /* live: no seed */
-function togglePresent(b){document.body.classList.toggle('present');b.textContent=document.body.classList.contains('present')?'✕ Exit Present':'⛶ Present';}
+function togglePresent(b){const on=!document.body.classList.contains('present');document.body.classList.toggle('present',on);b.textContent=on?'✕ Exit Present':'⛶ Present';if(on){if(page!=='ov')setPage('ov');try{if(document.documentElement.requestFullscreen)document.documentElement.requestFullscreen();}catch(e){}}else{try{if(document.fullscreenElement)document.exitFullscreen();}catch(e){}}}
 function toggleSide(){const s=document.getElementById('sidebar'),o=document.getElementById('sideOv');const open=!s.classList.contains('open');s.classList.toggle('open',open);o.classList.toggle('open',open);}
 function authGate(){document.body.innerHTML=`<div style="max-width:440px;margin:14vh auto;text-align:center;font-family:'Instrument Sans',sans-serif;color:#3b4b4a;padding:0 20px"><h2 style="font-family:'DM Serif Display',serif;font-weight:400;font-size:24px;margin-bottom:8px">Harvest Planner</h2><p style="color:#6a7a79;margin-bottom:18px">This page shows live Land Cloud data, so it needs your Land Cloud sign-in. Open Land Cloud, sign in, then reopen this page.</p><a href="/dalos-land-cloud-dev/" style="display:inline-block;background:#0d6a68;color:#fff;padding:9px 18px;border-radius:8px;text-decoration:none;font-weight:500">Open Land Cloud →</a></div>`;}
 async function boot(){
