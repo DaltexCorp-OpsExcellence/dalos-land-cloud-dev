@@ -270,7 +270,8 @@ body.present .sidebar,body.present .crop-bar,body.present .hint,body.present .ce
 body.present .topbar{height:auto;padding:12px 26px;position:static}
 body.present .topbar h1{font-size:23px}
 body.present #present{background:var(--accent);color:#fff}
-body.present #modeSeg,body.present #viewSeg,body.present .grpby,body.present #dirtyBadge,body.present [onclick*="saveAll"],body.present [onclick*="History"]{display:none}
+body.present #viewSeg,body.present .grpby,body.present #dirtyBadge,body.present #discardBtn,body.present #pasteBtn,body.present #copyLsBtn,body.present #bulkBtn,body.present #npToggle,body.present [onclick*="saveAll"],body.present [onclick*="History"]{display:none!important}
+body.present #modeSeg{display:inline-flex}
 body.present .ctrl-row{margin-bottom:6px}
 body.present .page{padding:22px 30px 70px;max-width:1600px;margin:0 auto}
 /* editable cells become clean read-only numbers */
@@ -1346,7 +1347,7 @@ async function pickRev(i){
 function setPresent(on){
   document.body.classList.toggle('present',on);
   const b=document.getElementById('present'); if(b)b.textContent=on?'✕ Exit Present':'⛶ Present';
-  if(on){ if(page!=='ov')setPage('ov'); try{if(document.documentElement.requestFullscreen)document.documentElement.requestFullscreen();}catch(e){} }
+  if(on){ try{if(document.documentElement.requestFullscreen)document.documentElement.requestFullscreen();}catch(e){} }
   else { try{if(document.fullscreenElement&&document.exitFullscreen)document.exitFullscreen();}catch(e){} }
 }
 function togglePresent(){ setPresent(!document.body.classList.contains('present')); }
