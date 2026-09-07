@@ -300,7 +300,9 @@ body.present .hidecol{display:none}
 body.present .logwrap{max-height:none;overflow:visible}
 body.present .daycell{padding:6px 3px}
 body.present .cin{font-size:18px;min-width:26px}
-body.present #logTable{min-width:0;width:100%}
+/* present: size to content so all 7 days fit with no horizontal scroll (don't stretch days to fill the wall) */
+body.present #logTable,body.present #trkTable{width:auto}
+body.present #logTable .daycell,body.present #logTable th.dayh,body.present #trkTable .daycell,body.present #trkTable th.dayh{width:64px}
 body.present .f0{width:84px;min-width:84px;max-width:84px}
 body.present .f1{left:84px}
 body.present .f2{left:auto;position:static}
