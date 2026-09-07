@@ -698,9 +698,11 @@ function viewCols(){
 }
 function renderLog(){
   const m=editMode; // 'plan' | 'harv'
-  const single=(m==='harv'&&(actView==='today'||actView==='day'));
-  const isToday=(m==='harv'&&actView==='today');
+  const present=document.body.classList.contains('present');
+  const single=(!present&&m==='harv'&&(actView==='today'||actView==='day')); // present ignores single-day views → always 2 weeks
+  const isToday=(!present&&m==='harv'&&actView==='today');
   if(isToday) selWeek=CUR; // "Today" always lives in the current week
+  if(present) selWeek=Math.max(0,Math.min(selWeek,WK.length-2)); // keep both weeks on-calendar for the wall
   const cols=viewCols(); curCols=cols;
   todayMode=isToday;
   document.getElementById('mePlan').classList.toggle('active',m==='plan');
