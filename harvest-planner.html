@@ -292,6 +292,14 @@ body.present .cal-wrap{padding:16px 18px}
 body.present .cal .hcell{width:66px;height:48px;font-size:14px}
 body.present .cal .hcell small{font-size:11px}
 body.present .cal th,body.present .cal td.rl{font-size:13px}
+body.present .hidecol{display:none}
+body.present .logwrap{max-height:none;overflow:visible}
+body.present .daycell{padding:6px 3px}
+body.present .cin{font-size:18px;min-width:26px}
+body.present #logTable{min-width:0;width:100%}
+body.present .f0{width:84px;min-width:84px;max-width:84px}
+body.present .f1{left:84px}
+body.present .f2{left:auto;position:static}
 body.present .rev-item .rt{font-size:15px}
 body.present .diff-row{font-size:15px}
 </style>
@@ -570,7 +578,7 @@ function renderLog(){
     `<span><b style="color:var(--text2)">big</b> = ${m==='plan'?'planned tonnes you\'re setting':'harvest tonnes you\'re logging'} · <b style="color:var(--text2)">small</b> = ${m==='plan'?'actual harvest, for reference':'the plan, for reference'} · <b style="color:var(--text2)">all values in tonnes (t)</b></span>`;
   let head=`<tr>
     <th class="frozen f0">Farm</th><th class="frozen f1">Plot</th><th class="frozen f2">Var.</th>
-    <th class="num">Area</th><th class="num">Yield</th><th class="num">Planned</th><th>Harvest window</th>`
+    <th class="num hidecol">Area</th><th class="num hidecol">Yield</th><th class="num hidecol">Planned</th><th class="hidecol">Harvest window</th>`
     +days.map(d=>`<th class="dayh ${today?'todayh':''}" style="border-left:1px solid var(--border)">${today?'Today · ':''}${d.wd}<br>${d.d}</th>`).join('')
     +`<th class="num">${wkLbl}</th><th class="num">${varLbl}</th></tr>`;
   const groups=logGroups();
@@ -612,19 +620,19 @@ function renderLog(){
       body+=`<tr>
         <td class="frozen f0" title="${p.f}">${p.f}</td><td class="frozen f1"><span class="plot">${p.p}</span>${groupBy==='farm'?`<div class="vsub" title="${p.v}">${p.v}</div>`:''}</td>
         <td class="frozen f2"><span class="pill p-${p.pnp}">${p.pnp}</span></td>
-        <td class="num">${areaCell}</td>
-        <td class="num">${yldCell}</td>
-        <td class="num"><span class="plancell" id="pl_${i}">${Math.round(plannedNow(i))}</span></td>
-        <td>${wchip}</td>
+        <td class="num hidecol">${areaCell}</td>
+        <td class="num hidecol">${yldCell}</td>
+        <td class="num hidecol"><span class="plancell" id="pl_${i}">${Math.round(plannedNow(i))}</span></td>
+        <td class="hidecol">${wchip}</td>
         ${cells}
         <td class="num" id="wp_${i}">${wkTot}</td>
         <td class="num">${m==='plan'?'':varCell}</td>
       </tr>`;
     });
     grandWk+=gwk;
-    body+=`<tr class="subtot"><td class="stlab" colspan="7">${g.key} — subtotal</td>`+gsum.map((s,c)=>`<td class="num" id="st_${gi}_${c}">${s}</td>`).join('')+`<td class="num" id="stwk_${gi}">${gwk}</td><td></td></tr>`;
+    body+=`<tr class="subtot"><td class="stlab" colspan="3">${g.key} — subtotal</td><td class="hidecol"></td><td class="hidecol"></td><td class="hidecol"></td><td class="hidecol"></td>`+gsum.map((s,c)=>`<td class="num" id="st_${gi}_${c}">${s}</td>`).join('')+`<td class="num" id="stwk_${gi}">${gwk}</td><td></td></tr>`;
   });
-  body+=`<tr class="grandtot"><td class="stlab" colspan="7">All plots — total per day</td>`+grand.map((s,c)=>`<td class="num" id="gt_${c}">${s}</td>`).join('')+`<td class="num" id="gtwk">${grandWk}</td><td></td></tr>`;
+  body+=`<tr class="grandtot"><td class="stlab" colspan="3">All plots — total per day</td><td class="hidecol"></td><td class="hidecol"></td><td class="hidecol"></td><td class="hidecol"></td>`+grand.map((s,c)=>`<td class="num" id="gt_${c}">${s}</td>`).join('')+`<td class="num" id="gtwk">${grandWk}</td><td></td></tr>`;
   document.getElementById('logTable').innerHTML=head+body;
   // banner (structural mode statement + today completeness)
   document.getElementById('modeBanner').innerHTML= m==='plan'
