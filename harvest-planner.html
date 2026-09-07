@@ -1451,7 +1451,6 @@ async function loadSeason(season){
       SB.from('hp_revision').select('*').eq('season_id',SEASON.id).order('captured_at',{ascending:false})
     ]);
     const blocks=bR.data||[],plan=pR.data||[],pd=pdR.data||[],ad=adR.data||[],tk=tkR.data||[],rv=rvR.data||[];
-    seasonHasPlan = plan.length>0;
     const mins=plan.map(p=>p.harvest_start).filter(Boolean).sort(),maxs=plan.map(p=>p.harvest_end).filter(Boolean).sort();
     // Span the full agricultural year of the season (Jul→Jun) derived from the season name, so harvest windows are
     // never capped by the current plan data. The season record has no date range, so we bound to the whole year
@@ -1466,6 +1465,7 @@ async function loadSeason(season){
     const planBy={},farmName={},varName={}; plan.forEach(p=>planBy[p.block_id]=p);
     plots=blocks.map(b=>{const code=b.farm_code+'-'+b.sector_code+'-'+b.plot_code+(b.block_add||'');const fn=(b.farms&&b.farms.name)||b.farm_code,vn=(b.varieties&&b.varieties.name)||'—';farmName[b.farm_id]=fn;varName[b.variety_id]=vn;const pl=planBy[b.id]||{};const aydi=(b.aydi_block_number&&String(b.aydi_block_number).trim())||code;return {blockId:b.id,farmId:b.farm_id,varId:b.variety_id,f:fn,p:code,aydi:aydi,v:vn,vt:PRODUCT_LABEL[product]||product,pnp:'P',area:Number(b.total_area_fed||0),latest:Number(pl.planned_t||0),budget:null,jul:null,nov:null,plan:Array(WK.length).fill(0),actual:Array(WK.length).fill(null)};});
     farmsList=[...new Set(plots.map(p=>p.f))];
+    seasonHasPlan = plots.some(pt=>planBy[pt.blockId]); // product-specific: does THIS crop have a plan this season
     const idx={}; plots.forEach((pt,i)=>{idx[pt.blockId]=i;const pl=planBy[pt.blockId];if(pl){planStore[i]={area:Number(pl.bearing_area_fed||pt.area||0),yield:pl.plan_yield_t_fed==null?null:Number(pl.plan_yield_t_fed)};if(pl.updated_at)planBaseTs[pt.blockId]=pl.updated_at;
       if(pl.harvest_start){let ws=wkIndexOfDate(pl.harvest_start),we=wkIndexOfDate(pl.harvest_end),wp=wkIndexOfDate(pl.harvest_peak);if(ws<0)ws=0;if(we<0)we=WK.length-1;if(wp<ws||wp>we)wp=Math.round((ws+we)/2);winStore[i]={start:ws,peak:wp,end:we,shape:pl.harvest_shape||'bell'};}
       }else{planStore[i]={area:pt.area,yield:0};}});
