@@ -158,6 +158,10 @@ th.todayh{color:var(--amber);font-weight:700}
 .f0{left:0;width:72px;min-width:72px;max-width:72px}
 .f1{left:72px;width:82px;min-width:82px;max-width:82px}
 .f2{left:154px;width:64px;min-width:64px;max-width:64px}
+/* Season Overview by-plot: freeze Farm/Plot/Variety so the variety stays visible on horizontal scroll (wider than the log grid's f2 pill column) */
+#ovPlot .of0{left:0;width:96px;min-width:96px;max-width:96px;white-space:nowrap}
+#ovPlot .of1{left:96px;width:66px;min-width:66px;max-width:66px;white-space:nowrap}
+#ovPlot .of2{left:162px;width:120px;min-width:120px;max-width:120px;white-space:nowrap}
 .vsub{font-size:10px;color:var(--text3);font-weight:400;margin-top:2px;max-width:78px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 th.frozen{z-index:3}
 .varcell{font-family:var(--font-mono);font-size:11px;padding:1px 7px;border-radius:20px;border:1px solid;font-weight:500}
@@ -1234,11 +1238,11 @@ function renderOv(){
   vb+=`<tr class="tot"><td class="frozen f0">Total</td><td class="num">${plots.length}</td><td class="num">${T.planWkTD.toLocaleString()}</td><td class="num">${T.actWk.toLocaleString()}</td><td class="num">${dchip(T.actWk-T.planWkTD,T.planWkTD)}</td><td class="num">${T.next2.toLocaleString()}</td><td class="num">${T.latest.toLocaleString()}</td><td class="num">${T.harv.toLocaleString()}</td><td class="num">${T.latest?Math.round(T.harv/T.latest*100):0}%</td><td class="num">${dchip(T.actTD-T.planTD,T.planTD)}</td><td class="num">${T.rem.toLocaleString()}</td><td></td></tr>`;
   document.getElementById('ovVar').innerHTML=vh+vb;
   // plot table — from the same model
-  let ph=`<tr><th class="frozen f0">Farm</th><th>Plot</th><th>Variety</th><th>P/NP</th><th class="num">Area</th><th class="num">Season plan</th><th class="num">Harvested</th><th class="num">% done</th><th class="num">Remaining</th></tr>`;
+  let ph=`<tr><th class="frozen of0">Farm</th><th class="frozen of1">Plot</th><th class="frozen of2">Variety</th><th>P/NP</th><th class="num">Area</th><th class="num">Season plan</th><th class="num">Harvested</th><th class="num">% done</th><th class="num">Remaining</th></tr>`;
   const psorted=plots.map((p,i)=>({p,i})).sort((a,b)=>a.p.v.localeCompare(b.p.v)||a.p.f.localeCompare(b.p.f));
   let pb=psorted.map(({p,i})=>{const latest=sum(WK.map((_,w)=>sum(WD.map((__,d)=>dayPlan(i,w,d))))); const harv=sumTo(getActual,i,CUR,CURDAY);
     return `<tr>
-    <td class="frozen f0">${p.f}</td><td><span class="plot" title="${p.p}">${p.aydi}</span></td><td><span class="vname">${p.v}</span></td>
+    <td class="frozen of0" title="${p.f}">${p.f}</td><td class="frozen of1"><span class="plot" title="${p.p}">${p.aydi}</span></td><td class="frozen of2"><span class="vname" title="${p.v}">${p.v}</span></td>
     <td><span class="pill p-${p.pnp}">${p.pnp}</span></td>
     <td class="num">${p.area.toFixed(1)}</td>
     <td class="num"><b style="color:var(--text)">${latest.toLocaleString()}</b></td>
