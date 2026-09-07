@@ -80,14 +80,14 @@ body{font-family:var(--font-body);background:var(--bg);color:var(--text);font-si
 .table-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:var(--r2);background:var(--card)}
 .logwrap{overflow:auto;max-height:68vh}
 table{border-collapse:collapse;width:100%}
-th{font-size:10px;text-transform:uppercase;letter-spacing:.04em;color:var(--text3);text-align:left;padding:9px 10px;border-bottom:2px solid var(--border2);white-space:nowrap;font-weight:600;background:var(--card);position:sticky;top:0;z-index:2}
+th{font-size:10px;text-transform:uppercase;letter-spacing:.04em;color:var(--text3);text-align:center;padding:9px 10px;border-bottom:2px solid var(--border2);white-space:nowrap;font-weight:600;background:var(--card);position:sticky;top:0;z-index:2}
 td{font-size:13px;color:var(--text2);padding:6px 10px;border-bottom:1px solid var(--border);white-space:nowrap}
 tr:last-child td{border-bottom:none}
 .num{font-family:var(--font-mono);font-size:12px;text-align:right;font-variant-numeric:tabular-nums}
-th.num{text-align:right}
+th.num{text-align:center}
 .plot{font-family:var(--font-mono);font-size:11px;background:var(--bg2);border-radius:4px;padding:1px 6px;color:var(--text)}
 .vname{font-weight:600;color:var(--text)}
-.grp td{z-index:1;background:var(--bg2);font-weight:600;color:var(--text);font-size:11px;text-transform:uppercase;letter-spacing:.05em;position:sticky;left:0}
+.grp td{z-index:2;background:var(--bg2);font-weight:600;color:var(--text);font-size:11px;text-transform:uppercase;letter-spacing:.05em;position:sticky;left:0;top:43px}
 tr.subtot td{background:#edeae4;font-weight:600;font-size:11px;color:#4a4840;padding:3px 10px}
 tr.subtot .num{text-align:right}
 tr.subtot .stlab{position:sticky;left:0;background:#edeae4;text-transform:uppercase;letter-spacing:.04em;font-size:10px;color:#5a564a}
@@ -99,7 +99,7 @@ tr.grandtot .stlab{position:sticky;left:0;background:#38352f;color:#fff;text-tra
 .p-P{background:var(--green-bg);color:var(--green);border-color:var(--green-border)}
 .p-NP{background:var(--bg2);color:var(--text3);border-color:var(--border2)}
 /* editable cells — persistent affordance so touch users see what's editable */
-.cin{width:52px;background:var(--card);border:1px solid var(--border);border-bottom-width:2px;border-radius:5px;padding:4px 5px;font-family:var(--font-mono);font-size:12px;text-align:center;color:var(--text);font-variant-numeric:tabular-nums}
+.cin{width:40px;background:var(--card);border:1px solid var(--border);border-bottom-width:2px;border-radius:5px;padding:4px 3px;font-family:var(--font-mono);font-size:12px;text-align:center;color:var(--text);font-variant-numeric:tabular-nums}
 .cin:focus{outline:none;border-color:var(--accent);background:#fff}
 .cin.plan{border-bottom-color:var(--accent2);background:#eaf3f2}
 .cin.harv{border-bottom-color:var(--amber);background:#fdfaf3}
@@ -111,8 +111,11 @@ tr.grandtot .stlab{position:sticky;left:0;background:#38352f;color:#fff;text-tra
 .wchip:hover{background:var(--bg2);border-color:var(--accent)}
 .wchip .wk{color:var(--accent);font-size:11px}
 .wchip.auto{border-style:dashed;border-color:var(--amber-border);background:var(--amber-bg);color:var(--amber)}
-.daycell{text-align:center;padding:3px 4px;border-left:1px solid var(--border)}
-th.dayh{text-align:center}
+.daycell{text-align:center;padding:3px 2px;border-left:1px solid var(--border)}
+th.dayh{text-align:center;padding:8px 4px}
+/* keep day columns compact — size the grid to its content instead of stretching every day column to fill the card */
+#logTable,#trkTable{width:auto}
+#logTable .daycell,#trkTable .daycell,#logTable th.dayh,#trkTable th.dayh{width:46px}
 .modebanner{display:flex;align-items:center;gap:10px;border-radius:8px;padding:9px 14px;margin-bottom:10px;font-size:13px;font-weight:600;border:1px solid;border-left-width:4px}
 .modebanner .tag{font-size:10px;text-transform:uppercase;letter-spacing:.08em;font-weight:700;padding:2px 8px;border-radius:20px}
 .modebanner.plan{background:#eaf3f2;border-color:var(--accent2);color:#0b3f3d}
@@ -333,7 +336,7 @@ body.present .diff-row{font-size:15px}
     <div class="topbar">
       <div class="menu-btn" onclick="toggleSide()">☰</div>
       <h1>Harvest Planner</h1>
-      <button id="present" class="btn btn-sec btn-sm" onclick="togglePresent(this)" style="margin-right:8px">⛶ Present</button><div class="pageswitch"><b class="active" id="swLog" onclick="setPage('log')">Harvest Plan / Actual</b><b id="swTrk" onclick="setPage('trk')">Trucks</b><b id="swOv" onclick="setPage('ov')">Season Overview</b><b id="swRev" onclick="setPage('rev')">Revisions</b></div>
+      <button id="present" class="btn btn-sec btn-sm" onclick="togglePresent()" style="margin-right:8px">⛶ Present</button><div class="pageswitch"><b class="active" id="swLog" onclick="setPage('log')">Harvest Plan / Actual</b><b id="swTrk" onclick="setPage('trk')">Trucks</b><b id="swOv" onclick="setPage('ov')">Season Overview</b><b id="swRev" onclick="setPage('rev')">Revisions</b></div>
       <div class="spacer"></div>
       <div class="season-sel">2025/26 <span class="tag">ACTIVE</span> ▾</div>
     </div>
@@ -391,7 +394,7 @@ body.present .diff-row{font-size:15px}
       <div class="table-wrap"><table id="ovVar"></table></div>
 
       <div class="sec-title">By plot <span class="r">the detail rows behind each variety</span></div>
-      <div class="table-wrap"><table id="ovPlot"></table></div>
+      <div class="table-wrap logwrap"><table id="ovPlot"></table></div>
     </div>
 
     <!-- ===================== REVISIONS ===================== -->
@@ -1336,7 +1339,16 @@ async function pickRev(i){
   }catch(err){det.innerHTML=head+`<div style="color:var(--red);font-size:12px">Diff load error: ${(err&&err.message)||err}</div>`;}
 }
 /* live: no seed */
-function togglePresent(b){const on=!document.body.classList.contains('present');document.body.classList.toggle('present',on);b.textContent=on?'✕ Exit Present':'⛶ Present';if(on){if(page!=='ov')setPage('ov');try{if(document.documentElement.requestFullscreen)document.documentElement.requestFullscreen();}catch(e){}}else{try{if(document.fullscreenElement)document.exitFullscreen();}catch(e){}}}
+function setPresent(on){
+  document.body.classList.toggle('present',on);
+  const b=document.getElementById('present'); if(b)b.textContent=on?'✕ Exit Present':'⛶ Present';
+  if(on){ if(page!=='ov')setPage('ov'); try{if(document.documentElement.requestFullscreen)document.documentElement.requestFullscreen();}catch(e){} }
+  else { try{if(document.fullscreenElement&&document.exitFullscreen)document.exitFullscreen();}catch(e){} }
+}
+function togglePresent(){ setPresent(!document.body.classList.contains('present')); }
+// leaving fullscreen (Esc, or the OS control) must also drop present mode — otherwise the view stays broken inside the window
+document.addEventListener('fullscreenchange',function(){ if(!document.fullscreenElement && document.body.classList.contains('present')) setPresent(false); });
+document.addEventListener('keydown',function(e){ if(e.key==='Escape' && document.body.classList.contains('present')) setPresent(false); });
 function toggleSide(){const s=document.getElementById('sidebar'),o=document.getElementById('sideOv');const open=!s.classList.contains('open');s.classList.toggle('open',open);o.classList.toggle('open',open);}
 function authGate(){document.body.innerHTML=`<div style="max-width:440px;margin:14vh auto;text-align:center;font-family:'Instrument Sans',sans-serif;color:#3b4b4a;padding:0 20px"><h2 style="font-family:'DM Serif Display',serif;font-weight:400;font-size:24px;margin-bottom:8px">Harvest Planner</h2><p style="color:#6a7a79;margin-bottom:18px">This page shows live Land Cloud data, so it needs your Land Cloud sign-in. Open Land Cloud, sign in, then reopen this page.</p><a href="/dalos-land-cloud-dev/" style="display:inline-block;background:#0d6a68;color:#fff;padding:9px 18px;border-radius:8px;text-decoration:none;font-weight:500">Open Land Cloud →</a></div>`;}
 async function boot(){
