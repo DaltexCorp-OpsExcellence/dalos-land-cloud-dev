@@ -3074,7 +3074,7 @@ function App(){
   useEffect(function(){
     if(!(auth&&auth.session)||!screen) return;
     var now=Date.now(); if(_pvRef.current[screen]&&now-_pvRef.current[screen]<15000) return; _pvRef.current[screen]=now;
-    try{ supabase.rpc('log_page_view',{p_app:'landcloud',p_page:screen}).then(function(){},function(){}); }catch(e){}
+    try{ supabase.rpc('log_page_view',{p_app:'landcloud',p_page:screen,p_env:(/-dev(\/|$)/.test(location.pathname)?'staging':'prod')}).then(function(){},function(){}); }catch(e){}
   },[screen,auth]);
   var c=useState('all'); var crop=c[0], setCrop=c[1];
   var y=useState(2025); var season=y[0], setSeason=y[1];
