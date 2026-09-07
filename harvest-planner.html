@@ -686,7 +686,7 @@ function renderLog(){
   document.getElementById('modeBanner').className='modebanner '+(m==='plan'?'plan':'harv');
   document.getElementById('wkLbl').textContent='Week of '+WK[selWeek];
   document.getElementById('logHint').innerHTML=
-    m==='plan' ? '<b>Setting the plan.</b> Set <b>Area × Yield</b> (season total), then click the <b>harvest-window</b> chip to set start/peak/end/shape — the tool draws the curve. Day cells can be hand-tweaked (edited cells get a green outline). Faint number = actual harvest.'
+    m==='plan' ? '<b>Setting the plan.</b> Set the <b>Yield</b> (t/fed) — area is the bearing area from Land Cloud (read-only); season total = Area × Yield. Then click the <b>harvest-window</b> chip to set start/peak/end/shape — the tool draws the curve. Day cells can be hand-tweaked (edited cells get a green outline). Faint number = actual harvest.'
   : today ? '<b>Logging today.</b> One column: type each plot\'s tonnes and press <b>Enter</b> (or ↓) to move to the next plot. <b>Blank = not logged yet</b>; type <b>0</b> for “no pick”. Rows = plots in window today or already logged today. Plan fields are read-only here.'
   :         '<b>Logging harvest</b> (actual production). Type tonnes per plot-day; faint number = plan; blank = not logged; Enter/↓ moves down a column. A pick on a 0-plan day turns <b style="color:var(--violet)">purple</b> (off-plan). Future days are locked. Plan fields are read-only here.';
   let days=dayLabels(selWeek).map((l,i)=>({wd:l.wd,d:l.d,di:i}));
@@ -738,7 +738,7 @@ function renderLog(){
         const vt=off?`+${wkHarv} off`:(Math.abs(v)<Math.max(3,wkPlan*0.06)?'on plan':`${v>0?'+':''}${v} t`);
         varCell=`<span class="varcell ${vc}" id="vr_${i}">${vt}</span>`;}
       gwk+=wkTot;
-      const areaCell = m==='plan' ? `<input class="cin plan" id="ar_${i}" value="${ay.area}" oninput="edited(this)">` : `<span class="rotxt">${ay.area}</span>`;
+      const areaCell = `<span class="rotxt" title="Bearing area from Land Cloud (read-only)">${ay.area}</span>`; // area = farm_blocks bearing area, DB-owned
       const yldCell  = m==='plan' ? `<input class="cin plan" id="yl_${i}" value="${ay.yield}" oninput="edited(this)">` : `<span class="rotxt">${ay.yield}</span>`;
       body+=`<tr>
         <td class="frozen f0" title="${p.f}">${p.f}</td><td class="frozen f1"><span class="plot" title="${p.p}">${p.aydi}</span>${groupBy==='farm'?`<div class="vsub" title="${p.v}">${p.v}</div>`:''}</td>
@@ -779,7 +779,8 @@ function edited(el){
     const id=el.id;
     if(id.startsWith('ar_')||id.startsWith('yl_')){
       const i=+id.split('_')[1]; const ar=document.getElementById('ar_'+i), yl=document.getElementById('yl_'+i);
-      if(ar&&yl){planStore[i]={area:parseFloat(ar.value)||0,yield:parseFloat(yl.value)||0};
+      if(yl){ // area is read-only (DB bearing area); only yield is editable here
+        planStore[i]={area: ar?(parseFloat(ar.value)||0):(getAY(i).area||plots[i].area||0), yield:parseFloat(yl.value)||0};
         const pc=document.getElementById('pl_'+i); if(pc)pc.textContent=Math.round(plannedNow(i)); dirty.add('plan-total|'+i);
         // curve rescales for untouched days; refresh their inputs in place
         for(let di=0;di<7;di++){const inp=document.getElementById('c_'+i+'_'+di); if(inp&&!(i+'|'+selWeek+'|'+di in planDayStore)&&m==='plan')inp.value=dayPlan(i,selWeek,di);}}
@@ -861,10 +862,11 @@ function curvePreview(barsId, labsId, c, w){
     const v=c[i], cls=i===w.peak?'pk':(v===0?'out':'');
     return `<div class="wb ${cls}" style="height:${Math.max(2,v/mx*66)}px" title="${WK[i]}: ${v} t"></div>`;
   }).join('');
-  const n=idxs.length, step=Math.max(1,Math.round((n-1)/5));
-  document.getElementById(labsId).innerHTML=idxs.map((i,k)=>{
-    const show = k===0 || k===n-1 || i===w.peak || (k%step===0);
-    return `<span class="${i===w.peak?'pk':''}">${show?WK[i]:''}</span>`;
+  // label by month — show the month name once, at its first week in view (a clean timeline axis)
+  let lastMon=null;
+  document.getElementById(labsId).innerHTML=idxs.map(i=>{
+    const mon=(WK[i].split(' ')[1]||''); const show=mon!==lastMon; lastMon=mon;
+    return `<span class="${i===w.peak?'pk':''}">${show?mon:''}</span>`;
   }).join('');
 }
 function winPrev(){
