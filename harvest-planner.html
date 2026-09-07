@@ -1,0 +1,149 @@
+<!doctype html><html lang="en"><head>
+<meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Harvest Planner · Land Cloud</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Mono:wght@400;500&family=Instrument+Sans:wght@400;500;600&family=Noto+Sans+Arabic:wght@400;500;600&display=swap" rel="stylesheet"/>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.110.8/dist/umd/supabase.js"></script>
+<style>
+:root{--bg:#eef1f0;--bg2:#e0e8e6;--bg3:#cedad7;--sidebar:#0e3a3d;--sidebar-text:#bdd8d6;--sidebar-muted:#5f8583;--accent:#0d6a68;--accent2:#159490;--amber:#b87820;--amber-bg:#fdf3e0;--amber-border:#e8c87a;--red:#b03030;--green:#1e6b3a;--green-bg:#e8f5ec;--green-border:#8ecba4;--text:#111f1f;--text2:#3b4b4a;--text3:#6a7a79;--border:#c6d4d2;--border2:#aabdbb;--card:#fff;--font-display:'DM Serif Display',serif;--font-body:'Instrument Sans','Noto Sans Arabic',sans-serif;--font-mono:'DM Mono','Noto Sans Arabic',monospace;--r:8px;--r2:12px}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font-body);background:var(--bg);color:var(--text);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
+.app{display:flex;min-height:100vh}
+.sidebar{width:218px;background:var(--sidebar);flex-shrink:0;display:flex;flex-direction:column;padding:16px 0;position:sticky;top:0;height:100vh;overflow-y:auto}
+.logo{padding:0 18px 16px;border-bottom:1px solid rgba(255,255,255,.07);margin-bottom:12px}
+.logo .name{font-family:var(--font-display);font-size:19px;color:#fff}
+.logo .sub{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--sidebar-muted);margin-top:5px;display:flex;align-items:center;gap:6px}
+.dot{width:6px;height:6px;border-radius:50%;background:var(--accent2);display:inline-block}
+.nav-sec{font-size:10px;letter-spacing:.11em;text-transform:uppercase;color:var(--sidebar-muted);padding:14px 18px 6px}
+.nav-item{display:flex;align-items:center;gap:10px;padding:8px 18px;font-size:13px;color:var(--sidebar-text);cursor:pointer}
+.nav-item .ic{width:15px;text-align:center;opacity:.6}
+.nav-item.active{background:var(--accent);color:#fff;font-weight:500}
+.side-foot{margin-top:auto;padding:12px 18px 0;border-top:1px solid rgba(255,255,255,.07);font-size:11px;color:var(--sidebar-muted)}
+.main{flex:1;min-width:0;display:flex;flex-direction:column}
+.topbar{height:52px;background:var(--bg);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px;padding:0 18px;position:sticky;top:0;z-index:10}
+.topbar h1{font-family:var(--font-display);font-size:17px;font-weight:400}
+.live{font-size:10px;font-weight:700;letter-spacing:.08em;background:var(--green-bg);color:var(--green);border:1px solid var(--green-border);border-radius:20px;padding:2px 9px}
+.spacer{flex:1}
+.season-sel{background:var(--card);border:1px solid var(--border2);border-radius:var(--r);padding:5px 11px;font-size:12px}
+.crop-bar{display:flex;align-items:center;gap:8px;padding:9px 18px;background:var(--bg);border-bottom:1px solid var(--border)}
+.crop-bar .cb-lbl{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--text3);font-weight:600}
+.crop-seg{display:inline-flex;border:1px solid var(--border2);border-radius:var(--r);overflow:hidden}
+.crop-seg b{padding:6px 16px;font-size:12.5px;font-weight:500;color:var(--text2);background:var(--card);border-right:1px solid var(--border)}
+.crop-seg b:last-child{border-right:none}.crop-seg b.on{background:var(--accent);color:#fff}
+.page{padding:16px 18px 48px}
+.note{font-size:12px;color:#7a4a10;background:var(--amber-bg);border:1px solid var(--amber-border);border-radius:8px;padding:9px 13px;margin-bottom:16px}
+.kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:16px}
+.card{background:var(--card);border:1px solid var(--border);border-radius:var(--r2);padding:14px 16px}
+.kpi .lab{font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em}
+.kpi .val{font-family:var(--font-display);font-size:24px;margin-top:5px}.kpi .val .un{font-family:var(--font-body);font-size:11px;color:var(--text3)}
+.kpi .sub{font-size:11px;margin-top:3px;color:var(--text3)}
+.sec-title{display:flex;align-items:center;gap:8px;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.09em;color:var(--text3);margin:22px 0 10px}
+.sec-title::before{content:"";width:20px;height:2px;background:var(--accent)}
+.table-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:var(--r2);background:var(--card)}
+table{border-collapse:collapse;width:100%;min-width:640px}
+th{font-size:10px;text-transform:uppercase;letter-spacing:.04em;color:var(--text3);text-align:left;padding:9px 11px;border-bottom:2px solid var(--border2);white-space:nowrap;font-weight:600}
+td{font-size:13px;color:var(--text2);padding:8px 11px;border-bottom:1px solid var(--border);white-space:nowrap}
+tr:last-child td{border-bottom:none}
+.num{font-family:var(--font-mono);font-size:12px;text-align:right;font-variant-numeric:tabular-nums}th.num{text-align:right}
+.vname{font-weight:600;color:var(--text)}.plot{font-family:var(--font-mono);font-size:11px;background:var(--bg2);border-radius:4px;padding:1px 6px;color:var(--text)}
+.tot td{background:var(--bg2);font-weight:600;color:var(--text)}
+.center{max-width:420px;margin:12vh auto;text-align:center;padding:0 20px}
+.center h2{font-family:var(--font-display);font-size:24px;font-weight:400;margin-bottom:8px}
+.center p{color:var(--text3);font-size:14px;margin-bottom:18px}
+.btn{display:inline-block;background:var(--accent);color:#fff;border-radius:var(--r);padding:9px 18px;font-size:13px;font-weight:500;text-decoration:none;border:none;cursor:pointer}
+.state{padding:44px;text-align:center;color:var(--text3)}
+</style></head>
+<body>
+<div id="root"><div class="state">Loading Harvest Planner…</div></div>
+<script>
+const SB_URL='https://sfyjvgjwvtwkrnqrvqyc.supabase.co', SB_ANON='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNmeWp2Z2p3dnR3a3JucXJ2cXljIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ4NzIxNjYsImV4cCI6MjA5MDQ0ODE2Nn0.FjA75XZsp0Kx5Xam_rrnYoAHX4JHKey6vEFCH_zlMuQ';
+const sb=window.supabase.createClient(SB_URL,SB_ANON);
+const $=(h)=>{const d=document.createElement('div');d.innerHTML=h;return d.firstElementChild;};
+const root=document.getElementById('root');
+const fmt=(n)=>Math.round(n||0).toLocaleString();
+const md=(s)=>s?new Date(s).toLocaleDateString('en-GB',{day:'numeric',month:'short'}):'—';
+function shell(inner){return `<div class="app">
+  <aside class="sidebar">
+    <div class="logo"><div class="name">Land Cloud</div><div class="sub"><span class="dot"></span><span id="seasonSub">Citrus</span></div></div>
+    <div class="nav-sec">Explore</div>
+    <div class="nav-item"><span class="ic">▤</span>Structure</div><div class="nav-item"><span class="ic">▦</span>Block Register</div>
+    <div class="nav-item"><span class="ic">≈</span>Production History</div><div class="nav-item"><span class="ic">▧</span>Yield Heatmap</div>
+    <div class="nav-sec">Manage</div>
+    <div class="nav-item active"><span class="ic">◷</span>Harvest Planner</div><div class="nav-item"><span class="ic">✎</span>Season Entry</div>
+    <div class="nav-item"><span class="ic">⇄</span>Reconciliation</div>
+    <div class="side-foot" id="sideUser">signed in</div>
+  </aside>
+  <div class="main">
+    <div class="topbar"><h1>Harvest Planner</h1><span class="live">● LIVE DATA</span><div class="spacer"></div><div class="season-sel" id="seasonPill">…</div></div>
+    <div class="crop-bar"><span class="cb-lbl">Crop</span><div class="crop-seg"><b class="on">Citrus</b><b>Grapes</b><b>Mango</b><b>Pomegranate</b></div></div>
+    <div class="page">${inner}</div>
+  </div></div>`;}
+
+async function boot(){
+  let session=null; try{session=(await sb.auth.getSession()).data.session;}catch(e){}
+  if(!session){
+    root.innerHTML=`<div class="center"><h2>Harvest Planner</h2><p>This live preview reads real Land Cloud data, so it needs your Land Cloud sign-in. Open Land Cloud, sign in, then come back to this page.</p><a class="btn" href="/dalos-land-cloud-dev/">Open Land Cloud →</a></div>`;
+    return;
+  }
+  root.innerHTML=shell(`<div class="state">Loading the active season…</div>`);
+  try{
+    const {data:seasons,error:se}=await sb.from('seasons').select('id,name,active').eq('active',true).limit(1);
+    if(se) throw se;
+    if(!seasons||!seasons.length){document.querySelector('.page').innerHTML=`<div class="note">No active season is set. Set one in Land Cloud to use the planner.</div>`;return;}
+    const season=seasons[0];
+    document.getElementById('seasonPill').textContent=season.name+' · ACTIVE';
+    document.getElementById('seasonSub').textContent='Citrus · '+season.name;
+    const email=(session.user&&session.user.email)||'signed in';
+    document.getElementById('sideUser').textContent=email;
+
+    const {data:plots,error:pe}=await sb.from('farm_blocks')
+      .select('id,farm_code,sector_code,plot_code,block_add,total_area_fed,varieties(name),farms(name)')
+      .eq('product_id','citrus').eq('lifecycle','bearing').not('variety_id','is',null).not('farm_id','is',null);
+    if(pe) throw pe;
+    const {data:plan,error:ple}=await sb.from('hp_plan').select('block_id,bearing_area_fed,plan_yield_t_fed,planned_t,harvest_start,harvest_end,harvest_shape').eq('season_id',season.id);
+    if(ple) throw ple;
+    const {data:acts,error:ae}=await sb.from('hp_actual_day').select('block_id,actual_t').eq('season_id',season.id);
+    if(ae) throw ae;
+
+    const planBy={}; (plan||[]).forEach(r=>planBy[r.block_id]=r);
+    const harvBy={}; (acts||[]).forEach(r=>harvBy[r.block_id]=(harvBy[r.block_id]||0)+Number(r.actual_t||0));
+    const rows=(plots||[]).map(b=>{
+      const pl=planBy[b.id]||{}; const code=`${b.farm_code}-${b.sector_code}-${b.plot_code}${b.block_add||''}`;
+      const planned=Number(pl.planned_t||0), harv=harvBy[b.id]||0;
+      return {code, farm:(b.farms&&b.farms.name)||b.farm_code, variety:(b.varieties&&b.varieties.name)||'—',
+        area:Number(b.total_area_fed||0), yield:Number(pl.plan_yield_t_fed||0), planned, harv, rem:planned-harv,
+        win: pl.harvest_start?`${md(pl.harvest_start)} → ${md(pl.harvest_end)}`:'—'};
+    }).sort((a,b)=>a.variety.localeCompare(b.variety)||a.farm.localeCompare(b.farm)||a.code.localeCompare(b.code));
+
+    const tPlan=rows.reduce((s,r)=>s+r.planned,0), tHarv=rows.reduce((s,r)=>s+r.harv,0), tArea=rows.reduce((s,r)=>s+r.area,0);
+    const farms=[...new Set(rows.map(r=>r.farm))], vars=[...new Set(rows.map(r=>r.variety))];
+
+    // variety rollup
+    const vAgg={}; rows.forEach(r=>{const a=vAgg[r.variety]||(vAgg[r.variety]={variety:r.variety,n:0,area:0,planned:0,harv:0});a.n++;a.area+=r.area;a.planned+=r.planned;a.harv+=r.harv;});
+    const vList=Object.values(vAgg).sort((a,b)=>b.planned-a.planned);
+
+    document.querySelector('.page').innerHTML=`
+      <div class="note">Live, read-only preview wired to the active season (<b>${season.name}</b>). Plan headers seeded with real plot areas + placeholder yields/windows for the team to review. Day-level logging &amp; editing come next.</div>
+      <div class="kpi-grid">
+        <div class="card kpi"><div class="lab">Plots (bearing)</div><div class="val">${rows.length}</div><div class="sub">${farms.length} farms · ${vars.length} varieties</div></div>
+        <div class="card kpi"><div class="lab">Planned harvest</div><div class="val">${fmt(tPlan)} <span class="un">t</span></div><div class="sub">field harvest, season</div></div>
+        <div class="card kpi"><div class="lab">Harvested to date</div><div class="val">${fmt(tHarv)} <span class="un">t</span></div><div class="sub">${tPlan?Math.round(tHarv/tPlan*100):0}% of plan</div></div>
+        <div class="card kpi"><div class="lab">Remaining</div><div class="val">${fmt(tPlan-tHarv)} <span class="un">t</span></div><div class="sub">on the trees</div></div>
+        <div class="card kpi"><div class="lab">Planted area</div><div class="val">${fmt(tArea)} <span class="un">fed</span></div><div class="sub">productive plots</div></div>
+      </div>
+      <div class="sec-title">By variety</div>
+      <div class="table-wrap"><table><thead><tr><th>Variety</th><th class="num">Plots</th><th class="num">Area fed</th><th class="num">Planned t</th><th class="num">Harvested t</th><th class="num">Remaining t</th><th class="num">t/fed</th></tr></thead><tbody>
+      ${vList.map(a=>`<tr><td class="vname">${a.variety}</td><td class="num">${a.n}</td><td class="num">${a.area.toFixed(1)}</td><td class="num">${fmt(a.planned)}</td><td class="num">${fmt(a.harv)}</td><td class="num">${fmt(a.planned-a.harv)}</td><td class="num">${a.area?(a.planned/a.area).toFixed(1):'—'}</td></tr>`).join('')}
+      <tr class="tot"><td>Total</td><td class="num">${rows.length}</td><td class="num">${tArea.toFixed(1)}</td><td class="num">${fmt(tPlan)}</td><td class="num">${fmt(tHarv)}</td><td class="num">${fmt(tPlan-tHarv)}</td><td class="num"></td></tr>
+      </tbody></table></div>
+      <div class="sec-title">By plot <span style="margin-left:auto;font-weight:400;text-transform:none;letter-spacing:0;color:var(--text3)">${rows.length} plots · live from farm_blocks + hp_plan</span></div>
+      <div class="table-wrap"><table><thead><tr><th>Farm</th><th>Plot</th><th>Variety</th><th class="num">Area</th><th class="num">Yield t/fed</th><th class="num">Planned t</th><th>Harvest window</th><th class="num">Harvested</th><th class="num">Remaining</th></tr></thead><tbody>
+      ${rows.map(r=>`<tr><td>${r.farm}</td><td><span class="plot">${r.code}</span></td><td class="vname">${r.variety}</td><td class="num">${r.area.toFixed(1)}</td><td class="num">${r.yield||'—'}</td><td class="num">${fmt(r.planned)}</td><td>${r.win}</td><td class="num">${r.harv?fmt(r.harv):'—'}</td><td class="num">${fmt(r.rem)}</td></tr>`).join('')}
+      </tbody></table></div>`;
+  }catch(err){
+    document.querySelector('.page').innerHTML=`<div class="note" style="background:#faeaea;border-color:#e8a0a0;color:#7a2020">Couldn't load live data: ${(err&&err.message)||err}. If you're newly signed in, refresh the page. If it persists, your account may not have Land Cloud read access yet.</div>`;
+  }
+}
+boot();
+</script>
+</body></html>
