@@ -3,7 +3,7 @@
 <title>Harvest Planner · Land Cloud</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
-<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Mono:wght@400;500&family=Instrument+Sans:wght@400;500;600&family=Noto+Sans+Arabic:wght@400;500;600&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Mono:wght@400;500&family=Instrument+Sans:wght@400;500;600&family=Space+Grotesk:wght@400;500;600;700&family=Noto+Sans+Arabic:wght@400;500;600&display=swap" rel="stylesheet"/>
 <style>
 /* Land Cloud design tokens (copied verbatim from dalos-land-cloud/index.html) */
 :root{
@@ -19,6 +19,7 @@
   --font-display:'DM Serif Display',serif;
   --font-body:'Instrument Sans','Noto Sans Arabic',sans-serif;
   --font-mono:'DM Mono','Noto Sans Arabic',monospace;
+  --font-num:'Space Grotesk','DM Mono',monospace;
   --r:8px;--r2:12px;--sidebar-w:218px;--aqua:#159490;--violet:#6a10b0;
 }
 *{box-sizing:border-box;margin:0;padding:0}
@@ -83,7 +84,7 @@ table{border-collapse:collapse;width:100%}
 th{font-size:10px;text-transform:uppercase;letter-spacing:.04em;color:var(--text3);text-align:center;padding:9px 10px;border-bottom:2px solid var(--border2);white-space:nowrap;font-weight:600;background:var(--card);position:sticky;top:0;z-index:2}
 td{font-size:13px;color:var(--text2);padding:6px 10px;border-bottom:1px solid var(--border);white-space:nowrap}
 tr:last-child td{border-bottom:none}
-.num{font-family:var(--font-mono);font-size:12px;text-align:right;font-variant-numeric:tabular-nums}
+.num{font-family:var(--font-num);font-size:12px;text-align:right;font-variant-numeric:tabular-nums;font-weight:500}
 th.num{text-align:center}
 .plot{font-family:var(--font-mono);font-size:11px;background:var(--bg2);border-radius:4px;padding:1px 6px;color:var(--text)}
 .vname{font-weight:600;color:var(--text)}
@@ -99,14 +100,14 @@ tr.grandtot .stlab{position:sticky;left:0;background:#38352f;color:#fff;text-tra
 .p-P{background:var(--green-bg);color:var(--green);border-color:var(--green-border)}
 .p-NP{background:var(--bg2);color:var(--text3);border-color:var(--border2)}
 /* editable cells — persistent affordance so touch users see what's editable */
-.cin{width:40px;background:var(--card);border:1px solid var(--border);border-bottom-width:2px;border-radius:5px;padding:4px 3px;font-family:var(--font-mono);font-size:12px;text-align:center;color:var(--text);font-variant-numeric:tabular-nums}
+.cin{width:40px;background:var(--card);border:1px solid var(--border);border-bottom-width:2px;border-radius:5px;padding:4px 3px;font-family:var(--font-num);font-size:13px;font-weight:500;text-align:center;color:var(--text);font-variant-numeric:tabular-nums}
 .cin:focus{outline:none;border-color:var(--accent);background:#fff}
 .cin.plan{border-bottom-color:var(--accent2);background:#eaf3f2}
 .cin.harv{border-bottom-color:var(--amber);background:#fdfaf3}
 .cin.int{border-bottom-color:#2a50c0;background:#eef1fb}
 .daycell.flag{background:#fff3e0;box-shadow:inset 0 0 0 1.5px #e0a94a}
 .v-flag{background:var(--amber-bg);color:var(--amber);border-color:var(--amber-border)}
-.plancell{font-family:var(--font-mono);font-size:12px;text-align:right;color:var(--text);font-weight:500}
+.plancell{font-family:var(--font-num);font-size:12px;text-align:right;color:var(--text);font-weight:500}
 .wchip{display:inline-flex;align-items:center;gap:5px;cursor:pointer;border:1px solid var(--border2);border-radius:20px;padding:2px 9px;font-size:11px;color:var(--text2);background:var(--card);white-space:nowrap}
 .wchip:hover{background:var(--bg2);border-color:var(--accent)}
 .wchip .wk{color:var(--accent);font-size:11px}
@@ -130,7 +131,7 @@ th.dayh{text-align:center;padding:8px 4px}
 .celllegend .demo .big{font-family:var(--font-mono);font-size:12px;color:var(--text);font-weight:500}
 .celllegend .demo .sm{font-family:var(--font-mono);font-size:9px;color:var(--text2)}
 .celllegend .demo .sm .tg{color:var(--text3);font-size:8px;text-transform:uppercase;margin-right:2px}
-.daycell .dp{font-family:var(--font-mono);font-size:12px;color:var(--text2);display:block;line-height:1.15;margin-top:1px;border-top:1px dotted var(--border2);padding-top:2px}
+.daycell .dp{font-family:var(--font-num);font-size:11px;color:var(--text2);display:block;line-height:1.15;margin-top:1px;border-top:1px dotted var(--border2);padding-top:2px}
 .daycell .dp .tg{color:var(--text3);font-size:10px;text-transform:uppercase;letter-spacing:.04em;margin-right:2px}
 #npToggle.on{background:var(--accent);color:#fff;border-color:var(--accent)}
 .daycell.off{background:#ece0ff;box-shadow:inset 3px 0 0 var(--violet)}
@@ -753,7 +754,7 @@ function renderLog(){
     body+=`<tr class="subtot"><td class="stlab" colspan="3">${g.key} — subtotal</td><td class="hidecol"></td><td class="hidecol"></td><td class="hidecol"></td><td class="hidecol"></td>`+gsum.map((s,c)=>`<td class="num" id="st_${gi}_${c}">${s}</td>`).join('')+`<td class="num" id="stwk_${gi}">${gwk}</td><td></td></tr>`;
   });
   body+=`<tr class="grandtot"><td class="stlab" colspan="3">All plots — total per day</td><td class="hidecol"></td><td class="hidecol"></td><td class="hidecol"></td><td class="hidecol"></td>`+grand.map((s,c)=>`<td class="num" id="gt_${c}">${s}</td>`).join('')+`<td class="num" id="gtwk">${grandWk}</td><td></td></tr>`;
-  document.getElementById('logTable').innerHTML=head+body;
+  document.getElementById('logTable').innerHTML='<thead>'+head+'</thead><tbody>'+body+'</tbody>';
   // banner (structural mode statement + today completeness)
   document.getElementById('modeBanner').innerHTML= m==='plan'
     ? `<span class="tag">Planning</span><span>Set Plan — you're editing the <b>planned</b> harvest. Actuals are shown greyed for reference and are not editable here.</span>`
@@ -1189,7 +1190,7 @@ function renderOv(){
     <td class="num"><b style="color:var(--text)">${latest.toLocaleString()}</b></td>
     <td class="num">${harv.toLocaleString()}</td><td class="num">${latest?Math.round(harv/latest*100):0}%</td><td class="num">${(latest-harv).toLocaleString()}</td>
     </tr>`;}).join('');
-  document.getElementById('ovPlot').innerHTML=ph+pb;
+  document.getElementById('ovPlot').innerHTML='<thead>'+ph+'</thead><tbody>'+pb+'</tbody>';
 }
 
 function setPage(p){page=p;
@@ -1253,7 +1254,7 @@ function renderTrucks(){
     body+=`<tr class="subtot"><td class="stlab">${g.key} — subtotal</td>`+gsum.map((s,di)=>`<td class="num" id="tst_${gi}_${di}">${s}</td>`).join('')+`<td class="num" id="tstwk_${gi}">${gwk}</td></tr>`;
   });
   body+=`<tr class="grandtot"><td class="stlab">All varieties — trucks / day</td>`+grand.map((s,di)=>`<td class="num" id="tgt_${di}">${s}</td>`).join('')+`<td class="num" id="tgtwk">${grandWk}</td></tr>`;
-  document.getElementById('trkTable').innerHTML=head+body;
+  document.getElementById('trkTable').innerHTML='<thead>'+head+'</thead><tbody>'+body+'</tbody>';
   trucksEdited();
 }
 function trucksEdited(){
