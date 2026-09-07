@@ -986,15 +986,15 @@ async function pickRev(i){
     plots.forEach((pt,idx)=>{const l=byBlock[pt.blockId]; if(!l)return;
       const nowT=Math.round(plannedNow(idx)), wasT=Math.round(Number(l.planned_t||0));
       const w=winStore[idx]||winOf(idx);
-      const nowWin=dateOf(w.start,0)+'|'+dateOf(w.end,6)+'|'+w.shape;
-      const wasWin=(l.harvest_start||'')+'|'+(l.harvest_end||'')+'|'+(l.harvest_shape||'');
+      const nowWin=w.start+'|'+w.end+'|'+w.shape;
+      const wasWin=wkIndexOfDate(l.harvest_start)+'|'+wkIndexOfDate(l.harvest_end)+'|'+(l.harvest_shape||'');
       if(nowT!==wasT||nowWin!==wasWin){net+=nowT-wasT;rows.push({p:pt.p,v:pt.v,wasT,nowT,tChg:nowT!==wasT,wChg:nowWin!==wasWin,l,w});}
     });
     if(!rows.length){det.innerHTML=head+`<div style="color:var(--text3);font-size:12px">No changes — the current plan matches this snapshot.</div>`;return;}
     rows.sort((a,b)=>Math.abs(b.nowT-b.wasT)-Math.abs(a.nowT-a.wasT));
     const body=rows.slice(0,80).map(d=>{
       const t=d.tChg?`<span class="was">${d.wasT.toLocaleString()}</span><span class="arw">→</span><span class="now">${d.nowT.toLocaleString()} t</span> ${chgChip(d.wasT,d.nowT)}`:`<span class="now">${d.nowT.toLocaleString()} t</span>`;
-      const win=d.wChg?` <span style="font-size:11px;color:var(--amber)">window ${md2(d.l.harvest_start)}→${md2(d.l.harvest_end)} ⇒ ${md2(dateOf(d.w.start,0))}→${md2(dateOf(d.w.end,6))}${(d.l.harvest_shape||'')!==d.w.shape?' · '+(d.l.harvest_shape||'?')+'→'+d.w.shape:''}</span>`:'';
+      const win=d.wChg?` <span style="font-size:11px;color:var(--amber)">window ${WK[wkIndexOfDate(d.l.harvest_start)]||md2(d.l.harvest_start)}→${WK[wkIndexOfDate(d.l.harvest_end)]||md2(d.l.harvest_end)} ⇒ ${WK[d.w.start]}→${WK[d.w.end]}${(d.l.harvest_shape||'')!==d.w.shape?' · '+(d.l.harvest_shape||'?')+'→'+d.w.shape:''}</span>`:'';
       return `<div class="diff-row"><span class="diff-plot">${d.p} · ${d.v}</span><span class="diff-vals">${t}${win}</span></div>`;
     }).join('');
     det.innerHTML=head+`<div style="font-size:11px;color:var(--text3);margin-bottom:6px">CHANGES SINCE THIS SNAPSHOT · ${rows.length} plot${rows.length>1?'s':''} · net ${net>=0?'+':''}${net} t</div>${body}${rows.length>80?`<div style="color:var(--text3);font-size:11px;padding:6px 10px">${rows.length-80} more…</div>`:''}`;
