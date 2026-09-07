@@ -1095,7 +1095,7 @@ async function saveAll(){
     if(b){const s=data.saved||{};b.textContent='Saved ✓'+(s.events?(' · '+s.events+' change'+(s.events>1?'s':'')+' logged'):'');b.style.display='';setTimeout(updateDirtyBadge,1800);}
   }catch(err){uiToast('Save failed: '+((err&&err.message)||err),'err');if(b){b.textContent='Save failed';b.style.display='';}}
 }
-async function truckCellEdit(el){trucksEdited();try{const q=el.id.split('_'),gi=+q[1],fi=+q[2],di=+q[3];const g=truckGroups()[gi];if(!g)return;const row=g.rows[fi];if(!row)return;const plot=plots.find(p=>p.v===row.v&&p.f===row.f);if(!plot)return;const val=el.value===''?0:parseInt(el.value)||0;const {error}=await SB.from('hp_truck').upsert({product_id:product,season_id:SEASON.id,farm_id:plot.farmId,variety_id:plot.varId,plan_date:dateOf(selWeek,di),trucks:val},{onConflict:'product_id,season_id,farm_id,variety_id,plan_date'});if(error)throw error;el.style.borderColor='';el.title='';}catch(err){el.style.borderColor='var(--red,#b03030)';el.title='Not saved: '+((err&&err.message)||err);console.warn('truck save failed',err);}}
+async function truckCellEdit(el){trucksEdited();try{const q=el.id.split('_'),gi=+q[1],fi=+q[2],w=+q[3],di=+q[4];const g=truckGroups()[gi];if(!g)return;const row=g.rows[fi];if(!row)return;const plot=plots.find(p=>p.v===row.v&&p.f===row.f);if(!plot)return;const val=el.value===''?0:parseInt(el.value)||0;const {error}=await SB.from('hp_truck').upsert({product_id:product,season_id:SEASON.id,farm_id:plot.farmId,variety_id:plot.varId,plan_date:dateOf(w,di),trucks:val},{onConflict:'product_id,season_id,farm_id,variety_id,plan_date'});if(error)throw error;el.style.borderColor='';el.title='';}catch(err){el.style.borderColor='var(--red,#b03030)';el.title='Not saved: '+((err&&err.message)||err);console.warn('truck save failed',err);}}
 async function captureSnapshot(){const name=await uiPrompt('Name this snapshot','Weekly — '+labelOf(new Date()),'e.g. Before 12 Apr meeting');if(!name)return;try{const {data:r,error}=await SB.from('hp_revision').insert({product_id:product,season_id:SEASON.id,name:name,kind:'weekly',note:'Captured from Harvest Planner'}).select().single();if(error)throw error;const lines=plots.map((pt,i)=>{const w=winStore[i]||winOf(i),ay=getAY(i);return {revision_id:r.id,block_id:pt.blockId,bearing_area_fed:ay.area,plan_yield_t_fed:ay.yield,planned_t:Math.round(plannedNow(i)),harvest_start:dateOf(w.start,0),harvest_peak:dateOf(w.peak,0),harvest_end:dateOf(w.end,6),harvest_shape:w.shape};});await SB.from('hp_revision_line').insert(lines);revs.unshift({id:r.id,t:name,d:new Date().toLocaleDateString('en-GB'),who:'you',in:'HP',locked:false,note:'Captured from Harvest Planner',diff:[]});renderRevList();uiToast('Snapshot “'+name+'” captured.');}catch(err){uiToast('Snapshot failed: '+((err&&err.message)||err),'err');}}
 
 // ---------- SEASON OVERVIEW page (everything derived from the SAME daily model as the grid) ----------
@@ -1279,63 +1279,66 @@ function truckGroups(){ // group by variety (rows=farm) or by farm (rows=variety
 }
 // seed current week per variety×farm (editable); other weeks blank
 truckPairs().forEach(pr=>{for(let di=0;di<7;di++){const t=fvDayTons(pr.v,pr.f,CUR,di);if(t>0)truckLog[tkey(pr.v,pr.f,CUR,di)]=Math.max(1,Math.round(t/20));}});
+function truckCols(){ const cols=[]; for(let k=0;k<2;k++){ const w=selWeek+k; if(w>WK.length-1)break; for(let di=0;di<7;di++) cols.push(colOf(w,di,di===0&&k>0)); } return cols; }
 function renderTrucks(){
-  const L=dayLabels(selWeek);
-  document.getElementById('trkWk').textContent='Week of '+WK[selWeek];
-  const head=`<tr><th class="frozen f0">${trkGroupBy==='farm'?'Farm / Variety':'Variety / Farm'}</th>`+L.map(l=>`<th class="dayh" style="border-left:1px solid var(--border)">${l.wd}<br>${l.d}</th>`).join('')+`<th class="num">Week</th></tr>`;
+  const cols=truckCols();
+  document.getElementById('trkWk').textContent = cols.length>7 ? ('Weeks of '+WK[selWeek]+' – '+WK[Math.min(selWeek+1,WK.length-1)]) : ('Week of '+WK[selWeek]);
+  const NCOL=1+cols.length+1;
+  const head=`<tr><th class="frozen f0">${trkGroupBy==='farm'?'Farm / Variety':'Variety / Farm'}</th>`+cols.map(c=>`<th class="dayh${c.wkStart?' wkstart':''}" style="border-left:1px solid var(--border)">${c.wd}<br>${c.d}</th>`).join('')+`<th class="num">${cols.length>7?'2-wk':'Week'}</th></tr>`;
   const groups=truckGroups();
-  let body='', grand=[0,0,0,0,0,0,0], grandWk=0;
+  let body='', grand=cols.map(()=>0), grandWk=0;
   groups.forEach((g,gi)=>{
-    body+=`<tr class="grp"><td colspan="9">${g.label}</td></tr>`;
-    let gsum=[0,0,0,0,0,0,0], gwk=0;
+    body+=`<tr class="grp"><td colspan="${NCOL}">${g.label}</td></tr>`;
+    let gsum=cols.map(()=>0), gwk=0;
     g.rows.forEach((row,fi)=>{
       let rowWk=0;
-      const cells=L.map((l,di)=>{
-        const tons=fvDayTons(row.v,row.f,selWeek,di), val=getTruck(row.v,row.f,selWeek,di);
-        const n=val===''?0:(parseInt(val)||0); rowWk+=n; gsum[di]+=n; grand[di]+=n;
-        return `<td class="trk daycell"><input class="cin trkin" id="tk_${gi}_${fi}_${di}" value="${val}" oninput="truckCellEdit(this)"><span class="t">${tons?tons+' t':''}</span></td>`;
+      const cells=cols.map((c,ci)=>{
+        const tons=fvDayTons(row.v,row.f,c.w,c.di), val=getTruck(row.v,row.f,c.w,c.di);
+        const n=val===''?0:(parseInt(val)||0); rowWk+=n; gsum[ci]+=n; grand[ci]+=n;
+        return `<td class="trk daycell${c.wkStart?' wkstart':''}"><input class="cin trkin" id="tk_${gi}_${fi}_${c.w}_${c.di}" value="${val}" oninput="truckCellEdit(this)"><span class="t">${tons?tons+' t':''}</span></td>`;
       }).join('');
       gwk+=rowWk;
       body+=`<tr><td class="frozen f0">${row.rowLabel}</td>${cells}<td class="trk"><span class="n" id="trw_${gi}_${fi}">${rowWk}</span></td></tr>`;
     });
     grandWk+=gwk;
-    body+=`<tr class="subtot"><td class="stlab">${g.key} — subtotal</td>`+gsum.map((s,di)=>`<td class="num" id="tst_${gi}_${di}">${s}</td>`).join('')+`<td class="num" id="tstwk_${gi}">${gwk}</td></tr>`;
+    body+=`<tr class="subtot"><td class="stlab">${g.key} — subtotal</td>`+gsum.map((s,ci)=>`<td class="num${cols[ci].wkStart?' wkstart':''}" id="tst_${gi}_${ci}">${s}</td>`).join('')+`<td class="num" id="tstwk_${gi}">${gwk}</td></tr>`;
   });
-  body+=`<tr class="grandtot"><td class="stlab">All varieties — trucks / day</td>`+grand.map((s,di)=>`<td class="num" id="tgt_${di}">${s}</td>`).join('')+`<td class="num" id="tgtwk">${grandWk}</td></tr>`;
+  body+=`<tr class="grandtot"><td class="stlab">All varieties — trucks / day</td>`+grand.map((s,ci)=>`<td class="num${cols[ci].wkStart?' wkstart':''}" id="tgt_${ci}">${s}</td>`).join('')+`<td class="num" id="tgtwk">${grandWk}</td></tr>`;
   document.getElementById('trkTable').innerHTML='<thead>'+head+'</thead><tbody>'+body+'</tbody>';
   trucksEdited();
 }
 function trucksEdited(){
-  const L=dayLabels(selWeek);
-  const groups=truckGroups(); const grand=[0,0,0,0,0,0,0]; let grandWk=0; const farmTot={};
+  const cols=truckCols();
+  const groups=truckGroups(); const grand=cols.map(()=>0); let grandWk=0; const farmTot={};
   groups.forEach((g,gi)=>{
-    const gsum=[0,0,0,0,0,0,0]; let gwk=0;
+    const gsum=cols.map(()=>0); let gwk=0;
     g.rows.forEach((row,fi)=>{
       let rowWk=0;
-      for(let di=0;di<7;di++){
-        const inp=document.getElementById('tk_'+gi+'_'+fi+'_'+di); if(!inp)continue;
+      cols.forEach((c,ci)=>{
+        const inp=document.getElementById('tk_'+gi+'_'+fi+'_'+c.w+'_'+c.di); if(!inp)return;
         const v=inp.value===''?0:parseInt(inp.value)||0;
-        truckLog[tkey(row.v,row.f,selWeek,di)]=inp.value===''?'':v;
-        rowWk+=v; gsum[di]+=v; grand[di]+=v;
-      }
+        truckLog[tkey(row.v,row.f,c.w,c.di)]=inp.value===''?'':v;
+        rowWk+=v; gsum[ci]+=v; grand[ci]+=v;
+      });
       farmTot[row.f]=(farmTot[row.f]||0)+rowWk;
       const w=document.getElementById('trw_'+gi+'_'+fi); if(w)w.textContent=rowWk;
     });
     gwk=gsum.reduce((a,b)=>a+b,0); grandWk+=gwk;
-    for(let di=0;di<7;di++){const c=document.getElementById('tst_'+gi+'_'+di); if(c)c.textContent=gsum[di];}
+    cols.forEach((c,ci)=>{const el=document.getElementById('tst_'+gi+'_'+ci); if(el)el.textContent=gsum[ci];});
     const w=document.getElementById('tstwk_'+gi); if(w)w.textContent=gwk;
   });
-  for(let di=0;di<7;di++){const c=document.getElementById('tgt_'+di); if(c)c.textContent=grand[di];}
+  cols.forEach((c,ci)=>{const el=document.getElementById('tgt_'+ci); if(el)el.textContent=grand[ci];});
   const gw=document.getElementById('tgtwk'); if(gw)gw.textContent=grandWk;
   const peak=grand.indexOf(Math.max(...grand));
   document.querySelectorAll('#trkTable td').forEach(td=>td.classList.remove('peak'));
   if(grand[peak]>0){document.querySelectorAll('#trkTable tr').forEach(tr=>{const td=tr.children[peak+1];if(td)td.classList.add('peak');});}
   const busy=Object.entries(farmTot).sort((a,b)=>b[1]-a[1])[0]||['—',0];
+  const pc=cols[peak]||{wd:'',d:'',mon:''}; const nDays=cols.length; const span=nDays>7?'(2 weeks)':'this week';
   document.getElementById('trkKpis').innerHTML=`
-    <div class="card kpi"><div class="lab">Truck-loads this week</div><div class="val">${grandWk} <span class="un">🚛</span></div><div class="sub flat">all varieties · all farms</div></div>
-    <div class="card kpi"><div class="lab">Peak day</div><div class="val">${grand[peak]||0} <span class="un">trucks</span></div><div class="sub flat">${L[peak].wd} ${L[peak].d} ${L[peak].mon}</div></div>
-    <div class="card kpi"><div class="lab">Busiest farm</div><div class="val" style="font-size:22px">${busy[0]}</div><div class="sub flat">${busy[1]} loads this week</div></div>
-    <div class="card kpi"><div class="lab">Avg per day</div><div class="val">${(grandWk/7).toFixed(1)} <span class="un">trucks</span></div><div class="sub flat">7 harvest days</div></div>`;
+    <div class="card kpi"><div class="lab">Truck-loads ${span}</div><div class="val">${grandWk} <span class="un">🚛</span></div><div class="sub flat">all varieties · all farms</div></div>
+    <div class="card kpi"><div class="lab">Peak day</div><div class="val">${grand[peak]||0} <span class="un">trucks</span></div><div class="sub flat">${pc.wd} ${pc.d} ${pc.mon}</div></div>
+    <div class="card kpi"><div class="lab">Busiest farm</div><div class="val" style="font-size:22px">${busy[0]}</div><div class="sub flat">${busy[1]} loads ${span}</div></div>
+    <div class="card kpi"><div class="lab">Avg per day</div><div class="val">${(grandWk/nDays).toFixed(1)} <span class="un">trucks</span></div><div class="sub flat">${nDays} harvest days</div></div>`;
 }
 
 // ---------- REVISIONS ----------
