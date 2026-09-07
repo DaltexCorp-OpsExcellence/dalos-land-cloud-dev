@@ -1513,6 +1513,8 @@ async function loadSeason(season){
     const idx={}; plots.forEach((pt,i)=>{idx[pt.blockId]=i;const pl=planBy[pt.blockId];if(pl){planStore[i]={area:Number(pl.bearing_area_fed||pt.area||0),yield:pl.plan_yield_t_fed==null?null:Number(pl.plan_yield_t_fed)};if(pl.updated_at)planBaseTs[pt.blockId]=pl.updated_at;
       if(pl.harvest_start){let ws=wkIndexOfDate(pl.harvest_start),we=wkIndexOfDate(pl.harvest_end),wp=wkIndexOfDate(pl.harvest_peak);if(ws<0)ws=0;if(we<0)we=WK.length-1;if(wp<ws||wp>we)wp=Math.round((ws+we)/2);winStore[i]={start:ws,peak:wp,end:we,shape:pl.harvest_shape||'bell'};}
       }else{planStore[i]={area:pt.area,yield:0};}});
+    // When today is outside the season, open on the FIRST planned-harvest week (not the calendar's June tail).
+    if(ti<0){const hs=Object.values(winStore).map(w=>w&&w.start).filter(n=>typeof n==='number'&&n>=0);if(hs.length)selWeek=Math.max(0,Math.min(Math.min(...hs),WK.length-2));}
     pd.forEach(r=>{const i=idx[r.block_id];if(i==null)return;const w=wkIndexOfDate(r.plan_date),d=dowOf(r.plan_date);if(w>=0)planDayStore[i+'|'+w+'|'+d]=Number(r.planned_t);});
     ad.forEach(r=>{const i=idx[r.block_id];if(i==null)return;const w=wkIndexOfDate(r.harvest_date),d=dowOf(r.harvest_date);if(w>=0){actStore[i+'|'+w+'|'+d]=Number(r.actual_t);if(r.review_status)reviewStore[i+'|'+w+'|'+d]=r.review_status;}});
     tk.forEach(r=>{const w=wkIndexOfDate(r.plan_date),d=dowOf(r.plan_date),f=farmName[r.farm_id],v=varName[r.variety_id];if(w>=0&&f&&v)truckLog[v+'|'+f+'|'+w+'|'+d]=r.trucks;});
