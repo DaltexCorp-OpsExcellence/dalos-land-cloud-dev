@@ -95,6 +95,19 @@
 
   function injectCss(){ if(document.getElementById('lc-shell-css'))return; var st=document.createElement('style'); st.id='lc-shell-css'; st.textContent=CSS; document.head.appendChild(st); }
 
+  // Shared Land Cloud favicon (dark hexagon leaf mark) — injected only if the host has none,
+  // so index.html keeps its inline one and the planner (which had none) inherits it.
+  var FAVICON = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='13' fill='%230e3a3d'/%3E%3Cpath d='M17 25 L30 15 L46 20 L50 34 L36 47 L20 41 Z' fill='%238fe0ad'/%3E%3Cg fill='%235fc9c4'%3E%3Ccircle cx='10' cy='22' r='4'/%3E%3Ccircle cx='27' cy='7' r='4'/%3E%3Ccircle cx='51' cy='14' r='4'/%3E%3Ccircle cx='56' cy='36' r='4'/%3E%3Ccircle cx='39' cy='55' r='4'/%3E%3Ccircle cx='15' cy='47' r='4'/%3E%3C/g%3E%3C/svg%3E";
+  function injectFavicon(){
+    try{
+      if(document.querySelector("link[rel~='icon']")) return; // host already set one
+      var head=document.head||document.documentElement;
+      var l=document.createElement('link'); l.rel='icon'; l.type='image/svg+xml'; l.href=FAVICON; head.appendChild(l);
+      var a=document.createElement('link'); a.rel='apple-touch-icon'; a.href=FAVICON; head.appendChild(a);
+    }catch(e){}
+  }
+  if(document.head) injectFavicon(); else document.addEventListener('DOMContentLoaded', injectFavicon);
+
   function render(container, opts){
     opts=opts||{}; injectCss();
     var role=opts.role||(opts.account&&opts.account.role)||null;

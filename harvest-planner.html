@@ -81,6 +81,9 @@ body{font-family:var(--font-body);background:var(--bg);color:var(--text);font-si
 /* tables */
 .table-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:var(--r2);background:var(--card)}
 .logwrap{overflow:auto;max-height:68vh}
+.skel{background:linear-gradient(90deg,var(--bg2) 25%,var(--bg3) 37%,var(--bg2) 63%);background-size:400% 100%;border-radius:5px;animation:skelsh 1.4s ease infinite;display:inline-block}
+@keyframes skelsh{0%{background-position:100% 0}100%{background-position:-100% 0}}
+.kpi .skel{height:30px}
 table{border-collapse:collapse;width:100%}
 th{font-size:10px;text-transform:uppercase;letter-spacing:.04em;color:var(--text3);text-align:center;padding:9px 10px;border-bottom:2px solid var(--border2);white-space:nowrap;font-weight:600;background:var(--card);position:sticky;top:0;z-index:2}
 td{font-size:13px;color:var(--text2);padding:6px 10px;border-bottom:1px solid var(--border);white-space:nowrap}
@@ -1420,10 +1423,19 @@ function renderShell(session){
   draw({name:'',role:null});
   if(session&&session.user){ LCShell.loadAccount(SB,session.user.id).then(draw).catch(()=>{}); }
 }
+function showGridSkeleton(){
+  const t=document.getElementById('logTable'); if(!t)return;
+  let rows='';
+  for(let i=0;i<10;i++){ let cells='';
+    for(let c=0;c<13;c++){ const w=c<3?'68%':(c>=3&&c<7?'55%':'80%'), h=c<3?13:22; cells+=`<td style="padding:8px 6px"><span class="skel" style="height:${h}px;width:${w}"></span></td>`; }
+    rows+='<tr>'+cells+'</tr>'; }
+  t.innerHTML='<tbody>'+rows+'</tbody>';
+}
 async function boot(){
   let session=null; try{session=(await SB.auth.getSession()).data.session;}catch(e){}
   if(!session){authGate();return;}
   renderShell(session);
+  showGridSkeleton();
   try{
     try{canWrite=!!(await SB.rpc('hp_can_write')).data;}catch(e){canWrite=false;}
     const ssr=await SB.from('seasons').select('id,name,active').order('name'); SEASONS=ssr.data||[];

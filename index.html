@@ -1328,6 +1328,7 @@ function FarmMapScreen(ctx){
   var cv=useState(null); var cov=cv[0],setCov=cv[1];
   var dw=useState(false); var drawing=dw[0],setDrawing=dw[1];
   var ag=useState(null); var assign=ag[0],setAssign=ag[1];
+  var sry=useState(false); var seriesReady=sry[0],setSeriesReady=sry[1]; // per-block production series done paging in
 
   function refreshGeom(){ var q=supabase.from('v_farm_block_geom').select('*'); if(ctx.crop!=='all') q=q.eq('product_id',ctx.crop);
     q.then(function(r){ if(r.error||!r.data) return; var features=[]; r.data.forEach(function(row){ if(!row.geojson) return; try{ features.push({type:'Feature',geometry:JSON.parse(row.geojson),properties:row}); }catch(e){} });
@@ -1420,8 +1421,9 @@ function FarmMapScreen(ctx){
     });
     // per-block production series for the hover sparkline + plot history. PostgREST caps
     // unpaginated reads at 1000 rows; v_farm_season_wide holds ~3.5k actual rows, so page it.
+    setSeriesReady(false);
     (function(){ var mp={}; var PAGE=1000;
-      function fin(){ Object.keys(mp).forEach(function(k){ mp[k].sort(function(a,b){return a[0]-b[0];}); }); seriesRef.current=mp; }
+      function fin(){ Object.keys(mp).forEach(function(k){ mp[k].sort(function(a,b){return a[0]-b[0];}); }); seriesRef.current=mp; setSeriesReady(true); }
       function page(from){
         supabase.from('v_farm_season_wide').select('block_id,season_year,metrics').eq('scenario','actual').order('block_id',{ascending:true}).order('season_year',{ascending:true}).range(from,from+PAGE-1).then(function(sr){
           if(sr.error||!sr.data){ fin(); return; }
@@ -1529,7 +1531,11 @@ function FarmMapScreen(ctx){
       var header=ce('div',{style:{display:'flex',alignItems:'baseline',gap:8,marginBottom:8}},
         ce('span',{className:'lot'},p.aydi_block_number), ce('span',{style:{fontSize:12,color:'var(--text3)'}}, fmCrop(p.product_id)+' · '+Number(p.total_area_fed||0).toFixed(2)+' fed'),
         ce('span',{style:{marginLeft:'auto',fontSize:11,color:'var(--text3)'}}, plantings.length+' planting'+(plantings.length>1?'s':'')));
-      if(prior.length && p.lifecycle!=='retired'){
+      if(!seriesReady){
+        plotPanel=ce('div',null, header,
+          ce('div',{className:'skel',style:{display:'block',height:66,marginTop:10,borderRadius:6}}),
+          ce('div',{className:'hint',style:{marginTop:8}},'Loading production history…'));
+      } else if(prior.length && p.lifecycle!=='retired'){
         var AMBER='#b87820', TEAL='var(--accent2)';
         var curArea=current.reduce(function(a,pl){return a+Number(pl.total_area_fed||0);},0);
         var ratio=curArea>0?Number(p.total_area_fed||0)/curArea:1; var pct=Math.round(ratio*100);
