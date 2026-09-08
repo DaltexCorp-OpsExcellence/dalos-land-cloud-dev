@@ -1,5 +1,6 @@
 <!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.110.8/dist/umd/supabase.js"></script>
+<script src="shell.js?cb=1"></script>
 <title>Harvest Planner · Land Cloud</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
@@ -336,27 +337,7 @@ body.present .diff-row{font-size:15px}
 
 <div class="app">
   <div class="sidebar-overlay" id="sideOv" onclick="toggleSide()"></div>
-  <aside class="sidebar" id="sidebar">
-    <div class="logo" style="cursor:pointer" onclick="location.href='index.html'"><div class="name">Land Cloud</div><div class="sub"><span class="dot"></span>Citrus · 2025/26</div></div>
-    <div class="nav-sec">Explore</div>
-    <div class="nav-item" onclick="location.href='index.html#structure'"><span class="ic">▤</span>Structure</div>
-    <div class="nav-item" onclick="location.href='index.html#register'"><span class="ic">▦</span>Block Register</div>
-    <div class="nav-item" onclick="location.href='index.html#history'"><span class="ic">≈</span>Production History</div>
-    <div class="nav-item" onclick="location.href='index.html#heatmap'"><span class="ic">▧</span>Yield Heatmap</div>
-    <div class="nav-item" onclick="location.href='index.html#bench'"><span class="ic">◫</span>Benchmark</div>
-    <div class="nav-item" onclick="location.href='index.html#map'"><span class="ic">◱</span>Farm Map</div>
-    <div class="nav-sec">Manage</div>
-    <div class="nav-item active"><span class="ic">◷</span>Harvest Planner</div>
-    <div class="nav-item" onclick="location.href='index.html#entry'"><span class="ic">✎</span>Season Entry</div>
-    <div class="nav-item" onclick="location.href='index.html#import'"><span class="ic">⇪</span>Bulk Import</div>
-    <div class="nav-item" onclick="location.href='index.html#recon'"><span class="ic">⇄</span>Reconciliation</div>
-    <div class="nav-item" onclick="location.href='index.html#health'"><span class="ic">✚</span>Data Health</div>
-    <div class="nav-item" onclick="location.href='index.html#reference'"><span class="ic">⚙</span>Reference Data</div>
-    <div class="side-foot">
-      <div class="acct"><span class="acct-av">TG</span><div><div class="u">Tarek Ghanem</div><div class="r">Admin · Planner</div></div></div>
-      <div class="side-ver">Land Cloud · v2025.9</div>
-    </div>
-  </aside>
+  <aside class="sidebar" id="sidebar" style="padding:0"></aside>
 
   <div class="main">
     <div class="topbar">
@@ -1433,9 +1414,16 @@ document.addEventListener('fullscreenchange',function(){ if(!document.fullscreen
 document.addEventListener('keydown',function(e){ if(e.key==='Escape' && document.body.classList.contains('present')) setPresent(false); });
 function toggleSide(){const s=document.getElementById('sidebar'),o=document.getElementById('sideOv');const open=!s.classList.contains('open');s.classList.toggle('open',open);o.classList.toggle('open',open);}
 function authGate(){document.body.innerHTML=`<div style="max-width:440px;margin:14vh auto;text-align:center;font-family:'Instrument Sans',sans-serif;color:#3b4b4a;padding:0 20px"><h2 style="font-family:'DM Serif Display',serif;font-weight:400;font-size:24px;margin-bottom:8px">Harvest Planner</h2><p style="color:#6a7a79;margin-bottom:18px">This page shows live Land Cloud data, so it needs your Land Cloud sign-in. Open Land Cloud, sign in, then reopen this page.</p><a href="/dalos-land-cloud-dev/" style="display:inline-block;background:#0d6a68;color:#fff;padding:9px 18px;border-radius:8px;text-decoration:none;font-weight:500">Open Land Cloud →</a></div>`;}
+function renderShell(session){
+  const el=document.getElementById('sidebar'); if(!el||!window.LCShell)return;
+  const draw=acct=>LCShell.render(el,{active:'planner',account:acct,onSignOut:()=>SB.auth.signOut()});
+  draw({name:'',role:null});
+  if(session&&session.user){ LCShell.loadAccount(SB,session.user.id).then(draw).catch(()=>{}); }
+}
 async function boot(){
   let session=null; try{session=(await SB.auth.getSession()).data.session;}catch(e){}
   if(!session){authGate();return;}
+  renderShell(session);
   try{
     try{canWrite=!!(await SB.rpc('hp_can_write')).data;}catch(e){canWrite=false;}
     const ssr=await SB.from('seasons').select('id,name,active').order('name'); SEASONS=ssr.data||[];
