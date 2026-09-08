@@ -288,12 +288,14 @@ body.present .sidebar,body.present .crop-bar,body.present .hint,body.present .ce
 body.present .topbar{height:auto;padding:12px 26px;position:static}
 body.present .topbar h1{font-size:23px}
 body.present #present{background:var(--accent);color:#fff}
-body.present #viewSeg,body.present .grpby,body.present #dirtyBadge,body.present #discardBtn,body.present #pasteBtn,body.present #copyLsBtn,body.present #bulkBtn,body.present #npToggle,body.present [onclick*="saveAll"],body.present [onclick*="History"]{display:none!important}
+body.present #viewSeg,body.present .grpby,body.present #pasteBtn,body.present #copyLsBtn,body.present #bulkBtn,body.present #npToggle,body.present [onclick*="History"]{display:none!important}
 body.present #modeSeg{display:inline-flex}
 body.present .ctrl-row{margin-bottom:6px}
 body.present .page{padding:22px 30px 70px;max-width:1600px;margin:0 auto}
-/* editable cells become clean read-only numbers */
-body.present .cin{border:none;background:transparent;font-size:19px;font-weight:600;width:52px;min-width:0;text-align:center;color:var(--text);pointer-events:none;box-shadow:none}
+/* present: cells stay clean big numbers but are editable (log actuals on the wall) */
+body.present .cin{border:none;background:transparent;font-size:19px;font-weight:600;width:52px;min-width:0;text-align:center;color:var(--text);box-shadow:none}
+body.present .cin:focus{outline:2px solid var(--accent);outline-offset:1px;border-radius:5px;background:var(--card)}
+body.present .cin:disabled{color:var(--text3)}
 body.present .daycell .dp,body.present .wchip .wk{display:none}
 body.present .wchip{border:none;background:transparent;font-size:13px;color:var(--text3)}
 body.present th{font-size:14px;padding:11px 12px}
