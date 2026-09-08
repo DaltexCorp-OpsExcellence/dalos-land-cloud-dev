@@ -185,8 +185,14 @@ th.frozen{z-index:3}
 .cal th{position:static;background:none;font-size:10px;padding:2px 4px;text-transform:uppercase;color:var(--text3);border:none;text-align:center}
 .cal th.cur{color:var(--accent);font-weight:700}
 .cal td.rl{font-size:12px;font-weight:600;color:var(--text);text-align:left;padding-right:10px;white-space:nowrap;border:none}
-/* keep the variety row-label visible when the 53-week season-shape heatmap scrolls right */
-.cal td.rl,.cal th.rl{position:sticky;left:0;z-index:2;background:var(--card);box-shadow:6px 0 6px -4px rgba(0,0,0,.10)}
+.cal th.rl{text-align:left}
+/* season shape = a fixed variety panel beside its own scrollable week window (two panels, not a sticky overlay) */
+.cal-split{display:flex;align-items:flex-start;gap:10px}
+.cal-nameswrap{flex:none;border:1px solid var(--border);border-radius:var(--r2);background:var(--card);padding:12px 6px 12px 14px}
+.cal-split .cal-wrap{flex:1;min-width:0;margin:0}
+.cal-nameswrap td.rl,.cal-split .cal-wrap td.hcell{height:30px;box-sizing:border-box}
+.cal-nameswrap td.rl{border:1px solid transparent}
+.cal-nameswrap th,.cal-split .cal-wrap .cal th{height:16px}
 .hcell{width:48px;height:30px;border-radius:5px;font-family:var(--font-mono);font-size:10px;text-align:center;color:var(--text2);vertical-align:middle;border:1px solid var(--border);line-height:1.1}
 .wbtn{cursor:pointer;display:inline-flex;align-items:center;gap:4px;border-radius:5px;padding:2px 5px}
 .wbtn:hover{background:var(--bg2)}
@@ -307,6 +313,7 @@ body.present .sec-title{font-size:14px;margin:28px 0 14px}
 body.present .wkhead{font-size:16px;margin-bottom:14px}
 body.present .cal-wrap{padding:16px 18px}
 body.present .cal .hcell{width:66px;height:48px;font-size:14px}
+body.present .cal-nameswrap td.rl{height:48px}
 body.present .cal .hcell small{font-size:11px}
 body.present .cal th,body.present .cal td.rl{font-size:13px}
 body.present .hidecol{display:none}
@@ -406,7 +413,7 @@ body.present .diff-row{font-size:15px}
       <div class="table-wrap"><table id="ovWatch"></table></div>
 
       <div class="sec-title">Season shape <span class="r">per week · past weeks show <b>actual</b>/plan · shading relative to each variety's own peak</span></div>
-      <div class="cal-wrap"><table class="cal" id="ovCal"></table></div>
+      <div class="cal-split"><div class="cal-nameswrap"><table class="cal" id="ovCalNames"></table></div><div class="cal-wrap" id="ovCalWrap"><table class="cal" id="ovCal"></table></div></div>
 
       <div class="sec-title">By variety <span class="r">mirrors the planning sheet — budget → estimates → latest → actuals</span></div>
       <div class="table-wrap"><table id="ovVar"></table></div>
@@ -1220,11 +1227,14 @@ function renderOv(){
   offPlanRender();
   // season shape heatmap — per-variety binning, past weeks show actual/plan, plus Total row
   function heatRow(v,mx){if(!v)return{bg:'#eef1f0',c:'var(--border2)'};const r=v/(mx||1);if(r<0.34)return{bg:'#cfe6e4',c:'var(--text2)'};if(r<0.67)return{bg:'#5fb0ab',c:'#06322f'};return{bg:'#0d6a68',c:'#fff'};}
-  let calHead=`<tr><th class="rl"></th>`+WK.map((w,i)=>`<th class="${i===CUR?'cur':''}">${w}</th>`).join('')+`</tr>`;
-  let calBody=A.map(a=>{const mx=Math.max(...a.planW);return `<tr><td class="rl">${a.v}</td>`+a.planW.map((v,i)=>{const h=heatRow(v,mx);const past=i<=CUR&&a.actW[i]!=null;
+  // fixed variety panel (row-aligned) beside the scrollable week window
+  let namesBody=A.map(a=>`<tr><td class="rl" title="${a.v}">${a.v}</td></tr>`).join('')+`<tr><td class="rl" style="font-weight:600">Total</td></tr>`;
+  document.getElementById('ovCalNames').innerHTML=`<tr><th class="rl">Variety</th></tr>`+namesBody;
+  let calHead=`<tr>`+WK.map((w,i)=>`<th class="${i===CUR?'cur':''}">${w}</th>`).join('')+`</tr>`;
+  let calBody=A.map(a=>{const mx=Math.max(...a.planW);return `<tr>`+a.planW.map((v,i)=>{const h=heatRow(v,mx);const past=i<=CUR&&a.actW[i]!=null;
     return `<td class="hcell" style="background:${h.bg};color:${h.c}">${past?`<b>${a.actW[i]||''}</b><small>/${v||0}</small>`:(v||'')}</td>`}).join('')+`</tr>`;}).join('');
   const totW=WK.map((_,w)=>sum(A.map(a=>a.planW[w]))), totA=WK.map((_,w)=>w>CUR?null:sum(A.map(a=>a.actW[w]||0))), tmx=Math.max(...totW);
-  calBody+=`<tr><td class="rl" style="border-top:1px solid var(--border)">Total</td>`+totW.map((v,i)=>{const h=heatRow(v,tmx);const past=i<=CUR;return `<td class="hcell" style="background:${h.bg};color:${h.c};font-weight:600">${past?`<b>${totA[i]||''}</b><small>/${v||0}</small>`:(v||'')}</td>`}).join('')+`</tr>`;
+  calBody+=`<tr>`+totW.map((v,i)=>{const h=heatRow(v,tmx);const past=i<=CUR;return `<td class="hcell" style="background:${h.bg};color:${h.c};font-weight:600">${past?`<b>${totA[i]||''}</b><small>/${v||0}</small>`:(v||'')}</td>`}).join('')+`</tr>`;
   document.getElementById('ovCal').innerHTML=calHead+calBody;
   // variety table — this-week columns first, estimates history at the end
   let vh=`<tr><th class="frozen f0">Variety</th><th class="num">Plots</th><th class="num">Plan wk</th><th class="num">Actual wk</th><th class="num">Δ wk</th><th class="num">Next 2 wks</th><th class="num">Season plan</th><th class="num">Harvested</th><th class="num">% done</th><th class="num">Pace Δ</th><th class="num">Remaining</th><th class="num">Plan t/fed</th></tr>`;
