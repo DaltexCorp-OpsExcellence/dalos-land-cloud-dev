@@ -67,12 +67,12 @@
   var SIGNOUT_SVG='<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 14H3.5A1.5 1.5 0 0 1 2 12.5v-9A1.5 1.5 0 0 1 3.5 2H6"></path><path d="M10.5 11 13.5 8 10.5 5"></path><path d="M13.5 8H6"></path></svg>';
 
   var CSS = [
-    '.lcsb{display:flex;flex-direction:column;height:100%;min-height:0;background:#0e3a3d;color:#bdd8d6;font-family:var(--font-body,"Instrument Sans","Noto Sans Arabic",sans-serif)}',
+    '.lcsb{display:flex;flex-direction:column;min-height:100%;background:#0e3a3d;color:#bdd8d6;font-family:var(--font-body,"Instrument Sans","Noto Sans Arabic",sans-serif)}',
     '.lcsb-logo{padding:16px 16px 14px;border-bottom:1px solid rgba(255,255,255,.07);display:flex;align-items:center;gap:10px}',
     '.lcsb-eyebrow{font-family:var(--font-display,"DM Serif Display",serif);font-size:13.5px;line-height:1;letter-spacing:.01em}',
     '.lcsb-eyebrow .a{color:#bdd8d6}.lcsb-eyebrow .b{color:#5fc9c4}',
     '.lcsb-title{font-family:var(--font-display,"DM Serif Display",serif);font-size:17px;color:#fff;line-height:1;margin-top:2px}',
-    '.lcsb-nav{padding:10px 8px;flex:1;overflow-y:auto;min-height:0}',
+    '.lcsb-nav{padding:10px 8px;flex:1}',
     '.lcsb-sec{font-size:10px;font-weight:600;letter-spacing:.11em;text-transform:uppercase;color:#5f8583;padding:12px 8px 5px}',
     '.lcsb-item{display:flex;align-items:center;gap:9px;padding:8px 9px;border-radius:8px;font-size:13px;color:#bdd8d6;border:none;background:none;width:100%;text-align:left;transition:background .12s;cursor:pointer;font-family:inherit}',
     '.lcsb-item svg{width:15px;height:15px;opacity:.65;flex-shrink:0}',
