@@ -1486,7 +1486,7 @@ function FarmMapScreen(ctx){
   }
 
   function spark(series,past){
-    if(!series||!series.length) return ce('div',{className:'hc-m'},ce('span',null,'no production recorded'));
+    if(!series||!series.length) return ce('div',{className:'hc-m'},ce('span',{style:seriesReady?null:{opacity:.7}},seriesReady?'no production recorded':'loading production…'));
     var mx=series.reduce(function(m,x){return Math.max(m,x[1]);},1);
     return ce(React.Fragment,null,
       ce('div',{className:'spark'}, series.map(function(x,i){ return ce('i',{key:i,style:{height:Math.max(2,x[1]/mx*26)+'px',background:past?'var(--border2)':'var(--accent)'}}); })),
