@@ -790,7 +790,7 @@ function renderLog(){
     body+=`<tr class="subtot"><td class="stlab" colspan="3">${g.key} — subtotal</td><td class="hidecol"></td><td class="hidecol"></td><td class="hidecol"></td><td class="hidecol"></td>`+gsum.map((s,c)=>`<td class="num${cols[c].wkStart?' wkstart':''}" id="st_${gi}_${c}">${s}</td>`).join('')+`<td class="num" id="stwk_${gi}">${gwk}</td><td></td></tr>`;
   });
   body+=`<tr class="grandtot"><td class="stlab" colspan="3">All plots — total per day</td><td class="hidecol"></td><td class="hidecol"></td><td class="hidecol"></td><td class="hidecol"></td>`+grand.map((s,c)=>`<td class="num${cols[c].wkStart?' wkstart':''}" id="gt_${c}">${s}</td>`).join('')+`<td class="num" id="gtwk">${grandWk}</td><td></td></tr>`;
-  document.getElementById('logTable').innerHTML='<thead>'+head+'</thead><tbody>'+body+'</tbody>';
+  {const _lt=document.getElementById('logTable'); _lt.style.width=''; _lt.innerHTML='<thead>'+head+'</thead><tbody>'+body+'</tbody>';}
   // banner (structural mode statement + today completeness)
   document.getElementById('modeBanner').innerHTML= m==='plan'
     ? `<span class="tag">Planning</span><span>Set Plan — you're editing the <b>planned</b> harvest. Actuals are shown greyed for reference and are not editable here.</span>`
@@ -1425,10 +1425,9 @@ function renderShell(session){
 }
 function showGridSkeleton(){
   const t=document.getElementById('logTable'); if(!t)return;
-  let rows='';
-  for(let i=0;i<10;i++){ let cells='';
-    for(let c=0;c<13;c++){ const w=c<3?'68%':(c>=3&&c<7?'55%':'80%'), h=c<3?13:22; cells+=`<td style="padding:8px 6px"><span class="skel" style="height:${h}px;width:${w}"></span></td>`; }
-    rows+='<tr>'+cells+'</tr>'; }
+  t.style.width='100%';
+  let rows='<tr><td style="padding:4px 6px 12px"><span class="skel" style="display:block;height:34px;width:100%;border-radius:8px"></span></td></tr>';
+  for(let i=0;i<11;i++){ const w=[92,86,78,90,72,88,94,80,84,76,90][i]; rows+=`<tr><td style="padding:6px"><span class="skel" style="display:block;height:22px;width:${w}%"></span></td></tr>`; }
   t.innerHTML='<tbody>'+rows+'</tbody>';
 }
 async function boot(){
