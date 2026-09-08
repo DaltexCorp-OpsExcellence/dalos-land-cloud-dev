@@ -139,6 +139,11 @@
     return container.querySelector('#lc-navsub'); // slot for the Farm Map sub-panel (app only)
   }
 
+  function setActive(container, key){ // update the highlight without rebuilding (keeps the navsub slot stable)
+    if(!container)return;
+    container.querySelectorAll('.lcsb-item').forEach(function(b){ b.classList.toggle('active', b.getAttribute('data-k')===key); });
+  }
+
   function loadAccount(supabase, userId){
     // same derivation as index.html: users(role, full_name, email)
     return supabase.from('users').select('role,full_name,email').eq('id',userId).maybeSingle()
@@ -146,5 +151,5 @@
       .catch(function(){ return {role:null, name:''}; });
   }
 
-  window.LCShell = { render:render, loadAccount:loadAccount, NAV:NAV, ICP:ICP, BUILD:BUILD, WORKSPACE_URL:WORKSPACE_URL };
+  window.LCShell = { render:render, setActive:setActive, loadAccount:loadAccount, NAV:NAV, ICP:ICP, BUILD:BUILD, WORKSPACE_URL:WORKSPACE_URL };
 })();

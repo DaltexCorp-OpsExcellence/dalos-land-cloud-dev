@@ -434,6 +434,8 @@ thead .stickyc{background:var(--card)}
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.110.8/dist/umd/supabase.js"></script>
 <!-- SheetJS for Bulk Import client-side parsing (§11d sanctioned) -->
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<!-- shared Land Cloud shell (sidebar) — single source with harvest-planner.html -->
+<script src="shell.js?cb=2"></script>
 <!-- Leaflet for the Farm Map (§11d sanctioned) -->
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
@@ -3086,6 +3088,35 @@ function App(){
   var mof=useState([]); var mapOff=mof[0], setMapOff=mof[1];
   var mmt=useState(null); var mapMeta=mmt[0], setMapMeta=mmt[1];
 
+  // ── Shared shell (shell.js) mounts the sidebar so index.html and harvest-planner.html
+  //    share ONE source. React owns the .sidebar wrapper (className/mobile toggle); shell
+  //    owns its children; the Farm Map sub-panel renders into shell's #lc-navsub via a
+  //    persistent nested root. Rebuild only when identity/role/name changes; else setActive.
+  var sidebarRef=React.useRef(null), navsubRootRef=React.useRef(null), builtRef=React.useRef(null);
+  useEffect(function(){
+    if(auth.phase!=='in' || !sidebarRef.current || !window.LCShell) return;
+    var el=sidebarRef.current, b=builtRef.current;
+    var same = b && b.el===el && b.role===auth.role && b.name===auth.name;
+    if(!same){
+      if(navsubRootRef.current){ try{navsubRootRef.current.unmount();}catch(e){} navsubRootRef.current=null; }
+      var slot = window.LCShell.render(el, {
+        active: screen,
+        account: {name:auth.name, role:auth.role}, role: auth.role,
+        onNav: function(it){ if(it.k==='planner'){ window.location.href=it.to; return; } setScreen(it.k); setMenu(false); },
+        onSignOut: function(){ supabase.auth.signOut(); },
+        onWorkspace: function(){ window.location.href='https://daltexcorp-opsexcellence.github.io/dalos-workspace-dev/'; }
+      });
+      builtRef.current={el:el, role:auth.role, name:auth.name};
+      if(slot) navsubRootRef.current=ReactDOM.createRoot(slot);
+    } else {
+      window.LCShell.setActive(el, screen);
+    }
+    if(navsubRootRef.current){
+      var mapApi={farm:mapFarm,setFarm:setMapFarm,mode:mapMode,setMode:setMapMode,off:mapOff,setOff:setMapOff,meta:mapMeta,setMeta:setMapMeta};
+      navsubRootRef.current.render(screen==='map'? ce(MapNavSub,{m:mapApi}) : null);
+    }
+  }, [auth.phase, auth.role, auth.name, screen, mapFarm, mapMode, mapOff, mapMeta]);
+
   useEffect(function(){
     var sub = supabase.auth.onAuthStateChange(function(_e, sess){ boot(sess); });
     supabase.auth.getSession().then(function(r){ boot(r.data.session); });
@@ -3127,35 +3158,7 @@ function App(){
 
   return ce('div',{className:'app'},
     ce('div',{className:'sidebar-overlay'+(menuOpen?' on':''),onClick:function(){setMenu(false);}}),
-    ce('div',{className:'sidebar'+(menuOpen?' open':'')},
-      ce('div',{className:'logo'},
-        ce('div',{style:{display:'flex',alignItems:'center',gap:10}},
-          lcMark(30,false),
-          ce('div',null,
-            ce('div',{style:{fontFamily:'var(--font-display)',fontSize:13.5,lineHeight:1,letterSpacing:'.01em'}}, ce('span',{style:{color:'#bdd8d6'}},'Dal'), ce('span',{style:{color:'#5fc9c4'}},'OS')),
-            ce('div',{className:'logo-name',style:{fontSize:17,marginTop:2}},'Land Cloud')))),
-      ce('div',{className:'nav'}, NAV.map(function(g){
-        return ce('div',{key:g.sec},
-          ce('div',{className:'nav-section'}, g.sec),
-          g.items.filter(visible).map(function(it){
-            return ce('button',{key:it.k,className:'nav-item'+(screen===it.k?' active':''),onClick:function(){ if(it.href){window.location.href=it.href;return;} setScreen(it.k);setMenu(false);}},
-              ce(it.Icon,null), ce('span',null, it.label),
-              it.v2?ce('span',{style:{marginLeft:'auto',fontSize:9,opacity:.6}},'v2'):null);
-          }),
-          (g.sec==='Explore'&&screen==='map')?ce(MapNavSub,{m:mapApi}):null);
-      })),
-      ce('div',{className:'lc-foot'},
-        ce('button',{className:'lc-ws',onClick:function(){ window.location.href='https://daltexcorp-opsexcellence.github.io/dalos-workspace-dev/'; }}, wsGridIcon(), 'Workspace'),
-        ce('div',{className:'lc-user'},
-          ce('div',{className:'lc-av'}, initials(auth.name)),
-          ce('div',{style:{minWidth:0}},
-            ce('div',{className:'lc-name'}, auth.name||'—'),
-            ce('div',{className:'lc-role'}, role||'no role'))),
-        ce('button',{className:'lc-signout',onClick:function(){ supabase.auth.signOut(); }},
-          ce('svg',{viewBox:'0 0 16 16',fill:'none',stroke:'currentColor',strokeWidth:1.5,strokeLinecap:'round',strokeLinejoin:'round','aria-hidden':'true'},
-            ce('path',{d:'M6 14H3.5A1.5 1.5 0 0 1 2 12.5v-9A1.5 1.5 0 0 1 3.5 2H6'}), ce('path',{d:'M10.5 11 13.5 8 10.5 5'}), ce('path',{d:'M13.5 8H6'})), 'Sign out'),
-        ce('div',{className:'lc-ver'}, BUILD))
-    ),
+    ce('div',{className:'sidebar'+(menuOpen?' open':''), ref:sidebarRef}),
     ce('div',{className:'main'},
       ce('div',{className:'topbar'},
         ce('button',{className:'menu-btn',onClick:function(){setMenu(!menuOpen);}}, '☰'),
