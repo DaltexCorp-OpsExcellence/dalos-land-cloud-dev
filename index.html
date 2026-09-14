@@ -1810,19 +1810,34 @@ function ReferenceDataScreen(ctx){
   var s=useState({loading:true,err:null,d:null}); var st=s[0],set=s[1];
   var msg=useState(null); var flash=msg[0],setFlash=msg[1];
   var no=useState(false); var newOpen=no[0],setNewOpen=no[1];
+  var fl=useState({product:'',category:'',breeder:'',q:'',withBlocks:true}); var flt=fl[0],setFlt=fl[1];
+  var eb=useState(null); var editBr=eb[0],setEditBr=eb[1];        // variety id currently editing breeder
+  var mb=useState(false); var mgrOpen=mb[0],setMgrOpen=mb[1];     // Manage breeders modal
+  var ex=useState({}); var vExpand=ex[0],setVExpand=ex[1];        // expanded breeders in manage modal
+  var ev=useState(''); var editVal=ev[0],setEditVal=ev[1];        // pending breeder id while editing a row
   useEffect(function(){ load(); },[]);
+  function saveBreeder(v,val){
+    setFlash({kind:'busy',t:'Saving breeder for '+v.name+'…'});
+    supabase.from('varieties').update({breeder_id:val||null}).eq('id',v.id).then(function(r){
+      if(r.error){ setFlash({kind:'err',t:'Save failed: '+r.error.message}); return; }
+      v.breeder_id=val||null; setEditBr(null); setFlash({kind:'ok',t:'Breeder set for '+v.name+'.'}); setFlt(Object.assign({},flt));
+    });
+  }
   function load(){
     set({loading:true,err:null,d:null});
     Promise.all([
       supabase.from('farm_metrics').select('id,code,name_en,name_ar,role,parent_code,aliases,active').order('code'),
       supabase.from('farm_metric_sets').select('id,product_id,season_year,scenario,farm_metric_set_items(metric_id)').order('product_id').order('season_year'),
       supabase.from('farm_rootstocks').select('id,code,name,product_id,raw_names,active').order('code'),
-      supabase.from('varieties').select('id,code,name,canonical_name,raw_names,product_id,active').order('product_id').order('name'),
-      supabase.from('farm_blocks').select('variety_id,rootstock_id').limit(1000)
+      supabase.from('varieties').select('id,code,name,canonical_name,raw_names,product_id,active,category_id,breeder_id').order('product_id').order('name'),
+      supabase.from('farm_blocks').select('variety_id,rootstock_id').limit(1000),
+      supabase.from('categories').select('id,name'),
+      supabase.from('breeders').select('id,name,code,country,notes').order('name')
     ]).then(function(r){
       var e=r.filter(function(x){return x.error;})[0]; if(e){ set({loading:false,err:e.message,d:null}); return; }
       var vCount={},rCount={}; (r[4].data||[]).forEach(function(b){ if(b.variety_id)vCount[b.variety_id]=(vCount[b.variety_id]||0)+1; if(b.rootstock_id)rCount[b.rootstock_id]=(rCount[b.rootstock_id]||0)+1; });
-      set({loading:false,err:null,d:{metrics:r[0].data||[],sets:r[1].data||[],rootstocks:r[2].data||[],varieties:r[3].data||[],vCount:vCount,rCount:rCount}});
+      var catMap={}; (r[5].data||[]).forEach(function(c){ catMap[c.id]=c.name; });
+      set({loading:false,err:null,d:{metrics:r[0].data||[],sets:r[1].data||[],rootstocks:r[2].data||[],varieties:r[3].data||[],vCount:vCount,rCount:rCount,catMap:catMap,breeders:r[6].data||[]}});
     });
   }
   function cloneSet(setRow){
@@ -1887,21 +1902,61 @@ function ReferenceDataScreen(ctx){
       ce('div',{className:'note',style:{marginTop:10}},'Codes are system-generated, never typed (§4.1b). A new rootstock or an alias is added here — no migration — and a block using it generates a correct operational ID immediately.')
     );
   } else {
-    var byProd={}; d.varieties.forEach(function(v){ (byProd[v.product_id]=byProd[v.product_id]||[]).push(v); });
+    var breederById={}; (d.breeders||[]).forEach(function(b){ breederById[b.id]=b.name; });
+    function catName(v){ return v.category_id?d.catMap[v.category_id]:null; }
+    // filter option lists
+    var products=d.varieties.map(function(v){return v.product_id;}).filter(function(x,i,a){return x&&a.indexOf(x)===i;}).sort();
+    var cats=d.varieties.filter(function(v){return !flt.product||v.product_id===flt.product;}).map(catName).filter(function(x,i,a){return x&&a.indexOf(x)===i;}).sort();
+    var rows=d.varieties.filter(function(v){
+      if(flt.withBlocks && !d.vCount[v.id]) return false;
+      if(flt.product && v.product_id!==flt.product) return false;
+      if(flt.category && catName(v)!==flt.category) return false;
+      if(flt.breeder==='__none'){ if(v.breeder_id) return false; }
+      else if(flt.breeder && v.breeder_id!==flt.breeder) return false;
+      if(flt.q){ var q=flt.q.toLowerCase(); if((v.name||'').toLowerCase().indexOf(q)<0 && (v.code||'').toLowerCase().indexOf(q)<0) return false; }
+      return true;
+    }).sort(function(a,b){return (d.vCount[b.id]||0)-(d.vCount[a.id]||0);});
+    var assigned=d.varieties.filter(function(v){return v.breeder_id;}).length;
+    function brCell(v){
+      var name=v.breeder_id?breederById[v.breeder_id]:null;
+      if(editBr===v.id){
+        return ce('span',{style:{display:'inline-flex',gap:6,alignItems:'center',flexWrap:'wrap'}},
+          selx(editVal,setEditVal,[{v:'',l:'— unassigned —'}].concat((d.breeders||[]).map(function(b){return {v:b.id,l:b.name};})),{style:{minWidth:150,width:'auto'}}),
+          ce('button',{className:'btn btn-primary btn-sm',onClick:function(){ saveBreeder(v,editVal); }},'Save'),
+          ce('button',{className:'btn btn-secondary btn-sm',onClick:function(){ setEditBr(null); }},'Cancel'));
+      }
+      return ce('span',{style:{display:'inline-flex',gap:8,alignItems:'center'}},
+        name?ce('span',null,name):ce('span',{style:{color:'var(--amber)'}},'Unassigned'),
+        ctx.canWrite?ce('button',{className:'btn btn-secondary btn-sm',onClick:function(){ setEditBr(v.id); setEditVal(v.breeder_id||''); }}, name?'Edit':'Assign'):null);
+    }
     body=ce('div',null,
-      ce('div',{className:'section-title'},ce('span',{className:'section-title-bar'}),'Varieties ('+d.varieties.length+') — shared platform table, read-mostly'),
-      ce('div',{className:'note',style:{marginBottom:10}},ce('b',null,'varieties is a platform table'),' referenced across Vision and CRM. This tab reads it and writes only ',ce('span',{className:'lot'},'code'),' and ',ce('span',{className:'lot'},'raw_names'),'. Creating, renaming or deactivating a variety happens in the platform admin, not here.'),
+      ce('div',{style:{display:'flex',alignItems:'center',justifyContent:'space-between',gap:12,flexWrap:'wrap'}},
+        ce('div',{className:'section-title',style:{margin:'4px 0 10px'}},ce('span',{className:'section-title-bar'}),'Varieties ('+d.varieties.length+') — shared platform table, read-mostly'),
+        ctx.canWrite?ce('button',{className:'btn btn-primary btn-sm',onClick:function(){setMgrOpen(true);}},'Manage breeders'):null),
+      ce('div',{className:'note',style:{marginBottom:10}},ce('b',null,'varieties is a platform table'),' referenced across Vision and CRM. This tab reads it and writes only ',ce('span',{className:'lot'},'code'),', ',ce('span',{className:'lot'},'raw_names'),' and ',ce('span',{className:'lot'},'breeder_id'),'. Creating, renaming or deactivating a variety happens in the platform admin, not here. Tagging a breeder here flows through to every plot, QC report and shipment on that variety.'),
+      // filter bar
+      ce('div',{style:{display:'flex',gap:12,flexWrap:'wrap',alignItems:'flex-end',marginBottom:12}},
+        ce('div',null,ce('label',{className:'form-label'},'Product'),selx(flt.product,function(x){setFlt(Object.assign({},flt,{product:x,category:''}));},[{v:'',l:'All products'}].concat(products.map(function(p){return {v:p,l:p};})),{style:{width:'auto',minWidth:130}})),
+        ce('div',null,ce('label',{className:'form-label'},'Category'),selx(flt.category,function(x){setFlt(Object.assign({},flt,{category:x}));},[{v:'',l:'All categories'}].concat(cats.map(function(c){return {v:c,l:c};})),{style:{width:'auto',minWidth:130}})),
+        ce('div',null,ce('label',{className:'form-label'},'Breeder'),selx(flt.breeder,function(x){setFlt(Object.assign({},flt,{breeder:x}));},[{v:'',l:'All breeders'}].concat((d.breeders||[]).map(function(b){return {v:b.id,l:b.name};})).concat([{v:'__none',l:'— Unassigned —'}]),{style:{width:'auto',minWidth:150}})),
+        ce('div',null,ce('label',{className:'form-label'},'Variety'),txt(flt.q,function(x){setFlt(Object.assign({},flt,{q:x}));},{type:'search',placeholder:'Search code or name…',style:{width:190}})),
+        ce('button',{className:'chip'+(flt.withBlocks?' active':''),onClick:function(){setFlt(Object.assign({},flt,{withBlocks:!flt.withBlocks}));}},(flt.withBlocks?'☑':'☐')+' With blocks only'),
+        ce('button',{className:'btn btn-secondary btn-sm',onClick:function(){setFlt({product:'',category:'',breeder:'',q:'',withBlocks:true});}},'Clear'),
+        ce('div',{style:{flex:1}}),
+        ce('div',{style:{fontSize:12,color:'var(--text3)',fontFamily:'var(--font-mono)'}},rows.length+' shown · '+assigned+'/'+d.varieties.length+' assigned')),
       ce('div',{className:'table-wrap'},
         ce('table',null,
-          ce('thead',null,ce('tr',null,['Crop','Code','Name','Spellings (raw_names)','Blocks'].map(function(h){return ce('th',{key:h,className:h==='Blocks'?'num':null},h);}))),
-          ce('tbody',null, d.varieties.filter(function(v){return d.vCount[v.id];}).sort(function(a,b){return (d.vCount[b.id]||0)-(d.vCount[a.id]||0);}).map(function(v){return ce('tr',{key:v.id},
+          ce('thead',null,ce('tr',null,['Crop','Code','Name','Spellings (raw_names)','Category','Breeder','Blocks'].map(function(h){return ce('th',{key:h,className:h==='Blocks'?'num':null},h);}))),
+          ce('tbody',null, rows.map(function(v){return ce('tr',{key:v.id},
             ce('td',null,ce('span',null,ce('span',{style:{display:'inline-block',width:8,height:8,borderRadius:2,background:CROP_COLORS[v.product_id]||'#999',marginRight:6}}),v.product_id)),
             ce('td',null,v.code?ce('span',{className:'lot'},v.code):ce('span',{style:{color:'var(--red)'}},'none')),
-            ce('td',{className:v.active?null:'',style:v.active?null:{color:'var(--text3)'}},v.name+(v.active?'':' (inactive)')),
+            ce('td',{style:v.active?null:{color:'var(--text3)'}},v.name+(v.active?'':' (inactive)')),
             ce('td',{className:'ar',dir:'auto',style:{fontSize:11,color:'var(--text3)'}},(v.raw_names||[]).join(' · ')||'—'),
+            ce('td',null,catName(v)||'—'),
+            ce('td',{style:(!v.breeder_id?{background:'var(--amber-bg)'}:null)},brCell(v)),
             ce('td',{className:'num'},d.vCount[v.id]||0));}))
         )),
-      ce('div',{style:{fontSize:11,color:'var(--text3)',marginTop:8}},'Showing varieties with blocks. Full platform list & create/rename live in the variety admin.')
+      ce('div',{style:{fontSize:11,color:'var(--text3)',marginTop:8}},'Default view shows varieties with blocks. Turn off ',ce('b',null,'With blocks only'),' to reach and tag orphan varieties.')
     );
   }
 
@@ -1914,7 +1969,83 @@ function ReferenceDataScreen(ctx){
     body,
     newOpen?ce(NewMetricSetModal,{ctx:ctx,metrics:d.metrics,sets:d.sets,
       onClose:function(){setNewOpen(false);},
-      onDone:function(m){ setNewOpen(false); setTab('metrics'); setFlash({kind:'ok',t:m+' No migration, no deploy.'}); load(); }}):null
+      onDone:function(m){ setNewOpen(false); setTab('metrics'); setFlash({kind:'ok',t:m+' No migration, no deploy.'}); load(); }}):null,
+    mgrOpen?ce(ManageBreedersModal,{ctx:ctx,breeders:d.breeders||[],varieties:d.varieties,vExpand:vExpand,setVExpand:setVExpand,
+      onClose:function(){setMgrOpen(false);},
+      onChanged:function(msg){ setFlash({kind:'ok',t:msg}); load(); }}):null
+  );
+}
+
+/* ── Manage breeders — CRUD on the breeders lookup (§4.0). Writes only public.breeders. ── */
+function ManageBreedersModal(p){
+  var fs=useState(null); var form=fs[0],setForm=fs[1];   // {id?,name,code,country,notes} when adding/editing
+  var bs=useState(false); var busy=bs[0],setBusy=bs[1];
+  var es=useState(null); var err=es[0],setErr=es[1];
+  function vFor(id){ return (p.varieties||[]).filter(function(v){return v.breeder_id===id;}); }
+  function startAdd(){ setErr(null); setForm({name:'',code:'',country:'',notes:''}); }
+  function startEdit(b){ setErr(null); setForm({id:b.id,name:b.name||'',code:b.code||'',country:b.country||'',notes:b.notes||''}); }
+  function save(){
+    var name=(form.name||'').trim(); if(!name){ setErr('Name is required.'); return; }
+    setBusy(true); setErr(null);
+    var row={name:name,code:(form.code||'').trim()||null,country:(form.country||'').trim()||null,notes:(form.notes||'').trim()||null};
+    var q=form.id?supabase.from('breeders').update(row).eq('id',form.id):supabase.from('breeders').insert(row);
+    q.then(function(r){ setBusy(false);
+      if(r.error){ setErr(/duplicate|unique/i.test(r.error.message)?('A breeder named "'+name+'" already exists.'):('Save failed: '+r.error.message)); return; }
+      setForm(null); p.onChanged((form.id?'Updated ':'Added ')+'breeder "'+name+'".');
+    });
+  }
+  function del(b){
+    var n=vFor(b.id).length; if(n){ setErr('"'+b.name+'" is used by '+n+' varieties — reassign them first.'); return; }
+    setBusy(true); setErr(null);
+    supabase.from('breeders').delete().eq('id',b.id).then(function(r){ setBusy(false);
+      if(r.error){ setErr('Delete failed: '+r.error.message); return; }
+      p.onChanged('Deleted breeder "'+b.name+'".');
+    });
+  }
+  var canW=p.ctx.canWrite;
+  var listBody=(p.breeders||[]).length?ce('div',{className:'table-wrap'},
+    ce('table',null,
+      ce('thead',null,ce('tr',null,['Name','Code','Country','Varieties',''].map(function(h){return ce('th',{key:h,className:h==='Varieties'?'num':null},h);}))),
+      ce('tbody',null, p.breeders.map(function(b){
+        var vs=vFor(b.id); var open=p.vExpand[b.id];
+        var main=ce('tr',{key:b.id},
+          ce('td',null,b.name),
+          ce('td',null,b.code?ce('span',{className:'lot'},b.code):'—'),
+          ce('td',null,b.country||'—'),
+          ce('td',{className:'num'},vs.length?ce('button',{className:'btn btn-secondary btn-sm',onClick:function(){var o=Object.assign({},p.vExpand);o[b.id]=!o[b.id];p.setVExpand(o);}},(open?'▾ ':'▸ ')+vs.length):'0'),
+          ce('td',{style:{textAlign:'right'}}, canW?ce('span',{style:{display:'inline-flex',gap:6,justifyContent:'flex-end'}},
+            ce('button',{className:'btn btn-secondary btn-sm',onClick:function(){startEdit(b);}},'Edit'),
+            ce('button',{className:'btn btn-secondary btn-sm',disabled:!!vs.length,onClick:function(){del(b);}},'Delete')):null));
+        if(!(open&&vs.length)) return main;
+        var detail=ce('tr',{key:b.id+'_x'},ce('td',{colSpan:5,style:{background:'var(--bg2)'}},
+          ce('div',{style:{display:'flex',flexWrap:'wrap',gap:6}}, vs.map(function(v){return ce('span',{key:v.id,style:{display:'inline-flex',alignItems:'center',gap:5,background:'#fff',border:'1px solid var(--border)',borderRadius:20,padding:'3px 10px',fontSize:12}},
+            ce('span',{style:{display:'inline-block',width:8,height:8,borderRadius:2,background:CROP_COLORS[v.product_id]||'#999'}}),
+            ce('span',{className:'lot'},v.code||'—'),' ',v.name);}))));
+        return [main,detail];
+      }))
+    )):ce('div',{className:'note'},'No breeders yet. Add the first one below.');
+
+  var formBody=form?ce('div',{style:{marginTop:14,background:'var(--bg2)',border:'1px solid var(--border)',borderRadius:12,padding:'14px 16px'}},
+    ce('div',{style:{fontWeight:600,fontSize:13,marginBottom:10}},form.id?'Edit breeder':'New breeder'),
+    err?ce('div',{className:'alert alert-fail',style:{marginBottom:10}},ce('span',null,'✕'),ce('div',null,err)):null,
+    ce('div',{className:'field-row'},
+      ce(Field,{label:'Name'},txt(form.name,function(x){setForm(Object.assign({},form,{name:x}));},{placeholder:'e.g. SNFL Group'})),
+      ce(Field,{label:'Code'},txt(form.code,function(x){setForm(Object.assign({},form,{code:x}));},{placeholder:'e.g. SNFL'}))),
+    ce('div',{className:'field-row'},
+      ce(Field,{label:'Country'},txt(form.country,function(x){setForm(Object.assign({},form,{country:x}));},{placeholder:'e.g. Spain'})),
+      ce(Field,{label:'Notes'},txt(form.notes,function(x){setForm(Object.assign({},form,{notes:x}));},{placeholder:'optional'}))),
+    ce('div',{style:{display:'flex',gap:8,marginTop:12}},
+      ce('button',{className:'btn btn-primary',onClick:save,disabled:busy},busy?'Saving…':'Save'),
+      ce('button',{className:'btn btn-secondary',onClick:function(){setForm(null);},disabled:busy},'Cancel'))
+  ):null;
+
+  return ce(Modal,{title:'Breeders',sub:'writes public.breeders · farm writers only',onClose:p.onClose,busy:busy,wide:true,
+    footer:[ canW&&!form?ce('button',{key:'add',className:'btn btn-primary',onClick:startAdd},'+ Add breeder'):null,
+             ce('div',{key:'sp',style:{flex:1}}),
+             ce('button',{key:'done',className:'btn btn-secondary',onClick:p.onClose},'Done') ]},
+    err&&!form?ce('div',{className:'alert alert-fail',style:{marginBottom:10}},ce('span',null,'✕'),ce('div',null,err)):null,
+    listBody, formBody,
+    !canW?ce('div',{className:'band',style:{marginTop:12}},'Read-only — breeders are editable by farm writers (admin / power_user / agronomy_admin).'):null
   );
 }
 
