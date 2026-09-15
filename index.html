@@ -1981,7 +1981,43 @@ function ManageBreedersModal(p){
   var fs=useState(null); var form=fs[0],setForm=fs[1];   // {id?,name,code,country,notes} when adding/editing
   var bs=useState(false); var busy=bs[0],setBusy=bs[1];
   var es=useState(null); var err=es[0],setErr=es[1];
+  var _today=new Date().toISOString().slice(0,10);
+  var xf=useState(null); var exFor=xf[0],setExFor=xf[1];          // breeder being extracted
+  var xb=useState(false); var exBusy=xb[0],setExBusy=xb[1];
+  var xm=useState(null); var exMsg=xm[0],setExMsg=xm[1];
+  var xr=useState({from:'2025-08-01',to:_today,inspections:true,qc:true,shipments:true,claims:true});
+  var exOpt=xr[0],setExOpt=xr[1];
   function vFor(id){ return (p.varieties||[]).filter(function(v){return v.breeder_id===id;}); }
+  function startExtract(b){ setErr(null); setExMsg(null); setExFor(b); }
+  function buildWorkbook(d){
+    var U=XLSX.utils, wb=U.book_new(), s=d.summary||{}, b=d.breeder||{};
+    function add(name,rows){ U.book_append_sheet(wb, U.json_to_sheet((rows&&rows.length)?rows:[{'(no rows)':''}]), name); }
+    U.book_append_sheet(wb, U.json_to_sheet([
+      {field:'Breeder',value:b.name},{field:'Code',value:b.code},{field:'Country',value:b.country},
+      {field:'Loading date from',value:d.params.from},{field:'Loading date to',value:d.params.to},
+      {field:'Varieties',value:s.varieties},{field:'Shipments',value:s.shipments},{field:'Containers',value:s.containers},
+      {field:'Net weight (t)',value:s.net_weight_t},{field:'Inspections',value:s.inspections},{field:'QC reports',value:s.qc},{field:'Claims',value:s.claims}
+    ]), 'Summary');
+    add('Varieties', d.varieties);
+    if(d.shipments) add('Shipments', d.shipments);
+    if(d.inspections) add('Inspections', d.inspections);
+    if(d.qc) add('QC', d.qc);
+    if(d.claims) add('Claims', d.claims);
+    if((d.unmatched_shipment_varieties||[]).length) add('Unmatched varieties', d.unmatched_shipment_varieties.map(function(v){return {variety:v};}));
+    var tag=(b.code||b.name||'breeder').replace(/[^A-Za-z0-9]+/g,'_');
+    XLSX.writeFile(wb, 'Breeder_'+tag+'_'+d.params.from+'_'+d.params.to+'.xlsx');
+  }
+  function runExtract(){
+    var reps=['inspections','qc','shipments','claims'].filter(function(k){return exOpt[k];});
+    setExBusy(true); setExMsg({k:'busy',t:'Building extract…'});
+    supabase.rpc('breeder_extract',{p_breeder_id:exFor.id,p_from:exOpt.from,p_to:exOpt.to,p_reports:reps}).then(function(r){
+      setExBusy(false);
+      if(r.error){ setExMsg({k:'err',t:'Extract failed: '+r.error.message}); return; }
+      var s=(r.data&&r.data.summary)||{};
+      try{ buildWorkbook(r.data); setExMsg({k:'ok',t:'Downloaded — '+(s.shipments||0)+' shipments · '+(s.inspections||0)+' inspections · '+(s.qc||0)+' QC.'}); }
+      catch(e){ setExMsg({k:'err',t:'Build failed: '+e.message}); }
+    });
+  }
   function startAdd(){ setErr(null); setForm({name:'',code:'',country:'',notes:''}); }
   function startEdit(b){ setErr(null); setForm({id:b.id,name:b.name||'',code:b.code||'',country:b.country||'',notes:b.notes||''}); }
   function save(){
@@ -2013,9 +2049,10 @@ function ManageBreedersModal(p){
           ce('td',null,b.code?ce('span',{className:'lot'},b.code):'—'),
           ce('td',null,b.country||'—'),
           ce('td',{className:'num'},vs.length?ce('button',{className:'btn btn-secondary btn-sm',onClick:function(){var o=Object.assign({},p.vExpand);o[b.id]=!o[b.id];p.setVExpand(o);}},(open?'▾ ':'▸ ')+vs.length):'0'),
-          ce('td',{style:{textAlign:'right'}}, canW?ce('span',{style:{display:'inline-flex',gap:6,justifyContent:'flex-end'}},
-            ce('button',{className:'btn btn-secondary btn-sm',onClick:function(){startEdit(b);}},'Edit'),
-            ce('button',{className:'btn btn-secondary btn-sm',disabled:!!vs.length,onClick:function(){del(b);}},'Delete')):null));
+          ce('td',{style:{textAlign:'right'}}, ce('span',{style:{display:'inline-flex',gap:6,justifyContent:'flex-end'}},
+            (p.ctx.isAdmin&&vs.length)?ce('button',{className:'btn btn-secondary btn-sm',style:{color:'var(--accent)',borderColor:'var(--accent)'},onClick:function(){startExtract(b);}},'⇩ Extract'):null,
+            canW?ce('button',{className:'btn btn-secondary btn-sm',onClick:function(){startEdit(b);}},'Edit'):null,
+            canW?ce('button',{className:'btn btn-secondary btn-sm',disabled:!!vs.length,onClick:function(){del(b);}},'Delete'):null)));
         if(!(open&&vs.length)) return main;
         var detail=ce('tr',{key:b.id+'_x'},ce('td',{colSpan:5,style:{background:'var(--bg2)'}},
           ce('div',{style:{display:'flex',flexWrap:'wrap',gap:6}}, vs.map(function(v){return ce('span',{key:v.id,style:{display:'inline-flex',alignItems:'center',gap:5,background:'#fff',border:'1px solid var(--border)',borderRadius:20,padding:'3px 10px',fontSize:12}},
@@ -2039,12 +2076,28 @@ function ManageBreedersModal(p){
       ce('button',{className:'btn btn-secondary',onClick:function(){setForm(null);},disabled:busy},'Cancel'))
   ):null;
 
+  function xcb(key,label){ return ce('label',{style:{display:'inline-flex',alignItems:'center',gap:5,fontSize:13,cursor:'pointer'}},
+    ce('input',{type:'checkbox',checked:!!exOpt[key],onChange:function(e){var o=Object.assign({},exOpt);o[key]=e.target.checked;setExOpt(o);}}),' ',label); }
+  var exPanel=exFor?ce('div',{style:{marginTop:14,background:'var(--bg2)',border:'1px solid var(--border)',borderRadius:12,padding:'14px 16px'}},
+    ce('div',{style:{fontWeight:600,fontSize:13,marginBottom:4}},'Extract · '+exFor.name),
+    ce('div',{className:'note',style:{marginBottom:10}},'Scoped by ',ce('span',{className:'lot'},'shipment loading_date'),'. Inspections/QC/claims are matched to those shipments by normalized container ',ce('b',null,'and'),' limited to this breeder’s varieties. Builds a multi-sheet .xlsx.'),
+    exMsg?ce('div',{className:'alert '+(exMsg.k==='ok'?'alert-ok':exMsg.k==='err'?'alert-fail':'alert-warn'),style:{marginBottom:10}},ce('span',null,exMsg.k==='ok'?'✓':exMsg.k==='err'?'✕':'…'),ce('div',null,exMsg.t)):null,
+    ce('div',{className:'field-row'},
+      ce(Field,{label:'Loading date from'},txt(exOpt.from,function(x){setExOpt(Object.assign({},exOpt,{from:x}));},{type:'date'})),
+      ce(Field,{label:'Loading date to'},txt(exOpt.to,function(x){setExOpt(Object.assign({},exOpt,{to:x}));},{type:'date'}))),
+    ce('div',{style:{display:'flex',gap:14,flexWrap:'wrap',alignItems:'center',margin:'10px 0 4px'}},
+      ce('span',{className:'form-label',style:{margin:0}},'Include'), xcb('inspections','Inspections'), xcb('qc','QC reports'), xcb('shipments','Shipments'), xcb('claims','Claims')),
+    ce('div',{style:{display:'flex',gap:8,marginTop:12}},
+      ce('button',{className:'btn btn-primary',onClick:runExtract,disabled:exBusy},exBusy?'Building…':'⇩ Download .xlsx'),
+      ce('button',{className:'btn btn-secondary',onClick:function(){setExFor(null);setExMsg(null);},disabled:exBusy},'Close'))
+  ):null;
+
   return ce(Modal,{title:'Breeders',sub:'writes public.breeders · farm writers only',onClose:p.onClose,busy:busy,wide:true,
-    footer:[ canW&&!form?ce('button',{key:'add',className:'btn btn-primary',onClick:startAdd},'+ Add breeder'):null,
+    footer:[ canW&&!form&&!exFor?ce('button',{key:'add',className:'btn btn-primary',onClick:startAdd},'+ Add breeder'):null,
              ce('div',{key:'sp',style:{flex:1}}),
              ce('button',{key:'done',className:'btn btn-secondary',onClick:p.onClose},'Done') ]},
     err&&!form?ce('div',{className:'alert alert-fail',style:{marginBottom:10}},ce('span',null,'✕'),ce('div',null,err)):null,
-    listBody, formBody,
+    listBody, formBody, exPanel,
     !canW?ce('div',{className:'band',style:{marginTop:12}},'Read-only — breeders are editable by farm writers (admin / power_user / agronomy_admin).'):null
   );
 }
