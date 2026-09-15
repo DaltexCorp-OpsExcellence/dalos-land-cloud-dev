@@ -729,7 +729,7 @@ function RegisterScreen(ctx){
   useEffect(function(){ loadMeta(); }, [ctx.crop]);
 
   function base(){
-    var sel='id,operational_block_id,aydi_block_number,product_id,farm_code,sector_code,plot_code,planting_year,total_area_fed,planted_area_fed,aerobotics_area_ha,jde_cost_center_id,rootstock_id,lifecycle,last_producing_season,farms(name),varieties(name),farm_rootstocks(name)';
+    var sel='id,operational_block_id,aydi_block_number,product_id,farm_code,sector_code,plot_code,planting_year,total_area_fed,planted_area_fed,aerobotics_area_ha,jde_cost_center_id,rootstock_id,lifecycle,last_producing_season,farms(name),varieties(name,breeders(name)),farm_rootstocks(name)';
     var query=supabase.from('farm_blocks').select(sel,{count:'exact'});
     if(ctx.crop!=='all') query=query.eq('product_id',ctx.crop);
     if(farmF) query=query.eq('farm_code',farmF);
@@ -809,7 +809,7 @@ function RegisterScreen(ctx){
     ce('div',null,
       ce('div',{className:'table-wrap'},
         ce('table',null,
-          ce('thead',null,ce('tr',null,['Aydi','Block ID','Crop','Farm','Variety','Rootstock','Planted','Total fed','Bearing fed','Last season','Aero ha','Cost ctr','Status'].map(function(h){var numH={'Planted':1,'Total fed':1,'Bearing fed':1,'Last season':1,'Aero ha':1,'Cost ctr':1};return ce('th',{key:h,style:numH[h]?{textAlign:'right'}:null},h);}))),
+          ce('thead',null,ce('tr',null,['Aydi','Block ID','Crop','Farm','Variety','Breeder','Rootstock','Planted','Total fed','Bearing fed','Last season','Aero ha','Cost ctr','Status'].map(function(h){var numH={'Planted':1,'Total fed':1,'Bearing fed':1,'Last season':1,'Aero ha':1,'Cost ctr':1};return ce('th',{key:h,style:numH[h]?{textAlign:'right'}:null},h);}))),
           ce('tbody',null, st.rows.map(function(b){
             return ce('tr',{key:b.id,className:'rowlink',onClick:function(){setSel(b);}},
               ce('td',{style:{whiteSpace:'nowrap'}}, ce('span',{className:'lot',style:{fontWeight:600}}, b.aydi_block_number||'—')),
@@ -817,6 +817,7 @@ function RegisterScreen(ctx){
               ce('td',null, ce('span',{style:{display:'inline-block',width:8,height:8,borderRadius:2,background:CROP_COLORS[b.product_id]||'#999',marginRight:6}}), b.product_id),
               ce('td',null, (b.farms&&b.farms.name)||b.farm_code),
               ce('td',{className:'ar',dir:'auto'}, (b.varieties&&b.varieties.name)||'—'),
+              ce('td',null, (b.varieties&&b.varieties.breeders&&b.varieties.breeders.name)||ce('span',{style:{color:'var(--text3)'}},'—')),
               ce('td',{className:'ar',dir:'auto'}, (b.farm_rootstocks&&b.farm_rootstocks.name)||'—'),
               ce('td',{className:'num'}, b.planting_year),
               ce('td',{className:'num'}, fmt(b.total_area_fed)),
@@ -862,7 +863,7 @@ function BlockDetail(p){
   var bstate=useState(p.block); var b=bstate[0],setB=bstate[1];
   useEffect(function(){ setB(p.block); },[p.block]);   // follow parent's selection; sibling nav is internal
   function openBlock(id){ if(!id||id===b.id) return;
-    supabase.from('farm_blocks').select('id,operational_block_id,aydi_block_number,product_id,farm_code,sector_code,plot_code,planting_year,total_area_fed,planted_area_fed,aerobotics_area_ha,jde_cost_center_id,rootstock_id,lifecycle,last_producing_season,farms(name),varieties(name),farm_rootstocks(name)')
+    supabase.from('farm_blocks').select('id,operational_block_id,aydi_block_number,product_id,farm_code,sector_code,plot_code,planting_year,total_area_fed,planted_area_fed,aerobotics_area_ha,jde_cost_center_id,rootstock_id,lifecycle,last_producing_season,farms(name),varieties(name,breeders(name)),farm_rootstocks(name)')
       .eq('id',id).maybeSingle().then(function(r){ if(r.data) setB(r.data); }); }
   var aeroFed = b.aerobotics_area_ha==null ? null : Math.round(b.aerobotics_area_ha*2.38095*100)/100;
   var variance = (aeroFed!=null && b.total_area_fed>0) ? Math.round((aeroFed-b.total_area_fed)/b.total_area_fed*1000)/10 : null;
@@ -1047,6 +1048,7 @@ function BlockDetail(p){
           row('Crop', b.product_id),
           row('Farm', (b.farms&&b.farms.name)||b.farm_code),
           row('Variety', (b.varieties&&b.varieties.name)||'—'),
+          row('Breeder', (b.varieties&&b.varieties.breeders&&b.varieties.breeders.name)||'—'),
           row('Rootstock', (b.farm_rootstocks&&b.farm_rootstocks.name)||'own-rooted / none'),
           row('Planting year', b.planting_year),
           row('Cost centre', b.jde_cost_center_id||'— not assigned'),
@@ -1329,6 +1331,10 @@ function FarmMapScreen(ctx){
   var dw=useState(false); var drawing=dw[0],setDrawing=dw[1];
   var ag=useState(null); var assign=ag[0],setAssign=ag[1];
   var sry=useState(false); var seriesReady=sry[0],setSeriesReady=sry[1]; // per-block production series done paging in
+  var bmp=useState({}); var brMap=bmp[0],setBrMap=bmp[1];   // variety name (lower) -> breeder name; v_farm_block_geom carries variety as text
+  useEffect(function(){ supabase.from('varieties').select('name,breeders(name)').then(function(r){
+    if(r.error||!r.data) return; var m={}; r.data.forEach(function(v){ if(v.name&&v.breeders&&v.breeders.name) m[String(v.name).trim().toLowerCase()]=v.breeders.name; }); setBrMap(m); }); },[]);
+  function breederOf(v){ if(!v) return null; return brMap[String(v).trim().toLowerCase()]||null; }
 
   function refreshGeom(){ var q=supabase.from('v_farm_block_geom').select('*'); if(ctx.crop!=='all') q=q.eq('product_id',ctx.crop);
     q.then(function(r){ if(r.error||!r.data) return; var features=[]; r.data.forEach(function(row){ if(!row.geojson) return; try{ features.push({type:'Feature',geometry:JSON.parse(row.geojson),properties:row}); }catch(e){} });
@@ -1511,6 +1517,7 @@ function FarmMapScreen(ctx){
         ce('div',null, ce('div',{className:'k'},'Farm'), ce('div',{className:'v'}, (sel.farm_name||'—'), sel.farm_code?ce('span',{className:'lot',style:{marginLeft:5}},sel.farm_code):null)),
         ce('div',null, ce('div',{className:'k'},'Crop'), ce('div',{className:'v'}, fmCrop(sel.product_id))),
         ce('div',null, ce('div',{className:'k'},'Cultivar'), ce('div',{className:'v'}, sel.variety||ce('span',{style:{color:'var(--red)'}},'unknown'))),
+        ce('div',null, ce('div',{className:'k'},'Breeder'), ce('div',{className:'v'}, breederOf(sel.variety)||ce('span',{style:{color:'var(--text3)'}},'—'))),
         ce('div',null, ce('div',{className:'k'},'Rootstock'), ce('div',{className:'v'}, (!sel.rootstock||sel.rootstock==='No')?'own-rooted':sel.rootstock)),
         kvItem('Planting year', sel.planting_year||'—'),
         kvItem('Area', haOf(sel.total_area_fed).toFixed(2)+' ha'),
@@ -1594,7 +1601,7 @@ function FarmMapScreen(ctx){
           ce('button',{className:'btn btn-secondary btn-sm',onClick:exportGeoJSON},'GeoJSON')),
         hover?ce('div',{className:'hc',style:{left:hover.x,top:hover.y}},
           ce('div',{className:'hc-h'}, ce('b',null,hover.p.aydi_block_number), ce('span',{style:{color:'var(--text3)',fontSize:10.5}}, fmCrop(hover.p.product_id)), ce('span',{className:'a'}, fmt(hover.p.total_area_fed)+' fed')),
-          ce('div',{className:'hc-v'}, (hover.p.variety||'unknown')+' · planted '+(hover.p.planting_year||'—')),
+          ce('div',{className:'hc-v'}, (hover.p.variety||'unknown')+(breederOf(hover.p.variety)?' · '+breederOf(hover.p.variety):'')+' · planted '+(hover.p.planting_year||'—')),
           spark(seriesRef.current[hover.p.id],false)
         ):null
       ),
