@@ -719,7 +719,7 @@ function viewCols(){
 // ---------- ACTUAL · DAY VIEW: harvest split by destination ----------
 // To Packhouse (=actStore, vs-plan) + Field Sorting + Local Sales + Waste (=actBreak). Day total = their sum.
 // English labels + DB columns mirror the grapes harvest_data model (raw_station/harvest_sorting/local_sales/waste).
-let curDay=null;
+let curDay=null,curDayShow=null;
 const DAY_CATS=[['wared','To Packhouse','وارد محطة'],['sorting','Field Sorting','فرزة أرض'],['local','Local Sales','خام تجار'],['waste','Waste','إعدامات']];
 function getBreak(i,w,d,cat){const b=actBreak[i+'|'+w+'|'+d];return b&&b[cat]!=null?b[cat]:null;}
 function fmtT(v){v=Math.round(v*10)/10;return v%1?v.toFixed(1):String(v);}
@@ -742,7 +742,7 @@ function dayRecalc(){
   const groups=logGroups(); const grand={wared:0,sorting:0,local:0,waste:0,tot:0};
   groups.forEach((g,gi)=>{
     const sub={wared:0,sorting:0,local:0,waste:0,tot:0};
-    g.idxs.forEach(i=>{
+    (curDayShow?g.idxs.filter(curDayShow):g.idxs).forEach(i=>{
       const wared=getActual(i,w,di)||0,sorting=getBreak(i,w,di,'sorting')||0,local=getBreak(i,w,di,'local')||0,waste=getBreak(i,w,di,'waste')||0;
       const tot=wared+sorting+local+waste;
       const dt=document.getElementById('dtot_'+i); if(dt)dt.textContent=fmtT(tot);
@@ -759,8 +759,9 @@ function dayRecalc(){
   DAY_CATS.forEach(c=>{const el=document.getElementById('dgt_'+c[0]);if(el)el.textContent=fmtT(grand[c[0]]);});
   const gtt=document.getElementById('dgtt'); if(gtt)gtt.textContent=fmtT(grand.tot);
 }
-function renderDaySplit(dc){
-  curDay=dc; const w=dc.w, di=dc.di; const isFut=(w>CUR)||(w===CUR&&di>CURDAY);
+function renderDaySplit(dc,opts){
+  opts=opts||{}; curDay=dc; const w=dc.w, di=dc.di; const isFut=(w>CUR)||(w===CUR&&di>CURDAY);
+  curDayShow = opts.today ? (i=> dayPlan(i,w,di)>0 || (dayTotalT(i,w,di)||0)>0) : null; // Today = only in-window-today / logged-today plots
   const NCOL=3+4+4+2;
   let head=`<tr>
     <th class="frozen f0">Farm</th><th class="frozen f1">Plot</th><th class="frozen f2">Var.</th>
@@ -770,9 +771,10 @@ function renderDaySplit(dc){
   const groups=logGroups(); let body='';
   const idp={wared:'c',sorting:'bs',local:'bl',waste:'bw'};
   groups.forEach((g,gi)=>{
-    if(!g.idxs.length)return;
+    const idxs = curDayShow ? g.idxs.filter(curDayShow) : g.idxs;
+    if(!idxs.length)return;
     body+=`<tr class="grp"><td colspan="${NCOL}"><span class="grplbl">${g.label}</span></td></tr>`;
-    g.idxs.forEach(i=>{
+    idxs.forEach(i=>{
       const p=plots[i], ay=getAY(i), wl=winOf(i);
       const vals={wared:getActual(i,w,di),sorting:getBreak(i,w,di,'sorting'),local:getBreak(i,w,di,'local'),waste:getBreak(i,w,di,'waste')};
       const inp=DAY_CATS.map(c=>`<td class="daycell dsh-${c[0]}"><input class="cin harv dsin" id="${idp[c[0]]}_${i}_${w}_${di}" value="${vals[c[0]]==null?'':vals[c[0]]}"${isFut?' disabled':''} placeholder="${isFut?'':'—'}" oninput="dayEdit(this,'${c[0]}')"></td>`).join('');
@@ -825,13 +827,18 @@ function renderLog(){
     : (cols.length>7?('Weeks of '+WK[selWeek]+' – '+WK[Math.min(selWeek+1,WK.length-1)]):('Week of '+WK[selWeek]));
   document.getElementById('logHint').innerHTML=
     m==='plan' ? '<b>Setting the plan.</b> Enter the <b>Planned</b> season total (t) — Planted area is from Land Cloud (read-only) and <b>Yield</b> is calculated (Planned ÷ Planted). Then click the <b>harvest-window</b> chip to set start/peak/end/shape — the tool draws the curve. Two weeks shown; day cells can be hand-tweaked (edited cells get a green outline). Faint number = actual harvest.'
-  : isToday ? '<b>Logging today.</b> One column: type each plot\'s tonnes and press <b>Enter</b> (or ↓) to move to the next plot. <b>Blank = not logged yet</b>; type <b>0</b> for “no pick”. Rows = plots in window today or already logged today. Plan fields are read-only here.'
+  : isToday ? '<b>Logging today.</b> Each plot\'s pick is split by destination — To Packhouse (vs plan), Field Sorting, Local Sales, Waste. <b>Blank = not logged yet</b>; type <b>0</b> for “no pick”. Rows = plots in window today or already logged today. Plan fields are read-only here.'
   : actView==='day' ? '<b>Logging a day.</b> Pick any date on the right; one column — type each plot\'s tonnes and press <b>Enter</b> (or ↓) for the next plot. Blank = not logged; 0 = no pick. Plan fields are read-only here.'
   :         '<b>Two-week overview.</b> Each cell is the day\'s <b>total pick</b> (all four destinations); the faint <b>PH</b> = the To-Packhouse portion. Tap any day to open its four-way split and log it. Row total = tonnes picked over the fortnight; <b>vs plan</b> tracks To Packhouse.';
-  if(m==='harv' && actView==='day' && !document.body.classList.contains('present')){
-    renderDaySplit(cols[0]);
+  if(m==='harv' && (actView==='day'||actView==='today') && !document.body.classList.contains('present')){
+    renderDaySplit(cols[0],{today:isToday});
     document.getElementById('cellLegend').innerHTML=`<span>Destinations:</span> <b style="color:var(--accent)">To Packhouse</b> = export-bound (vs plan) · Field Sorting = field grade-out · Local Sales = raw to traders · Waste = condemned · <b>Day total</b> = sum`;
-    document.getElementById('modeBanner').innerHTML=`<span class="tag">Actual Harvest</span><span>Logging <b>${cols[0].wd} ${cols[0].d} ${cols[0].mon}</b> — split each plot's pick by destination. <b>vs plan</b> is on To Packhouse (وارد محطة). Blank = not logged.</span>`;
+    if(isToday){
+      let rowsN=0,loggedN=0;plots.forEach((p,i)=>{if(document.getElementById('c_'+i+'_'+CUR+'_'+CURDAY)){rowsN++;if(getActual(i,CUR,CURDAY)!=null)loggedN++;}});
+      document.getElementById('modeBanner').innerHTML=`<span class="tag">Actual Harvest</span><span>Today · ${cols[0].wd} ${cols[0].d} — <b><span id="todayCnt">${loggedN} of ${rowsN}</span></b> in-window plots logged · split each plot's pick by destination. <b>vs plan</b> on To Packhouse (وارد محطة). Blank = not logged.</span>`;
+    } else {
+      document.getElementById('modeBanner').innerHTML=`<span class="tag">Actual Harvest</span><span>Logging <b>${cols[0].wd} ${cols[0].d} ${cols[0].mon}</b> — split each plot's pick by destination. <b>vs plan</b> is on To Packhouse (وارد محطة). Blank = not logged.</span>`;
+    }
     updateDirtyBadge(); return;
   }
   const NCOL=7+cols.length+2;
