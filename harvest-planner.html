@@ -597,8 +597,8 @@ function dowOf(str){return new Date(str+'T00:00:00').getDay();}
 function dateOf(w,d){const x=new Date(WKDATE[w]);x.setDate(x.getDate()+d);return ymd(x);}
 
 // per-plot editable overrides
-const planStore={}, actStore={}, planDayStore={}, winStore={}; // area/yield ; actual (=To Station) ; day-plan override ; harvest window
-const actBreak={}; // i|w|d -> {sorting,local,waste} : daily harvest-destination split (To Station lives in actStore=actual_t)
+const planStore={}, actStore={}, planDayStore={}, winStore={}; // area/yield ; actual (=To Packhouse) ; day-plan override ; harvest window
+const actBreak={}; // i|w|d -> {sorting,local,waste} : daily harvest-destination split (To Packhouse lives in actStore=actual_t)
 const planBaseTs={}; // block_id -> hp_plan.updated_at at load, for optimistic-concurrency checks on save
 const reviewStore={}; // i|w|d -> off-plan review_status: off_plan_confirmed | data_error (unset = needs review)
 function getAY(pi){return planStore[pi]||{area:plots[pi].area,yield:plots[pi].yield};}
@@ -710,10 +710,10 @@ function viewCols(){
   return cols;
 }
 // ---------- ACTUAL · DAY VIEW: harvest split by destination ----------
-// To Station (=actStore, vs-plan) + Field Sorting + Local Sales + Waste (=actBreak). Day total = their sum.
+// To Packhouse (=actStore, vs-plan) + Field Sorting + Local Sales + Waste (=actBreak). Day total = their sum.
 // English labels + DB columns mirror the grapes harvest_data model (raw_station/harvest_sorting/local_sales/waste).
 let curDay=null;
-const DAY_CATS=[['wared','To Station','وارد محطة'],['sorting','Field Sorting','فرزة أرض'],['local','Local Sales','خام تجار'],['waste','Waste','إعدامات']];
+const DAY_CATS=[['wared','To Packhouse','وارد محطة'],['sorting','Field Sorting','فرزة أرض'],['local','Local Sales','خام تجار'],['waste','Waste','إعدامات']];
 function getBreak(i,w,d,cat){const b=actBreak[i+'|'+w+'|'+d];return b&&b[cat]!=null?b[cat]:null;}
 function fmtT(v){v=Math.round(v*10)/10;return v%1?v.toFixed(1):String(v);}
 function dayEdit(el,cat){
@@ -816,8 +816,8 @@ function renderLog(){
   :         '<b>Logging harvest</b> (actual production) — two weeks. Type tonnes per plot-day; faint number = plan; blank = not logged; Enter/↓ moves down a column. A pick on a 0-plan day turns <b style="color:var(--violet)">purple</b> (off-plan). Future days are locked. Plan fields are read-only here.';
   if(m==='harv' && actView==='day' && !document.body.classList.contains('present')){
     renderDaySplit(cols[0]);
-    document.getElementById('cellLegend').innerHTML=`<span>Destinations:</span> <b style="color:var(--accent)">To Station</b> = packhouse/export (vs plan) · Field Sorting = field grade-out · Local Sales = raw to traders · Waste = condemned · <b>Day total</b> = sum`;
-    document.getElementById('modeBanner').innerHTML=`<span class="tag">Actual Harvest</span><span>Logging <b>${cols[0].wd} ${cols[0].d} ${cols[0].mon}</b> — split each plot's pick by destination. <b>vs plan</b> is on To Station (وارد محطة). Blank = not logged.</span>`;
+    document.getElementById('cellLegend').innerHTML=`<span>Destinations:</span> <b style="color:var(--accent)">To Packhouse</b> = export-bound (vs plan) · Field Sorting = field grade-out · Local Sales = raw to traders · Waste = condemned · <b>Day total</b> = sum`;
+    document.getElementById('modeBanner').innerHTML=`<span class="tag">Actual Harvest</span><span>Logging <b>${cols[0].wd} ${cols[0].d} ${cols[0].mon}</b> — split each plot's pick by destination. <b>vs plan</b> is on To Packhouse (وارد محطة). Blank = not logged.</span>`;
     updateDirtyBadge(); return;
   }
   const NCOL=7+cols.length+2;
