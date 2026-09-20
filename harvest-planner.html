@@ -121,6 +121,18 @@ tr.grandtot .stlab{position:sticky;left:0;background:#38352f;color:#fff;text-tra
 th.dayh{text-align:center;padding:8px 4px}
 /* keep day columns compact — size the grid to its content (trailing space becomes normal card padding) instead of stretching every day column */
 #logTable,#trkTable{width:auto}
+/* Actual · Day view — harvest destination split */
+.dsin{width:64px}
+th.dayh .arh{display:block;font-family:var(--font-body);font-size:10px;font-weight:400;color:var(--text3);margin-top:2px}
+th.dayh.dsh-wared{border-bottom:2px solid var(--accent)}
+th.dayh.dsh-farza{border-bottom:2px solid #4a6a78}
+th.dayh.dsh-kham{border-bottom:2px solid var(--amber)}
+th.dayh.dsh-e3{border-bottom:2px solid var(--red)}
+.daycell.dsh-wared .cin{border-bottom:2px solid var(--accent)}
+.daycell.dsh-farza .cin{border-bottom:2px solid #4a6a78}
+.daycell.dsh-kham .cin{border-bottom:2px solid var(--amber)}
+.daycell.dsh-e3 .cin{border-bottom:2px solid var(--red)}
+td.daytot{border-left:1px solid var(--border2);font-weight:600}
 #logTable .daycell,#trkTable .daycell,#logTable th.dayh,#trkTable th.dayh{width:46px}
 /* separator between the two weeks in the 2-week view */
 .daycell.wkstart,th.dayh.wkstart,td.num.wkstart{border-left:2px solid var(--text3)!important}
@@ -585,7 +597,8 @@ function dowOf(str){return new Date(str+'T00:00:00').getDay();}
 function dateOf(w,d){const x=new Date(WKDATE[w]);x.setDate(x.getDate()+d);return ymd(x);}
 
 // per-plot editable overrides
-const planStore={}, actStore={}, planDayStore={}, winStore={}; // area/yield ; actual ; day-plan override ; harvest window
+const planStore={}, actStore={}, planDayStore={}, winStore={}; // area/yield ; actual (=Wared ma7ata) ; day-plan override ; harvest window
+const actBreak={}; // i|w|d -> {farza,kham,e3} : daily harvest-destination split (Wared ma7ata lives in actStore)
 const planBaseTs={}; // block_id -> hp_plan.updated_at at load, for optimistic-concurrency checks on save
 const reviewStore={}; // i|w|d -> off-plan review_status: off_plan_confirmed | data_error (unset = needs review)
 function getAY(pi){return planStore[pi]||{area:plots[pi].area,yield:plots[pi].yield};}
@@ -696,6 +709,81 @@ function viewCols(){
   const cols=[]; for(let k=0;k<2;k++){ const w=selWeek+k; if(w>WK.length-1)break; for(let di=0;di<7;di++) cols.push(colOf(w,di,di===0&&k>0)); }
   return cols;
 }
+// ---------- ACTUAL · DAY VIEW: harvest split by destination ----------
+// Wared ma7ata (=actStore, vs-plan) + Farza ard + Kham togar + E3damat (=actBreak). Day total = their sum.
+let curDay=null;
+const DAY_CATS=[['wared','Wared ma7ata','وارد محطة'],['farza','Farza ard','فرزة أرض'],['kham','Kham togar','خام تجار'],['e3','E3damat','إعدامات']];
+function getBreak(i,w,d,cat){const b=actBreak[i+'|'+w+'|'+d];return b&&b[cat]!=null?b[cat]:null;}
+function fmtT(v){v=Math.round(v*10)/10;return v%1?v.toFixed(1):String(v);}
+function dayEdit(el,cat){
+  const q=el.id.split('_'),i=+q[1],w=+q[2],di=+q[3],k=i+'|'+w+'|'+di;
+  const raw=el.value===''?null:parseFloat(el.value); const val=(raw==null||isNaN(raw))?null:raw;
+  if(cat==='wared'){actStore[k]=val;}
+  else {const b=actBreak[k]||(actBreak[k]={}); b[cat]=val;}
+  dirty.add(k+'|harv'); el.closest('td').classList.add('dirty');
+  dayRecalc(); updateDirtyBadge();
+}
+function dayRecalc(){
+  if(!curDay)return; const w=curDay.w, di=curDay.di;
+  const groups=logGroups(); const grand={wared:0,farza:0,kham:0,e3:0,tot:0};
+  groups.forEach((g,gi)=>{
+    const sub={wared:0,farza:0,kham:0,e3:0,tot:0};
+    g.idxs.forEach(i=>{
+      const wared=getActual(i,w,di)||0,farza=getBreak(i,w,di,'farza')||0,kham=getBreak(i,w,di,'kham')||0,e3=getBreak(i,w,di,'e3')||0;
+      const tot=wared+farza+kham+e3;
+      const dt=document.getElementById('dtot_'+i); if(dt)dt.textContent=fmtT(tot);
+      const dp=dayPlan(i,w,di), vr=document.getElementById('vr_'+i);
+      if(vr){const off=dp===0&&wared>0,v=wared-dp,on=Math.abs(v)<Math.max(3,dp*0.06);
+        vr.className='varcell '+(off?'v-off':(on?'v-on':(v>0?'v-over':'v-under')));
+        vr.textContent=off?`+${fmtT(wared)} off`:(on?'on plan':`${v>0?'+':''}${fmtT(v)} t`);}
+      sub.wared+=wared;sub.farza+=farza;sub.kham+=kham;sub.e3+=e3;sub.tot+=tot;
+    });
+    DAY_CATS.forEach(c=>{const el=document.getElementById('dst_'+gi+'_'+c[0]);if(el)el.textContent=fmtT(sub[c[0]]);});
+    const stt=document.getElementById('dstt_'+gi); if(stt)stt.textContent=fmtT(sub.tot);
+    grand.wared+=sub.wared;grand.farza+=sub.farza;grand.kham+=sub.kham;grand.e3+=sub.e3;grand.tot+=sub.tot;
+  });
+  DAY_CATS.forEach(c=>{const el=document.getElementById('dgt_'+c[0]);if(el)el.textContent=fmtT(grand[c[0]]);});
+  const gtt=document.getElementById('dgtt'); if(gtt)gtt.textContent=fmtT(grand.tot);
+}
+function renderDaySplit(dc){
+  curDay=dc; const w=dc.w, di=dc.di; const isFut=(w>CUR)||(w===CUR&&di>CURDAY);
+  const NCOL=3+4+4+2;
+  let head=`<tr>
+    <th class="frozen f0">Farm</th><th class="frozen f1">Plot</th><th class="frozen f2">Var.</th>
+    <th class="num hidecol">Area</th><th class="num hidecol">Yield</th><th class="num hidecol">Planned</th><th class="hidecol wincol">Harvest window</th>`
+    + DAY_CATS.map(c=>`<th class="dayh dsh-${c[0]}">${c[1]}<span class="arh">${c[2]}</span></th>`).join('')
+    + `<th class="num">Day total</th><th class="num">vs plan</th></tr>`;
+  const groups=logGroups(); let body='';
+  const idp={wared:'c',farza:'bf',kham:'bk',e3:'be'};
+  groups.forEach((g,gi)=>{
+    if(!g.idxs.length)return;
+    body+=`<tr class="grp"><td colspan="${NCOL}"><span class="grplbl">${g.label}</span></td></tr>`;
+    g.idxs.forEach(i=>{
+      const p=plots[i], ay=getAY(i), wl=winOf(i);
+      const vals={wared:getActual(i,w,di),farza:getBreak(i,w,di,'farza'),kham:getBreak(i,w,di,'kham'),e3:getBreak(i,w,di,'e3')};
+      const inp=DAY_CATS.map(c=>`<td class="daycell dsh-${c[0]}"><input class="cin harv dsin" id="${idp[c[0]]}_${i}_${w}_${di}" value="${vals[c[0]]==null?'':vals[c[0]]}"${isFut?' disabled':''} placeholder="${isFut?'':'—'}" oninput="dayEdit(this,'${c[0]}')"></td>`).join('');
+      body+=`<tr>
+        <td class="frozen f0" title="${p.f}">${p.f}</td><td class="frozen f1"><span class="plot" title="${p.p}">${p.aydi}</span>${groupBy==='farm'?`<div class="vsub" title="${p.v}">${p.v}</div>`:''}</td>
+        <td class="frozen f2"><span class="pill p-${p.pnp}">${p.pnp}</span></td>
+        <td class="num hidecol"><span class="rotxt">${ay.area}</span></td>
+        <td class="num hidecol"><span class="rotxt">${ay.yield==null?'—':ay.yield}</span></td>
+        <td class="num hidecol"><span class="plancell">${Math.round(plannedNow(i))}</span></td>
+        <td class="hidecol wincol"><span class="wchip ro"><span class="wk">◷</span>${WK[wl.start]}→${WK[wl.end]}</span></td>
+        ${inp}
+        <td class="num daytot" id="dtot_${i}">0</td>
+        <td class="num"><span class="varcell" id="vr_${i}"></span></td>
+      </tr>`;
+    });
+    body+=`<tr class="subtot"><td class="stlab" colspan="3">${g.key} — subtotal</td><td class="hidecol"></td><td class="hidecol"></td><td class="hidecol"></td><td class="hidecol"></td>`
+      + DAY_CATS.map(c=>`<td class="num" id="dst_${gi}_${c[0]}">0</td>`).join('')
+      + `<td class="num daytot" id="dstt_${gi}">0</td><td></td></tr>`;
+  });
+  body+=`<tr class="grandtot"><td class="stlab" colspan="3">All plots — ${dc.wd} ${dc.d} ${dc.mon}</td><td class="hidecol"></td><td class="hidecol"></td><td class="hidecol"></td><td class="hidecol"></td>`
+    + DAY_CATS.map(c=>`<td class="num" id="dgt_${c[0]}">0</td>`).join('')
+    + `<td class="num daytot" id="dgtt">0</td><td></td></tr>`;
+  {const _lt=document.getElementById('logTable'); _lt.style.width=''; _lt.innerHTML='<thead>'+head+'</thead><tbody>'+body+'</tbody>';}
+  dayRecalc();
+}
 function renderLog(){
   const m=editMode; // 'plan' | 'harv'
   const present=document.body.classList.contains('present');
@@ -725,6 +813,12 @@ function renderLog(){
   : isToday ? '<b>Logging today.</b> One column: type each plot\'s tonnes and press <b>Enter</b> (or ↓) to move to the next plot. <b>Blank = not logged yet</b>; type <b>0</b> for “no pick”. Rows = plots in window today or already logged today. Plan fields are read-only here.'
   : actView==='day' ? '<b>Logging a day.</b> Pick any date on the right; one column — type each plot\'s tonnes and press <b>Enter</b> (or ↓) for the next plot. Blank = not logged; 0 = no pick. Plan fields are read-only here.'
   :         '<b>Logging harvest</b> (actual production) — two weeks. Type tonnes per plot-day; faint number = plan; blank = not logged; Enter/↓ moves down a column. A pick on a 0-plan day turns <b style="color:var(--violet)">purple</b> (off-plan). Future days are locked. Plan fields are read-only here.';
+  if(m==='harv' && actView==='day' && !document.body.classList.contains('present')){
+    renderDaySplit(cols[0]);
+    document.getElementById('cellLegend').innerHTML=`<span>Destinations:</span> <b style="color:var(--accent)">Wared ma7ata</b> to packhouse (vs plan) · Farza ard field grade-out · Kham togar raw to traders · E3damat condemned · <b>Day total</b> = sum`;
+    document.getElementById('modeBanner').innerHTML=`<span class="tag">Actual Harvest</span><span>Logging <b>${cols[0].wd} ${cols[0].d} ${cols[0].mon}</b> — split each plot's pick by destination. <b>vs plan</b> is on Wared ma7ata (وارد محطة). Blank = not logged.</span>`;
+    updateDirtyBadge(); return;
+  }
   const NCOL=7+cols.length+2;
   const wkLbl = (cols.length>7?'2-wk ':'')+(m==='plan'?'plan':'harv');
   const varLbl= m==='plan'?'':'vs plan';
@@ -1082,7 +1176,10 @@ async function saveAll(){
       plan.push({block_id:plots[i].blockId,area:ay.area,yield:ay.yield,start:dateOf(w.start,0),peak:dateOf(w.peak,0),end:dateOf(w.end,6),shape:w.shape,base_updated_at:planBaseTs[plots[i].blockId]||null});
     } else {const q=k.split('|'),i=+q[0],w=+q[1],d=+q[2],mode=q[3];
       if(mode==='plan'){const v=planDayStore[i+'|'+w+'|'+d];if(v!=null)plan_day.push({block_id:plots[i].blockId,plan_date:dateOf(w,d),planned_t:v,source:'manual'});}
-      else {const v=actStore[i+'|'+w+'|'+d];if(v!=null&&!isNaN(v))actual_day.push({block_id:plots[i].blockId,harvest_date:dateOf(w,d),seq:1,actual_t:v});else actual_del.push({block_id:plots[i].blockId,harvest_date:dateOf(w,d)});}
+      else {const v=actStore[i+'|'+w+'|'+d]; const b=actBreak[i+'|'+w+'|'+d]||{};
+        const hasW=(v!=null&&!isNaN(v)); const hasB=(b.farza!=null||b.kham!=null||b.e3!=null);
+        if(hasW||hasB)actual_day.push({block_id:plots[i].blockId,harvest_date:dateOf(w,d),seq:1,actual_t:hasW?v:0,farza_ard_t:b.farza,kham_togar_t:b.kham,e3damat_t:b.e3});
+        else actual_del.push({block_id:plots[i].blockId,harvest_date:dateOf(w,d)});}
     }});
   const b=document.getElementById('dirtyBadge');
   try{
@@ -1449,7 +1546,7 @@ function buildSeasonPicker(){
   sel.innerHTML=SEASONS.map(s=>`<option value="${s.id}"${SEASON&&s.id===SEASON.id?' selected':''}>${s.name}${s.active?' · Active':''}</option>`).join('');
 }
 function clearSeasonStores(){
-  [planStore,actStore,planDayStore,winStore,planBaseTs,reviewStore,truckLog].forEach(o=>Object.keys(o).forEach(k=>delete o[k]));
+  [planStore,actStore,actBreak,planDayStore,winStore,planBaseTs,reviewStore,truckLog].forEach(o=>Object.keys(o).forEach(k=>delete o[k]));
   dirty.clear();
 }
 async function pickSeason(id){
@@ -1502,7 +1599,7 @@ async function loadSeason(season){
       SB.from('farm_blocks').select('id,farm_code,sector_code,plot_code,block_add,aydi_block_number,total_area_fed,variety_id,farm_id,varieties(name),farms(name)').eq('product_id',product).eq('lifecycle','bearing').not('variety_id','is',null).not('farm_id','is',null),
       SB.from('hp_plan').select('*').eq('season_id',SEASON.id),
       SB.from('hp_plan_day').select('block_id,plan_date,planned_t').eq('season_id',SEASON.id),
-      SB.from('hp_actual_day').select('block_id,harvest_date,actual_t,review_status').eq('season_id',SEASON.id),
+      SB.from('hp_actual_day').select('block_id,harvest_date,actual_t,farza_ard_t,kham_togar_t,e3damat_t,review_status').eq('season_id',SEASON.id),
       SB.from('hp_truck').select('*').eq('season_id',SEASON.id),
       SB.from('hp_revision').select('*').eq('season_id',SEASON.id).order('captured_at',{ascending:false})
     ]);
@@ -1528,7 +1625,7 @@ async function loadSeason(season){
     // When today is outside the season, open on the FIRST planned-harvest week (not the calendar's June tail).
     if(ti<0){const hs=Object.values(winStore).map(w=>w&&w.start).filter(n=>typeof n==='number'&&n>=0);if(hs.length)selWeek=Math.max(0,Math.min(Math.min(...hs),WK.length-2));}
     pd.forEach(r=>{const i=idx[r.block_id];if(i==null)return;const w=wkIndexOfDate(r.plan_date),d=dowOf(r.plan_date);if(w>=0)planDayStore[i+'|'+w+'|'+d]=Number(r.planned_t);});
-    ad.forEach(r=>{const i=idx[r.block_id];if(i==null)return;const w=wkIndexOfDate(r.harvest_date),d=dowOf(r.harvest_date);if(w>=0){actStore[i+'|'+w+'|'+d]=Number(r.actual_t);if(r.review_status)reviewStore[i+'|'+w+'|'+d]=r.review_status;}});
+    ad.forEach(r=>{const i=idx[r.block_id];if(i==null)return;const w=wkIndexOfDate(r.harvest_date),d=dowOf(r.harvest_date);if(w>=0){const k=i+'|'+w+'|'+d;actStore[k]=Number(r.actual_t);if(r.farza_ard_t!=null||r.kham_togar_t!=null||r.e3damat_t!=null)actBreak[k]={farza:r.farza_ard_t!=null?Number(r.farza_ard_t):null,kham:r.kham_togar_t!=null?Number(r.kham_togar_t):null,e3:r.e3damat_t!=null?Number(r.e3damat_t):null};if(r.review_status)reviewStore[k]=r.review_status;}});
     tk.forEach(r=>{const w=wkIndexOfDate(r.plan_date),d=dowOf(r.plan_date),f=farmName[r.farm_id],v=varName[r.variety_id];if(w>=0&&f&&v)truckLog[v+'|'+f+'|'+w+'|'+d]=r.trucks;});
     revs = rv.length?rv.map(r=>({id:r.id,t:r.name,d:new Date(r.captured_at).toLocaleDateString('en-GB'),who:'—',in:'HP',locked:r.is_locked,note:r.note||'',diff:[]})):[{id:null,t:'No snapshots yet',d:'',who:'—',in:'HP',locked:false,note:'Use “Capture snapshot” to start the history.',diff:[]}];
   }
