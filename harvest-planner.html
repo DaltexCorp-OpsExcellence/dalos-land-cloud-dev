@@ -125,13 +125,13 @@ th.dayh{text-align:center;padding:8px 4px}
 .dsin{width:64px}
 th.dayh .arh{display:block;font-family:var(--font-body);font-size:10px;font-weight:400;color:var(--text3);margin-top:2px}
 th.dayh.dsh-wared{border-bottom:2px solid var(--accent)}
-th.dayh.dsh-farza{border-bottom:2px solid #4a6a78}
-th.dayh.dsh-kham{border-bottom:2px solid var(--amber)}
-th.dayh.dsh-e3{border-bottom:2px solid var(--red)}
+th.dayh.dsh-sorting{border-bottom:2px solid #4a6a78}
+th.dayh.dsh-local{border-bottom:2px solid var(--amber)}
+th.dayh.dsh-waste{border-bottom:2px solid var(--red)}
 .daycell.dsh-wared .cin{border-bottom:2px solid var(--accent)}
-.daycell.dsh-farza .cin{border-bottom:2px solid #4a6a78}
-.daycell.dsh-kham .cin{border-bottom:2px solid var(--amber)}
-.daycell.dsh-e3 .cin{border-bottom:2px solid var(--red)}
+.daycell.dsh-sorting .cin{border-bottom:2px solid #4a6a78}
+.daycell.dsh-local .cin{border-bottom:2px solid var(--amber)}
+.daycell.dsh-waste .cin{border-bottom:2px solid var(--red)}
 td.daytot{border-left:1px solid var(--border2);font-weight:600}
 #logTable .daycell,#trkTable .daycell,#logTable th.dayh,#trkTable th.dayh{width:46px}
 /* separator between the two weeks in the 2-week view */
@@ -597,8 +597,8 @@ function dowOf(str){return new Date(str+'T00:00:00').getDay();}
 function dateOf(w,d){const x=new Date(WKDATE[w]);x.setDate(x.getDate()+d);return ymd(x);}
 
 // per-plot editable overrides
-const planStore={}, actStore={}, planDayStore={}, winStore={}; // area/yield ; actual (=Wared ma7ata) ; day-plan override ; harvest window
-const actBreak={}; // i|w|d -> {farza,kham,e3} : daily harvest-destination split (Wared ma7ata lives in actStore)
+const planStore={}, actStore={}, planDayStore={}, winStore={}; // area/yield ; actual (=To Station) ; day-plan override ; harvest window
+const actBreak={}; // i|w|d -> {sorting,local,waste} : daily harvest-destination split (To Station lives in actStore=actual_t)
 const planBaseTs={}; // block_id -> hp_plan.updated_at at load, for optimistic-concurrency checks on save
 const reviewStore={}; // i|w|d -> off-plan review_status: off_plan_confirmed | data_error (unset = needs review)
 function getAY(pi){return planStore[pi]||{area:plots[pi].area,yield:plots[pi].yield};}
@@ -710,9 +710,10 @@ function viewCols(){
   return cols;
 }
 // ---------- ACTUAL · DAY VIEW: harvest split by destination ----------
-// Wared ma7ata (=actStore, vs-plan) + Farza ard + Kham togar + E3damat (=actBreak). Day total = their sum.
+// To Station (=actStore, vs-plan) + Field Sorting + Local Sales + Waste (=actBreak). Day total = their sum.
+// English labels + DB columns mirror the grapes harvest_data model (raw_station/harvest_sorting/local_sales/waste).
 let curDay=null;
-const DAY_CATS=[['wared','Wared ma7ata','وارد محطة'],['farza','Farza ard','فرزة أرض'],['kham','Kham togar','خام تجار'],['e3','E3damat','إعدامات']];
+const DAY_CATS=[['wared','To Station','وارد محطة'],['sorting','Field Sorting','فرزة أرض'],['local','Local Sales','خام تجار'],['waste','Waste','إعدامات']];
 function getBreak(i,w,d,cat){const b=actBreak[i+'|'+w+'|'+d];return b&&b[cat]!=null?b[cat]:null;}
 function fmtT(v){v=Math.round(v*10)/10;return v%1?v.toFixed(1):String(v);}
 function dayEdit(el,cat){
@@ -725,22 +726,22 @@ function dayEdit(el,cat){
 }
 function dayRecalc(){
   if(!curDay)return; const w=curDay.w, di=curDay.di;
-  const groups=logGroups(); const grand={wared:0,farza:0,kham:0,e3:0,tot:0};
+  const groups=logGroups(); const grand={wared:0,sorting:0,local:0,waste:0,tot:0};
   groups.forEach((g,gi)=>{
-    const sub={wared:0,farza:0,kham:0,e3:0,tot:0};
+    const sub={wared:0,sorting:0,local:0,waste:0,tot:0};
     g.idxs.forEach(i=>{
-      const wared=getActual(i,w,di)||0,farza=getBreak(i,w,di,'farza')||0,kham=getBreak(i,w,di,'kham')||0,e3=getBreak(i,w,di,'e3')||0;
-      const tot=wared+farza+kham+e3;
+      const wared=getActual(i,w,di)||0,sorting=getBreak(i,w,di,'sorting')||0,local=getBreak(i,w,di,'local')||0,waste=getBreak(i,w,di,'waste')||0;
+      const tot=wared+sorting+local+waste;
       const dt=document.getElementById('dtot_'+i); if(dt)dt.textContent=fmtT(tot);
       const dp=dayPlan(i,w,di), vr=document.getElementById('vr_'+i);
       if(vr){const off=dp===0&&wared>0,v=wared-dp,on=Math.abs(v)<Math.max(3,dp*0.06);
         vr.className='varcell '+(off?'v-off':(on?'v-on':(v>0?'v-over':'v-under')));
         vr.textContent=off?`+${fmtT(wared)} off`:(on?'on plan':`${v>0?'+':''}${fmtT(v)} t`);}
-      sub.wared+=wared;sub.farza+=farza;sub.kham+=kham;sub.e3+=e3;sub.tot+=tot;
+      sub.wared+=wared;sub.sorting+=sorting;sub.local+=local;sub.waste+=waste;sub.tot+=tot;
     });
     DAY_CATS.forEach(c=>{const el=document.getElementById('dst_'+gi+'_'+c[0]);if(el)el.textContent=fmtT(sub[c[0]]);});
     const stt=document.getElementById('dstt_'+gi); if(stt)stt.textContent=fmtT(sub.tot);
-    grand.wared+=sub.wared;grand.farza+=sub.farza;grand.kham+=sub.kham;grand.e3+=sub.e3;grand.tot+=sub.tot;
+    grand.wared+=sub.wared;grand.sorting+=sub.sorting;grand.local+=sub.local;grand.waste+=sub.waste;grand.tot+=sub.tot;
   });
   DAY_CATS.forEach(c=>{const el=document.getElementById('dgt_'+c[0]);if(el)el.textContent=fmtT(grand[c[0]]);});
   const gtt=document.getElementById('dgtt'); if(gtt)gtt.textContent=fmtT(grand.tot);
@@ -754,13 +755,13 @@ function renderDaySplit(dc){
     + DAY_CATS.map(c=>`<th class="dayh dsh-${c[0]}">${c[1]}<span class="arh">${c[2]}</span></th>`).join('')
     + `<th class="num">Day total</th><th class="num">vs plan</th></tr>`;
   const groups=logGroups(); let body='';
-  const idp={wared:'c',farza:'bf',kham:'bk',e3:'be'};
+  const idp={wared:'c',sorting:'bs',local:'bl',waste:'bw'};
   groups.forEach((g,gi)=>{
     if(!g.idxs.length)return;
     body+=`<tr class="grp"><td colspan="${NCOL}"><span class="grplbl">${g.label}</span></td></tr>`;
     g.idxs.forEach(i=>{
       const p=plots[i], ay=getAY(i), wl=winOf(i);
-      const vals={wared:getActual(i,w,di),farza:getBreak(i,w,di,'farza'),kham:getBreak(i,w,di,'kham'),e3:getBreak(i,w,di,'e3')};
+      const vals={wared:getActual(i,w,di),sorting:getBreak(i,w,di,'sorting'),local:getBreak(i,w,di,'local'),waste:getBreak(i,w,di,'waste')};
       const inp=DAY_CATS.map(c=>`<td class="daycell dsh-${c[0]}"><input class="cin harv dsin" id="${idp[c[0]]}_${i}_${w}_${di}" value="${vals[c[0]]==null?'':vals[c[0]]}"${isFut?' disabled':''} placeholder="${isFut?'':'—'}" oninput="dayEdit(this,'${c[0]}')"></td>`).join('');
       body+=`<tr>
         <td class="frozen f0" title="${p.f}">${p.f}</td><td class="frozen f1"><span class="plot" title="${p.p}">${p.aydi}</span>${groupBy==='farm'?`<div class="vsub" title="${p.v}">${p.v}</div>`:''}</td>
@@ -815,8 +816,8 @@ function renderLog(){
   :         '<b>Logging harvest</b> (actual production) — two weeks. Type tonnes per plot-day; faint number = plan; blank = not logged; Enter/↓ moves down a column. A pick on a 0-plan day turns <b style="color:var(--violet)">purple</b> (off-plan). Future days are locked. Plan fields are read-only here.';
   if(m==='harv' && actView==='day' && !document.body.classList.contains('present')){
     renderDaySplit(cols[0]);
-    document.getElementById('cellLegend').innerHTML=`<span>Destinations:</span> <b style="color:var(--accent)">Wared ma7ata</b> to packhouse (vs plan) · Farza ard field grade-out · Kham togar raw to traders · E3damat condemned · <b>Day total</b> = sum`;
-    document.getElementById('modeBanner').innerHTML=`<span class="tag">Actual Harvest</span><span>Logging <b>${cols[0].wd} ${cols[0].d} ${cols[0].mon}</b> — split each plot's pick by destination. <b>vs plan</b> is on Wared ma7ata (وارد محطة). Blank = not logged.</span>`;
+    document.getElementById('cellLegend').innerHTML=`<span>Destinations:</span> <b style="color:var(--accent)">To Station</b> = packhouse/export (vs plan) · Field Sorting = field grade-out · Local Sales = raw to traders · Waste = condemned · <b>Day total</b> = sum`;
+    document.getElementById('modeBanner').innerHTML=`<span class="tag">Actual Harvest</span><span>Logging <b>${cols[0].wd} ${cols[0].d} ${cols[0].mon}</b> — split each plot's pick by destination. <b>vs plan</b> is on To Station (وارد محطة). Blank = not logged.</span>`;
     updateDirtyBadge(); return;
   }
   const NCOL=7+cols.length+2;
@@ -1177,8 +1178,8 @@ async function saveAll(){
     } else {const q=k.split('|'),i=+q[0],w=+q[1],d=+q[2],mode=q[3];
       if(mode==='plan'){const v=planDayStore[i+'|'+w+'|'+d];if(v!=null)plan_day.push({block_id:plots[i].blockId,plan_date:dateOf(w,d),planned_t:v,source:'manual'});}
       else {const v=actStore[i+'|'+w+'|'+d]; const b=actBreak[i+'|'+w+'|'+d]||{};
-        const hasW=(v!=null&&!isNaN(v)); const hasB=(b.farza!=null||b.kham!=null||b.e3!=null);
-        if(hasW||hasB)actual_day.push({block_id:plots[i].blockId,harvest_date:dateOf(w,d),seq:1,actual_t:hasW?v:0,farza_ard_t:b.farza,kham_togar_t:b.kham,e3damat_t:b.e3});
+        const hasW=(v!=null&&!isNaN(v)); const hasB=(b.sorting!=null||b.local!=null||b.waste!=null);
+        if(hasW||hasB)actual_day.push({block_id:plots[i].blockId,harvest_date:dateOf(w,d),seq:1,actual_t:hasW?v:0,harvest_sorting_t:b.sorting,local_sales_t:b.local,waste_t:b.waste});
         else actual_del.push({block_id:plots[i].blockId,harvest_date:dateOf(w,d)});}
     }});
   const b=document.getElementById('dirtyBadge');
@@ -1599,7 +1600,7 @@ async function loadSeason(season){
       SB.from('farm_blocks').select('id,farm_code,sector_code,plot_code,block_add,aydi_block_number,total_area_fed,variety_id,farm_id,varieties(name),farms(name)').eq('product_id',product).eq('lifecycle','bearing').not('variety_id','is',null).not('farm_id','is',null),
       SB.from('hp_plan').select('*').eq('season_id',SEASON.id),
       SB.from('hp_plan_day').select('block_id,plan_date,planned_t').eq('season_id',SEASON.id),
-      SB.from('hp_actual_day').select('block_id,harvest_date,actual_t,farza_ard_t,kham_togar_t,e3damat_t,review_status').eq('season_id',SEASON.id),
+      SB.from('hp_actual_day').select('block_id,harvest_date,actual_t,harvest_sorting_t,local_sales_t,waste_t,review_status').eq('season_id',SEASON.id),
       SB.from('hp_truck').select('*').eq('season_id',SEASON.id),
       SB.from('hp_revision').select('*').eq('season_id',SEASON.id).order('captured_at',{ascending:false})
     ]);
@@ -1625,7 +1626,7 @@ async function loadSeason(season){
     // When today is outside the season, open on the FIRST planned-harvest week (not the calendar's June tail).
     if(ti<0){const hs=Object.values(winStore).map(w=>w&&w.start).filter(n=>typeof n==='number'&&n>=0);if(hs.length)selWeek=Math.max(0,Math.min(Math.min(...hs),WK.length-2));}
     pd.forEach(r=>{const i=idx[r.block_id];if(i==null)return;const w=wkIndexOfDate(r.plan_date),d=dowOf(r.plan_date);if(w>=0)planDayStore[i+'|'+w+'|'+d]=Number(r.planned_t);});
-    ad.forEach(r=>{const i=idx[r.block_id];if(i==null)return;const w=wkIndexOfDate(r.harvest_date),d=dowOf(r.harvest_date);if(w>=0){const k=i+'|'+w+'|'+d;actStore[k]=Number(r.actual_t);if(r.farza_ard_t!=null||r.kham_togar_t!=null||r.e3damat_t!=null)actBreak[k]={farza:r.farza_ard_t!=null?Number(r.farza_ard_t):null,kham:r.kham_togar_t!=null?Number(r.kham_togar_t):null,e3:r.e3damat_t!=null?Number(r.e3damat_t):null};if(r.review_status)reviewStore[k]=r.review_status;}});
+    ad.forEach(r=>{const i=idx[r.block_id];if(i==null)return;const w=wkIndexOfDate(r.harvest_date),d=dowOf(r.harvest_date);if(w>=0){const k=i+'|'+w+'|'+d;actStore[k]=Number(r.actual_t);if(r.harvest_sorting_t!=null||r.local_sales_t!=null||r.waste_t!=null)actBreak[k]={sorting:r.harvest_sorting_t!=null?Number(r.harvest_sorting_t):null,local:r.local_sales_t!=null?Number(r.local_sales_t):null,waste:r.waste_t!=null?Number(r.waste_t):null};if(r.review_status)reviewStore[k]=r.review_status;}});
     tk.forEach(r=>{const w=wkIndexOfDate(r.plan_date),d=dowOf(r.plan_date),f=farmName[r.farm_id],v=varName[r.variety_id];if(w>=0&&f&&v)truckLog[v+'|'+f+'|'+w+'|'+d]=r.trucks;});
     revs = rv.length?rv.map(r=>({id:r.id,t:r.name,d:new Date(r.captured_at).toLocaleDateString('en-GB'),who:'—',in:'HP',locked:r.is_locked,note:r.note||'',diff:[]})):[{id:null,t:'No snapshots yet',d:'',who:'—',in:'HP',locked:false,note:'Use “Capture snapshot” to start the history.',diff:[]}];
   }
