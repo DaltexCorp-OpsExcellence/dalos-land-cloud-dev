@@ -605,9 +605,12 @@ const planStore={}, actStore={}, planDayStore={}, winStore={}; // area/yield ; a
 const actBreak={}; // i|w|d -> {sorting,local,waste} : daily harvest-destination split (To Packhouse lives in actStore=actual_t)
 const planBaseTs={}; // block_id -> hp_plan.updated_at at load, for optimistic-concurrency checks on save
 const reviewStore={}; // i|w|d -> off-plan review_status: off_plan_confirmed | data_error (unset = needs review)
-function getAY(pi){return planStore[pi]||{area:plots[pi].area,yield:plots[pi].yield};}
-function plannedNow(pi){const a=getAY(pi);return a.area*(a.yield||0);}
-// harvest window: {start,peak,end,shape} — total comes from area×yield
+// Plan input model: Planned (season total) is the input; yield is DERIVED = Planned / planted area.
+function getAY(pi){const ps=planStore[pi]||{}; const planted=(ps.planted!=null?ps.planted:(plots[pi]&&plots[pi].planted))||0;
+  const planned=(ps.planned!=null?ps.planned:null); const yld=(planned!=null&&planted>0)?(planned/planted):null;
+  return {area:planted, planted:planted, planned:planned, yield:yld};}
+function plannedNow(pi){const p=(planStore[pi]||{}).planned; return (p!=null&&!isNaN(p))?p:0;}
+// harvest window: {start,peak,end,shape} — total comes from the Planned season total
 function winOf(pi){
   if(winStore[pi])return winStore[pi];
   const pl=plots[pi].plan; let s=pl.findIndex(x=>x>0);
@@ -676,9 +679,9 @@ function setGroup(g){groupBy=g;
   document.getElementById('gbFarm').classList.toggle('active',g==='farm');
   renderLog();
 }
-let showNP=false; // P (productive) plots only by default — NP = no plan yield and no actuals ("if NP then no production anyway", Ibrahim)
+let showNP=true; // show P and NP by default (Tarek); NP = no planned tonnage and no actuals — toggle can hide them
 function hasAnyActual(i){for(const k in actStore){if(k.indexOf(i+'|')===0&&(actStore[k]||0)>0)return true;}return false;}
-function isNP(i){const y=getAY(i).yield; return (typeof y==='number') && y<=0 && !hasAnyActual(i);} // blank (null) yield = not-yet-set, shown; explicit 0 = non-productive, hideable
+function isNP(i){const p=(planStore[i]||{}).planned; return (typeof p==='number') && p<=0 && !hasAnyActual(i);} // blank (null) planned = not-yet-set, shown; explicit 0 = non-productive, hideable
 function npCount(){let n=0;plots.forEach((p,i)=>{if(isNP(i))n++;});return n;}
 function setShowNP(v){showNP=v;
   const t=document.getElementById('npToggle'); if(t)t.classList.toggle('on',v);
@@ -761,7 +764,7 @@ function renderDaySplit(dc){
   const NCOL=3+4+4+2;
   let head=`<tr>
     <th class="frozen f0">Farm</th><th class="frozen f1">Plot</th><th class="frozen f2">Var.</th>
-    <th class="num hidecol">Area</th><th class="num hidecol">Yield</th><th class="num hidecol">Planned</th><th class="hidecol wincol">Harvest window</th>`
+    <th class="num hidecol">Planted</th><th class="num hidecol">Yield</th><th class="num hidecol">Planned</th><th class="hidecol wincol">Harvest window</th>`
     + DAY_CATS.map(c=>`<th class="dayh dsh-${c[0]}">${c[1]}<span class="arh">${c[2]}</span></th>`).join('')
     + `<th class="num">Day total</th><th class="num">vs plan</th></tr>`;
   const groups=logGroups(); let body='';
@@ -777,7 +780,7 @@ function renderDaySplit(dc){
         <td class="frozen f0" title="${p.f}">${p.f}</td><td class="frozen f1"><span class="plot" title="${p.p}">${p.aydi}</span>${groupBy==='farm'?`<div class="vsub" title="${p.v}">${p.v}</div>`:''}</td>
         <td class="frozen f2"><span class="pill p-${p.pnp}">${p.pnp}</span></td>
         <td class="num hidecol"><span class="rotxt">${ay.area}</span></td>
-        <td class="num hidecol"><span class="rotxt">${ay.yield==null?'—':ay.yield}</span></td>
+        <td class="num hidecol"><span class="rotxt">${ay.yield==null?'—':(Math.round(ay.yield*10)/10)}</span></td>
         <td class="num hidecol"><span class="plancell">${Math.round(plannedNow(i))}</span></td>
         <td class="hidecol wincol"><span class="wchip ro"><span class="wk">◷</span>${WK[wl.start]}→${WK[wl.end]}</span></td>
         ${inp}
@@ -821,7 +824,7 @@ function renderLog(){
     ? (isToday?'Today · ':'')+cols[0].wd+' '+cols[0].d+' '+cols[0].mon
     : (cols.length>7?('Weeks of '+WK[selWeek]+' – '+WK[Math.min(selWeek+1,WK.length-1)]):('Week of '+WK[selWeek]));
   document.getElementById('logHint').innerHTML=
-    m==='plan' ? '<b>Setting the plan.</b> Set the <b>Yield</b> (t/fed) — area is the bearing area from Land Cloud (read-only); season total = Area × Yield. Then click the <b>harvest-window</b> chip to set start/peak/end/shape — the tool draws the curve. Two weeks shown; day cells can be hand-tweaked (edited cells get a green outline). Faint number = actual harvest.'
+    m==='plan' ? '<b>Setting the plan.</b> Enter the <b>Planned</b> season total (t) — Planted area is from Land Cloud (read-only) and <b>Yield</b> is calculated (Planned ÷ Planted). Then click the <b>harvest-window</b> chip to set start/peak/end/shape — the tool draws the curve. Two weeks shown; day cells can be hand-tweaked (edited cells get a green outline). Faint number = actual harvest.'
   : isToday ? '<b>Logging today.</b> One column: type each plot\'s tonnes and press <b>Enter</b> (or ↓) to move to the next plot. <b>Blank = not logged yet</b>; type <b>0</b> for “no pick”. Rows = plots in window today or already logged today. Plan fields are read-only here.'
   : actView==='day' ? '<b>Logging a day.</b> Pick any date on the right; one column — type each plot\'s tonnes and press <b>Enter</b> (or ↓) for the next plot. Blank = not logged; 0 = no pick. Plan fields are read-only here.'
   :         '<b>Two-week overview.</b> Each cell is the day\'s <b>total pick</b> (all four destinations); the faint <b>PH</b> = the To-Packhouse portion. Tap any day to open its four-way split and log it. Row total = tonnes picked over the fortnight; <b>vs plan</b> tracks To Packhouse.';
@@ -840,7 +843,7 @@ function renderLog(){
     `<span><b style="color:var(--text2)">big</b> = ${m==='plan'?'planned tonnes you\'re setting':'harvest tonnes you\'re logging'} · <b style="color:var(--text2)">small</b> = ${m==='plan'?'actual harvest, for reference':'the plan, for reference'} · <b style="color:var(--text2)">all values in tonnes (t)</b></span>`;
   let head=`<tr>
     <th class="frozen f0">Farm</th><th class="frozen f1">Plot</th><th class="frozen f2">Var.</th>
-    <th class="num hidecol">Area</th><th class="num hidecol">Yield</th><th class="num hidecol">Planned</th><th class="hidecol wincol">Harvest window</th>`
+    <th class="num hidecol">Planted</th><th class="num hidecol">Yield</th><th class="num hidecol">Planned</th><th class="hidecol wincol">Harvest window</th>`
     +cols.map(c=>`<th class="dayh${c.wkStart?' wkstart':''}${isToday?' todayh':''}">${isToday?'Today · ':''}${c.wd}<br>${c.d}</th>`).join('')
     +`<th class="num">${wkLbl}</th><th class="num">${varLbl}</th></tr>`;
   const groups=logGroups();
@@ -883,14 +886,17 @@ function renderLog(){
         const vt=off?`+${tHarv} off`:(Math.abs(v)<Math.max(3,tPlan*0.06)?'on plan':`${v>0?'+':''}${v} t`);
         varCell=`<span class="varcell ${vc}" id="vr_${i}">${vt}</span>`;}
       gwk+=wkTot;
-      const areaCell = `<span class="rotxt" title="Bearing area from Land Cloud (read-only)">${ay.area}</span>`; // area = farm_blocks bearing area, DB-owned
-      const yldCell  = m==='plan' ? `<input class="cin plan" id="yl_${i}" value="${ay.yield==null?'':ay.yield}" placeholder="—" oninput="edited(this)">` : `<span class="rotxt">${ay.yield==null?'—':ay.yield}</span>`;
+      const areaCell = `<span class="rotxt" title="Planted area from Land Cloud (read-only)">${ay.area}</span>`; // area = farm_blocks.planted_area_fed, DB-owned
+      const yldCell  = `<span class="rotxt" id="yv_${i}" title="Yield = Planned ÷ planted area (calculated)">${ay.yield==null?'—':(Math.round(ay.yield*10)/10)}</span>`;
+      const plannedInputCell = m==='plan'
+        ? `<input class="cin plan" id="pl_${i}" value="${(planStore[i]&&planStore[i].planned!=null)?planStore[i].planned:''}" placeholder="—" oninput="edited(this)">`
+        : `<span class="plancell" id="pl_${i}">${Math.round(plannedNow(i))}</span>`;
       body+=`<tr>
         <td class="frozen f0" title="${p.f}">${p.f}</td><td class="frozen f1"><span class="plot" title="${p.p}">${p.aydi}</span>${groupBy==='farm'?`<div class="vsub" title="${p.v}">${p.v}</div>`:''}</td>
         <td class="frozen f2"><span class="pill p-${p.pnp}">${p.pnp}</span></td>
         <td class="num hidecol">${areaCell}</td>
         <td class="num hidecol">${yldCell}</td>
-        <td class="num hidecol"><span class="plancell" id="pl_${i}">${Math.round(plannedNow(i))}</span></td>
+        <td class="num hidecol">${plannedInputCell}</td>
         <td class="hidecol wincol">${wchip}</td>
         ${cells}
         <td class="num" id="wp_${i}">${wkTot}</td>
@@ -924,13 +930,14 @@ function edited(el){
   const m=editMode;
   if(el&&el.id){
     const id=el.id;
-    if(id.startsWith('ar_')||id.startsWith('yl_')){
-      const i=+id.split('_')[1]; const ar=document.getElementById('ar_'+i), yl=document.getElementById('yl_'+i);
-      if(yl){ // area is read-only (DB bearing area); only yield is editable here
-        planStore[i]={area: ar?(parseFloat(ar.value)||0):(getAY(i).area||plots[i].area||0), yield:parseFloat(yl.value)||0};
-        const pc=document.getElementById('pl_'+i); if(pc)pc.textContent=Math.round(plannedNow(i)); dirty.add('plan-total|'+i);
-        // curve rescales for untouched days; refresh their inputs in place across the visible columns
-        curCols.forEach(c=>{const inp=document.getElementById('c_'+i+'_'+c.w+'_'+c.di); if(inp&&!(i+'|'+c.w+'|'+c.di in planDayStore)&&m==='plan')inp.value=dayPlan(i,c.w,c.di);});}
+    if(id.startsWith('pl_')){ // Planned (season total) is the input; area (planted) is read-only, yield is derived
+      const i=+id.split('_')[1]; const pin=document.getElementById('pl_'+i);
+      const raw=pin.value===''?null:parseFloat(pin.value); const planned=(raw==null||isNaN(raw))?null:raw;
+      planStore[i]={planted:(planStore[i]?planStore[i].planted:(plots[i]?plots[i].planted:0)), planned:planned};
+      const yv=document.getElementById('yv_'+i); if(yv){const y=getAY(i).yield; yv.textContent=(y==null?'—':(Math.round(y*10)/10));}
+      dirty.add('plan-total|'+i);
+      // curve rescales for untouched days; refresh their inputs in place across the visible columns
+      curCols.forEach(c=>{const inp=document.getElementById('c_'+i+'_'+c.w+'_'+c.di); if(inp&&!(i+'|'+c.w+'|'+c.di in planDayStore)&&m==='plan')inp.value=dayPlan(i,c.w,c.di);});
     } else if(id.startsWith('c_')){
       const parts=id.split('_'); const i=+parts[1], w=+parts[2], di=+parts[3]; const k=i+'|'+w+'|'+di;
       const val=el.value===''?null:parseFloat(el.value);
@@ -1190,7 +1197,7 @@ async function saveAll(){
   const plan=[],plan_day=[],actual_day=[],actual_del=[];
   dirty.forEach(k=>{
     if(k.indexOf('plan-total|')===0){const i=+k.split('|')[1];const ay=getAY(i),w=winStore[i]||winOf(i);
-      plan.push({block_id:plots[i].blockId,area:ay.area,yield:ay.yield,start:dateOf(w.start,0),peak:dateOf(w.peak,0),end:dateOf(w.end,6),shape:w.shape,base_updated_at:planBaseTs[plots[i].blockId]||null});
+      plan.push({block_id:plots[i].blockId,area:ay.area,yield:(ay.yield==null?'':ay.yield),planned:(planStore[i]&&planStore[i].planned!=null?planStore[i].planned:''),start:dateOf(w.start,0),peak:dateOf(w.peak,0),end:dateOf(w.end,6),shape:w.shape,base_updated_at:planBaseTs[plots[i].blockId]||null});
     } else {const q=k.split('|'),i=+q[0],w=+q[1],d=+q[2],mode=q[3];
       if(mode==='plan'){const v=planDayStore[i+'|'+w+'|'+d];if(v!=null)plan_day.push({block_id:plots[i].blockId,plan_date:dateOf(w,d),planned_t:v,source:'manual'});}
       else {const v=actStore[i+'|'+w+'|'+d]; const b=actBreak[i+'|'+w+'|'+d]||{};
@@ -1613,7 +1620,7 @@ async function loadSeason(season){
   clearSeasonStores();
   {
     const [bR,pR,pdR,adR,tkR,rvR]=await Promise.all([
-      SB.from('farm_blocks').select('id,farm_code,sector_code,plot_code,block_add,aydi_block_number,total_area_fed,variety_id,farm_id,varieties(name),farms(name)').eq('product_id',product).eq('lifecycle','bearing').not('variety_id','is',null).not('farm_id','is',null),
+      SB.from('farm_blocks').select('id,farm_code,sector_code,plot_code,block_add,aydi_block_number,total_area_fed,planted_area_fed,variety_id,farm_id,varieties(name),farms(name)').eq('product_id',product).eq('lifecycle','bearing').not('variety_id','is',null).not('farm_id','is',null),
       SB.from('hp_plan').select('*').eq('season_id',SEASON.id),
       SB.from('hp_plan_day').select('block_id,plan_date,planned_t').eq('season_id',SEASON.id),
       SB.from('hp_actual_day').select('block_id,harvest_date,actual_t,harvest_sorting_t,local_sales_t,waste_t,review_status').eq('season_id',SEASON.id),
@@ -1633,12 +1640,12 @@ async function loadSeason(season){
     buildWeeks(lo, hi);
     const ti=wkIndexOfDate(ymd(new Date())); const beforeSeason=new Date()<WKDATE[0]; CUR=ti>=0?ti:(beforeSeason?0:WK.length-1); CURDAY=ti>=0?new Date().getDay():(beforeSeason?0:3); selWeek=CUR;
     const planBy={},farmName={},varName={}; plan.forEach(p=>planBy[p.block_id]=p);
-    plots=blocks.map(b=>{const code=b.farm_code+'-'+b.sector_code+'-'+b.plot_code+(b.block_add||'');const fn=(b.farms&&b.farms.name)||b.farm_code,vn=(b.varieties&&b.varieties.name)||'—';farmName[b.farm_id]=fn;varName[b.variety_id]=vn;const pl=planBy[b.id]||{};const aydi=(b.aydi_block_number&&String(b.aydi_block_number).trim())||code;return {blockId:b.id,farmId:b.farm_id,varId:b.variety_id,f:fn,p:code,aydi:aydi,v:vn,vt:PRODUCT_LABEL[product]||product,pnp:'P',area:Number(b.total_area_fed||0),latest:Number(pl.planned_t||0),budget:null,jul:null,nov:null,plan:Array(WK.length).fill(0),actual:Array(WK.length).fill(null)};});
+    plots=blocks.map(b=>{const code=b.farm_code+'-'+b.sector_code+'-'+b.plot_code+(b.block_add||'');const fn=(b.farms&&b.farms.name)||b.farm_code,vn=(b.varieties&&b.varieties.name)||'—';farmName[b.farm_id]=fn;varName[b.variety_id]=vn;const pl=planBy[b.id]||{};const aydi=(b.aydi_block_number&&String(b.aydi_block_number).trim())||code;return {blockId:b.id,farmId:b.farm_id,varId:b.variety_id,f:fn,p:code,aydi:aydi,v:vn,vt:PRODUCT_LABEL[product]||product,pnp:'P',area:Number(b.total_area_fed||0),planted:Number(b.planted_area_fed||0),latest:Number(pl.planned_t||0),budget:null,jul:null,nov:null,plan:Array(WK.length).fill(0),actual:Array(WK.length).fill(null)};});
     farmsList=[...new Set(plots.map(p=>p.f))];
     seasonHasPlan = plots.some(pt=>planBy[pt.blockId]); // product-specific: does THIS crop have a plan this season
-    const idx={}; plots.forEach((pt,i)=>{idx[pt.blockId]=i;const pl=planBy[pt.blockId];if(pl){planStore[i]={area:Number(pl.bearing_area_fed||pt.area||0),yield:pl.plan_yield_t_fed==null?null:Number(pl.plan_yield_t_fed)};if(pl.updated_at)planBaseTs[pt.blockId]=pl.updated_at;
+    const idx={}; plots.forEach((pt,i)=>{idx[pt.blockId]=i;const pl=planBy[pt.blockId];if(pl){planStore[i]={planted:pt.planted, planned: pl.planned_t==null?null:Number(pl.planned_t)};if(pl.updated_at)planBaseTs[pt.blockId]=pl.updated_at;
       if(pl.harvest_start){let ws=wkIndexOfDate(pl.harvest_start),we=wkIndexOfDate(pl.harvest_end),wp=wkIndexOfDate(pl.harvest_peak);if(ws<0)ws=0;if(we<0)we=WK.length-1;if(wp<ws||wp>we)wp=Math.round((ws+we)/2);winStore[i]={start:ws,peak:wp,end:we,shape:pl.harvest_shape||'bell'};}
-      }else{planStore[i]={area:pt.area,yield:0};}});
+      }else{planStore[i]={planted:pt.planted, planned:null};}});
     // When today is outside the season, open on the FIRST planned-harvest week (not the calendar's June tail).
     if(ti<0){const hs=Object.values(winStore).map(w=>w&&w.start).filter(n=>typeof n==='number'&&n>=0);if(hs.length)selWeek=Math.max(0,Math.min(Math.min(...hs),WK.length-2));}
     pd.forEach(r=>{const i=idx[r.block_id];if(i==null)return;const w=wkIndexOfDate(r.plan_date),d=dowOf(r.plan_date);if(w>=0)planDayStore[i+'|'+w+'|'+d]=Number(r.planned_t);});
