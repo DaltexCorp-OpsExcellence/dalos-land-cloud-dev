@@ -133,6 +133,10 @@ th.dayh.dsh-waste{border-bottom:2px solid var(--red)}
 .daycell.dsh-local .cin{border-bottom:2px solid var(--amber)}
 .daycell.dsh-waste .cin{border-bottom:2px solid var(--red)}
 td.daytot{border-left:1px solid var(--border2);font-weight:600}
+/* 2-week overview: read-only day-total cell, click to drill into the day split */
+td.daycell.dtot2{cursor:pointer}
+td.daycell.dtot2:hover{background:var(--bg2)}
+.dtotval{font-family:var(--font-num);font-weight:600;font-size:15px;color:var(--text)}
 #logTable .daycell,#trkTable .daycell,#logTable th.dayh,#trkTable th.dayh{width:46px}
 /* separator between the two weeks in the 2-week view */
 .daycell.wkstart,th.dayh.wkstart,td.num.wkstart{border-left:2px solid var(--text3)!important}
@@ -716,6 +720,12 @@ let curDay=null;
 const DAY_CATS=[['wared','To Packhouse','وارد محطة'],['sorting','Field Sorting','فرزة أرض'],['local','Local Sales','خام تجار'],['waste','Waste','إعدامات']];
 function getBreak(i,w,d,cat){const b=actBreak[i+'|'+w+'|'+d];return b&&b[cat]!=null?b[cat]:null;}
 function fmtT(v){v=Math.round(v*10)/10;return v%1?v.toFixed(1):String(v);}
+// day total across the 4 destinations (null if nothing logged that day) — used by the 2-week overview
+function dayTotalT(i,w,d){const a=getActual(i,w,d),b=actBreak[i+'|'+w+'|'+d]||{};
+  const parts=[a,b.sorting,b.local,b.waste].filter(x=>x!=null&&!isNaN(x));
+  return parts.length?parts.reduce((s,x)=>s+x,0):null;}
+// 2-week overview → click a day to edit its four-way split in the Day view
+function drillDay(w,di){ daySel={w,di}; actView='day'; renderLog(); }
 function dayEdit(el,cat){
   const q=el.id.split('_'),i=+q[1],w=+q[2],di=+q[3],k=i+'|'+w+'|'+di;
   const raw=el.value===''?null:parseFloat(el.value); const val=(raw==null||isNaN(raw))?null:raw;
@@ -790,6 +800,7 @@ function renderLog(){
   const present=document.body.classList.contains('present');
   const single=(!present&&m==='harv'&&(actView==='today'||actView==='day')); // present ignores single-day views → always 2 weeks
   const isToday=(!present&&m==='harv'&&actView==='today');
+  const wk2act=(!present&&m==='harv'&&actView==='weeks'); // 2-week Actual = read-only day totals, click a day to edit the split
   if(isToday) selWeek=CUR; // "Today" always lives in the current week
   if(present) selWeek=Math.max(0,Math.min(selWeek,WK.length-2)); // keep both weeks on-calendar for the wall
   const cols=viewCols(); curCols=cols;
@@ -813,7 +824,7 @@ function renderLog(){
     m==='plan' ? '<b>Setting the plan.</b> Set the <b>Yield</b> (t/fed) — area is the bearing area from Land Cloud (read-only); season total = Area × Yield. Then click the <b>harvest-window</b> chip to set start/peak/end/shape — the tool draws the curve. Two weeks shown; day cells can be hand-tweaked (edited cells get a green outline). Faint number = actual harvest.'
   : isToday ? '<b>Logging today.</b> One column: type each plot\'s tonnes and press <b>Enter</b> (or ↓) to move to the next plot. <b>Blank = not logged yet</b>; type <b>0</b> for “no pick”. Rows = plots in window today or already logged today. Plan fields are read-only here.'
   : actView==='day' ? '<b>Logging a day.</b> Pick any date on the right; one column — type each plot\'s tonnes and press <b>Enter</b> (or ↓) for the next plot. Blank = not logged; 0 = no pick. Plan fields are read-only here.'
-  :         '<b>Logging harvest</b> (actual production) — two weeks. Type tonnes per plot-day; faint number = plan; blank = not logged; Enter/↓ moves down a column. A pick on a 0-plan day turns <b style="color:var(--violet)">purple</b> (off-plan). Future days are locked. Plan fields are read-only here.';
+  :         '<b>Two-week overview.</b> Each cell is the day\'s <b>total pick</b> (all four destinations); the faint <b>PH</b> = the To-Packhouse portion. Tap any day to open its four-way split and log it. Row total = tonnes picked over the fortnight; <b>vs plan</b> tracks To Packhouse.';
   if(m==='harv' && actView==='day' && !document.body.classList.contains('present')){
     renderDaySplit(cols[0]);
     document.getElementById('cellLegend').innerHTML=`<span>Destinations:</span> <b style="color:var(--accent)">To Packhouse</b> = export-bound (vs plan) · Field Sorting = field grade-out · Local Sales = raw to traders · Waste = condemned · <b>Day total</b> = sum`;
@@ -821,7 +832,7 @@ function renderLog(){
     updateDirtyBadge(); return;
   }
   const NCOL=7+cols.length+2;
-  const wkLbl = (cols.length>7?'2-wk ':'')+(m==='plan'?'plan':'harv');
+  const wkLbl = (cols.length>7?'2-wk ':'')+(m==='plan'?'plan':(wk2act?'total':'harv'));
   const varLbl= m==='plan'?'':'vs plan';
   document.getElementById('cellLegend').innerHTML=
     `<span>Each day cell:</span>`+
@@ -841,11 +852,16 @@ function renderLog(){
     let gsum=cols.map(()=>0), gwk=0;
     idxs.forEach(i=>{
       const p=plots[i], ay=getAY(i);
-      let tPlan=0,tHarv=0;
-      cols.forEach(c=>{tPlan+=dayPlan(i,c.w,c.di);tHarv+=(getActual(i,c.w,c.di)||0);});
+      let tPlan=0,tHarv=0,tTot=0;
+      cols.forEach(c=>{tPlan+=dayPlan(i,c.w,c.di);tHarv+=(getActual(i,c.w,c.di)||0);tTot+=(dayTotalT(i,c.w,c.di)||0);});
       const cells=cols.map((c,ci)=>{
         const w=c.w, di=c.di;
         const dp=dayPlan(i,w,di), h=getActual(i,w,di);
+        if(wk2act){ // read-only day total (sum of the 4 destinations); click to edit the split in Day view
+          const tot=dayTotalT(i,w,di); gsum[ci]+=(tot||0); grand[ci]+=(tot||0);
+          const off=dp===0&&(tot||0)>0;
+          return `<td class="daycell dtot2${off?' off':''}${c.wkStart?' wkstart':''}" onclick="drillDay(${w},${di})" title="Click to edit this day's split (To Packhouse / Field Sorting / Local Sales / Waste)"><span class="dtotval">${tot==null?'':fmtT(tot)}</span><span class="dp">${h!=null?('<span class="tg">PH</span>'+fmtT(h)):''}</span></td>`;
+        }
         const val=m==='plan'?dp:(h||0); gsum[ci]+=val; grand[ci]+=val;
         const isFut=(w>CUR)||(w===CUR&&di>CURDAY);
         let editVal, refVal, cinCls, extra='', dis='';
@@ -862,7 +878,7 @@ function renderLog(){
         : `<span class="wchip ro" title="Plan is read-only in Actual Harvest mode"><span class="wk">◷</span>${WK[w.start]}→${WK[w.end]} · ${w.shape}</span>`;
       let wkTot, varCell='';
       if(m==='plan'){wkTot=tPlan;}
-      else {wkTot=tHarv;const v=tHarv-tPlan,off=tPlan===0&&tHarv>0;
+      else {wkTot=wk2act?tTot:tHarv;const v=tHarv-tPlan,off=tPlan===0&&tHarv>0;
         const vc=off?'v-off':(Math.abs(v)<Math.max(3,tPlan*0.06)?'v-on':(v>0?'v-over':'v-under'));
         const vt=off?`+${tHarv} off`:(Math.abs(v)<Math.max(3,tPlan*0.06)?'on plan':`${v>0?'+':''}${v} t`);
         varCell=`<span class="varcell ${vc}" id="vr_${i}">${vt}</span>`;}
@@ -893,7 +909,7 @@ function renderLog(){
       ? `<span class="tag">Actual Harvest</span><span>Today · ${cols[0].wd} ${cols[0].d} — <b><span id="todayCnt">${loggedN} of ${rowsN}</span></b> in-window plots logged. Blank = not logged · 0 = no pick. Plan fields are read-only.</span>`
       : actView==='day'
         ? `<span class="tag">Actual Harvest</span><span>Logging <b>${cols[0].wd} ${cols[0].d} ${cols[0].mon}</b> — pick any date. Blank = not logged · 0 = no pick. Plan fields are read-only.</span>`
-        : `<span class="tag">Actual Harvest</span><span>Actual Harvest · two weeks — you're logging <b>what was actually picked</b>. Plan is shown greyed for reference and is read-only here.</span>`;
+        : `<span class="tag">Actual Harvest</span><span>Two-week overview — each day shows the <b>total pick</b> (faint <b>PH</b> = To Packhouse). <b>Click a day</b> to log its four-way split. vs plan tracks To Packhouse.</span>`;
   updateDirtyBadge();
 }
 // recompute on edit — stores ONLY the cell that changed (per-cell dirty set); totals recomputed from the model
