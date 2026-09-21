@@ -1043,7 +1043,11 @@ function BlockDetail(p){
   var lineageSection=null, chartPrior=null;   // chartPrior feeds the prior-variety bars into the production chart below
   if(!lin.loading){
     var lname=function(pl){ return (pl.varieties&&pl.varieties.name)||'unknown'; };
-    var prior=lin.plantings.filter(function(pl){ return pl.lifecycle==='retired'; });
+    // a planting's effective last producing season (explicit, else derived from its series)
+    var plLast=function(pl){ if(pl.last_producing_season!=null) return Number(pl.last_producing_season); var s=lin.series[pl.id]||{}, ys=Object.keys(s).filter(function(y){return s[y]>0;}).map(Number); return ys.length?Math.max.apply(null,ys):null; };
+    // genuine predecessor only: retired AND stopped producing before this block was planted —
+    // excludes nurseries and any planting that coexisted with the old one (incl. 1-yr transitions)
+    var prior=lin.plantings.filter(function(pl){ var L=plLast(pl); return pl.lifecycle==='retired' && L!=null && b.planting_year!=null && L < b.planting_year; });
     var current=lin.plantings.filter(function(pl){ return pl.lifecycle!=='retired'; });
     if(prior.length && b.lifecycle!=='retired'){
       var AMBER='#b87820', TEAL='var(--accent2)';
@@ -1089,9 +1093,11 @@ function BlockDetail(p){
     var lname3=function(pl){ return (pl.varieties&&pl.varieties.name)||'unknown'; };
     var LCB={planned:['Planned','var(--text3)'],pre_bearing:['Pre-bearing','var(--amber)'],nursery:['Nursery','var(--amber)'],bearing:['Bearing','var(--green)'],retired:['Retired','var(--text3)'],superseded:['Superseded','var(--text3)'],fallow:['Fallow','var(--text3)']};
     var sTot=function(id){ var s=lin.series[id]||{}; return Object.keys(s).reduce(function(a,y){return a+(s[y]>0?s[y]:0);},0); };
-    var preds=lin.plantings.filter(function(pl){ return pl.id!==b.id && sTot(pl.id)>0; });   // other plantings that actually produced
+    var plLast2=function(pl){ if(pl.last_producing_season!=null) return Number(pl.last_producing_season); var s=lin.series[pl.id]||{}, ys=Object.keys(s).filter(function(y){return s[y]>0;}).map(Number); return ys.length?Math.max.apply(null,ys):null; };
+    // TRUE predecessors only: produced AND stopped before this block was planted (excludes coexisting/nursery plantings)
+    var preds=lin.plantings.filter(function(pl){ var L=plLast2(pl); return pl.id!==b.id && sTot(pl.id)>0 && L!=null && b.planting_year!=null && L < b.planting_year; });
     var curPl=lin.plantings.filter(function(pl){ return pl.id===b.id; })[0]; var curName=curPl?lname3(curPl):'this planting';
-    replantNote=ce('div',{style:{marginTop:18}},
+    if(preds.length) replantNote=ce('div',{style:{marginTop:18}},
       ce('div',{className:'section-title'},ce('span',{className:'section-title-bar'}),'Replant lineage'),
       ce('div',{style:{fontSize:11.5,color:'var(--text2)',lineHeight:1.5,marginBottom:9}}, 'This land carries '+lin.plantings.length+' plantings on the same plot — a replant. Production never carries across the replant; each variety keeps its own record.'),
       lin.plantings.map(function(pl){ var isB=pl.id===b.id; var rel=isB?'this plot':(pl.planting_year<(b.planting_year||0)?'predecessor':(pl.planting_year>(b.planting_year||0)?'successor':'same year')); var lc=LCB[pl.lifecycle]||[pl.lifecycle,'var(--text3)']; var tot=sTot(pl.id);
