@@ -1173,7 +1173,7 @@ function BlockDetail(p){
         row('Detail mode', rawSeason.detail_mode||'none'),
         row('Updated', rawSeason.updated_at?String(rawSeason.updated_at).slice(0,10):'—')),
       ce('div',{className:'section-title',style:{marginTop:16}},ce('span',{className:'section-title-bar'}),'Stored metrics'),
-      ce('div',{className:'table-wrap'}, ce('table',null,
+      ce('div',{className:'table-wrap'}, ce('table',{style:{minWidth:0}},
         ce('thead',null,ce('tr',null,['Metric','Code','Value (t)'].map(function(x){return ce('th',{key:x},x);}))),
         ce('tbody',null, METORDER.filter(function(k){return rawSeason.metrics&&rawSeason.metrics[k]!=null;}).concat(extraKeys).map(function(k){ var v=Number(rawSeason.metrics[k]);
           return ce('tr',{key:k}, ce('td',null,METLABEL[k]||k), ce('td',null,ce('span',{className:'lot'},k)), ce('td',{className:'num',style:v===0?{color:'var(--text3)'}:null}, fmt(Math.round(v*100)/100))); }))))
