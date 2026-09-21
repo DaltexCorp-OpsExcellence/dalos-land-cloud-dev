@@ -185,6 +185,7 @@ tr.rowlink:hover td{background:var(--bg)}
 @keyframes fade{to{opacity:1}}
 .drawer{position:fixed;top:0;right:0;bottom:0;width:520px;max-width:94vw;background:var(--bg);z-index:51;box-shadow:-4px 0 24px rgba(0,0,0,.14);display:flex;flex-direction:column;transform:translateX(100%);animation:slidein .22s cubic-bezier(.32,.72,0,1) forwards;overflow-y:auto}
 @keyframes slidein{to{transform:translateX(0)}}
+.rawover{position:fixed;top:0;right:0;bottom:0;width:520px;max-width:94vw;background:var(--bg);z-index:60;display:flex;flex-direction:column;overflow:hidden}
 .drawer-head{position:sticky;top:0;background:var(--bg2);border-bottom:1px solid var(--border);padding:14px 18px;display:flex;align-items:center;gap:10px}
 .drawer-head h2{font-family:var(--font-display);font-size:19px;font-weight:400}
 .drawer-body{padding:16px 18px}
@@ -276,6 +277,7 @@ tr.rowlink:hover td{background:var(--bg)}
 .devrow .pct{width:56px;flex:none;text-align:right;font-family:var(--font-mono)}
 @media (max-width:700px){
   .drawer{top:auto;left:0;right:0;bottom:0;width:100%;max-width:100%;height:82vh;border-radius:20px 20px 0 0;transform:translateY(100%);animation:sheetin .28s cubic-bezier(.32,.72,0,1) forwards}
+  .rawover{top:auto;left:0;right:0;bottom:0;width:100%;max-width:100%;height:82vh;border-radius:20px 20px 0 0}
   @keyframes sheetin{to{transform:translateY(0)}}
   .field-row{grid-template-columns:1fr}
 }
@@ -1157,7 +1159,7 @@ function BlockDetail(p){
   // raw season-record overlay (full original detail)
   var rawSeason = rawY!=null ? seasons.filter(function(s){return s.season_year===rawY;})[0] : null;
   var extraKeys = rawSeason&&rawSeason.metrics ? Object.keys(rawSeason.metrics).filter(function(k){return METORDER.indexOf(k)<0 && rawSeason.metrics[k]!=null;}) : [];
-  var rawPanel = rawSeason ? ce('div',{style:{position:'absolute',inset:0,background:'var(--bg)',zIndex:3,display:'flex',flexDirection:'column'}},
+  var rawPanel = rawSeason ? ce('div',{className:'rawover'},
     ce('div',{className:'drawer-head'},
       ce('button',{className:'btn btn-secondary btn-sm',onClick:function(){setRawY(null);}},'‹ Back'),
       ce('h2',{style:{fontSize:15,fontFamily:'var(--font-mono)',margin:0}}, b.aydi_block_number+' · '+rawSeason.season_year),
@@ -1220,9 +1222,9 @@ function BlockDetail(p){
         historySection,
         benchSection,
         segFlow
-      ),
-      rawPanel
+      )
     ),
+    rawPanel,
     action==='edit'    ? ce(EditIdentityModal,{block:b,onClose:function(){setAction(null);},onDone:done}) : null,
     action==='retire'  ? ce(RetireModal,{block:b,onClose:function(){setAction(null);},onDone:done}) : null,
     action==='replant' ? ce(ReplantModal,{block:b,onClose:function(){setAction(null);},onDone:done}) : null,
