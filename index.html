@@ -933,9 +933,10 @@ function geomTile(geo, addable, onAdd){
       poly=ce('svg',{viewBox:'0 0 '+W+' '+H,width:'100%',height:H,'aria-label':'Plot boundary'},
         ce('polygon',{points:pts,fill:'color-mix(in srgb,var(--accent2) 42%,transparent)',stroke:'var(--accent)',strokeWidth:1.5,strokeLinejoin:'round'}));
     }
-    return ce('div',{style:{width:112,flex:'none',border:'1px solid var(--border)',borderRadius:8,background:'var(--bg2)',padding:5}},
+    var tile=ce('div',{style:{width:112,flex:'none',border:'1px solid var(--border)',borderRadius:8,background:'var(--bg2)',padding:5}},
       poly||ce('div',{style:{height:H}}),
-      ce('div',{style:{fontSize:9,fontFamily:'var(--font-mono)',color:'var(--text3)',textAlign:'center',marginTop:3}}, 'boundary'+(geo.src?' · '+geo.src:'')));
+      ce('div',{style:{fontSize:9,fontFamily:'var(--font-mono)',color:addable?'var(--accent)':'var(--text3)',textAlign:'center',marginTop:3}}, addable?'edit boundary':('boundary'+(geo.src?' · '+geo.src:''))));
+    return addable ? ce('button',{onClick:onAdd,title:'Edit this plot’s boundary',style:{padding:0,border:'none',background:'none',cursor:'pointer'}}, tile) : tile;
   }
   var inner=ce('div',{style:{width:112,flex:'none',border:'1px dashed var(--border2)',borderRadius:8,background:'var(--bg2)',height:H+20,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',textAlign:'center'}},
     ce('div',{style:{fontSize:20,color:'var(--text3)',lineHeight:1}},'⬡'),
@@ -2739,12 +2740,13 @@ function DupAlert(p){ var d=p.dup, farmName=p.farmName; if(!d||d.state!=='clash'
    geoms {id→GeoJSON} · onSet(id, GeoJSON|null) · height. One target = New-plot draw;
    many = Split children. "From outline" copies the seed into a target to reshape. ── */
 function MiniMap(p){
-  var box=React.useRef(null), mapR=React.useRef(null), fgR=React.useRef(null), drawR=React.useRef(null), editR=React.useRef(null), seedR=React.useRef(null);
+  var box=React.useRef(null), mapR=React.useRef(null), fgR=React.useRef(null), drawR=React.useRef(null), editR=React.useRef(null), seedR=React.useRef(null), refR=React.useRef(null);
   var a=useState(null); var active=a[0],setActive=a[1];
   var e=useState(false); var editing=e[0],setEditing=e[1];
   function fit(){ var m=mapR.current; if(!m) return; try{ var b=null;
     if(fgR.current&&fgR.current.getLayers().length) b=fgR.current.getBounds();
     else if(seedR.current) b=seedR.current.getBounds();
+    else if(refR.current&&refR.current.getLayers().length) b=refR.current.getBounds();
     if(b&&b.isValid()) m.fitBounds(b.pad(0.35)); m.invalidateSize(); }catch(err){} }
   function drawTarget(t){ var g=(p.geoms||{})[t.id]; if(!g) return; var ll=geomToLatLngs(g); if(!ll) return;
     var layer=L.polygon(ll,{color:t.color,weight:2.5,fillOpacity:0.28}); layer._tid=t.id; layer.addTo(fgR.current); }
@@ -2753,6 +2755,7 @@ function MiniMap(p){
     L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:19}).addTo(m);
     mapR.current=m; fgR.current=L.featureGroup().addTo(m);
     if(p.seed){ var sll=geomToLatLngs(p.seed); if(sll){ seedR.current=L.polygon(sll,{color:'#fff',weight:1.5,opacity:.6,dashArray:'5 5',fill:false,interactive:false}).addTo(m); } }
+    if(p.refGeoms&&p.refGeoms.length){ refR.current=L.featureGroup().addTo(m); p.refGeoms.forEach(function(g){ var rl=geomToLatLngs(g); if(rl){ try{ L.polygon(rl,{color:'#cfe6d8',weight:1,opacity:.6,dashArray:'3 4',fill:false,interactive:false}).addTo(refR.current); }catch(e){} } }); }
     (p.targets||[]).forEach(drawTarget);
     setTimeout(fit,80);
     return function(){ try{ m.remove(); }catch(err){} mapR.current=null; };
@@ -2846,10 +2849,13 @@ function EditIdentityModal(p){
 function SetGeomModal(p){
   var b=p.block;
   var g=useState(null); var geom=g[0],setGeomV=g[1];
+  var rf=useState(null); var refs=rf[0],setRefs=rf[1];   // farm's other plot outlines (reference + zoom target)
   var st=useState({busy:false,err:null}); var s=st[0],setS=st[1];
-  useEffect(function(){   // seed the editor with any existing boundary
-    supabase.from('v_farm_block_geom').select('geojson').eq('id',b.id).maybeSingle().then(function(r){
-      if(r.data&&r.data.geojson){ try{ setGeomV(JSON.parse(r.data.geojson)); }catch(e){} } });
+  useEffect(function(){   // seed the editor with any existing boundary, and load the farm's plots to zoom to
+    supabase.from('v_farm_block_geom').select('id,geojson').eq('farm_code',b.farm_code).eq('product_id',b.product_id).limit(1000).then(function(r){
+      var others=[]; (r.data||[]).forEach(function(x){ if(!x.geojson) return; try{ var gj=JSON.parse(x.geojson); if(x.id===b.id) setGeomV(gj); else others.push(gj); }catch(e){} });
+      setRefs(others);
+    },function(){ setRefs([]); });
   },[b.id]);
   function save(){ if(!geom){ setS({busy:false,err:'Draw the plot boundary on the map first.'}); return; } setS({busy:true,err:null});
     supabase.rpc('fn_set_block_geom',{p_block_id:b.id,p_geojson:geom,p_source:'manual'}).then(function(r){
@@ -2859,8 +2865,9 @@ function SetGeomModal(p){
     footer:[ce('button',{key:'c',className:'btn btn-secondary btn-sm',onClick:p.onClose,disabled:s.busy},'Cancel'),
             ce('button',{key:'s',className:'btn btn-primary btn-sm',onClick:save,disabled:s.busy||!geom}, s.busy?'Saving…':'Save boundary')]},
     ce('div',null,
-      ce(MiniMap,{seed:null,targets:[{id:'plot',label:'Plot boundary',color:'#2b5c3f'}],geoms:geom?{plot:geom}:{},height:300,onSet:function(id,gj){ setGeomV(gj); }}),
-      ce('div',{className:'form-hint',style:{marginTop:6}},'Click “Draw” on the map legend, click points to trace the plot, double-click to finish. Saved as this block’s geometry (geom_source = manual).'),
+      refs==null ? ce('div',{className:'skel',style:{height:300,borderRadius:8}})
+        : ce(MiniMap,{seed:null,refGeoms:refs,targets:[{id:'plot',label:'Plot boundary',color:'#2b5c3f'}],geoms:geom?{plot:geom}:{},height:300,onSet:function(id,gj){ setGeomV(gj); }}),
+      ce('div',{className:'form-hint',style:{marginTop:6}},'The farm’s other plots are dashed for reference. Click “Draw” on the map legend, click points to trace this plot, double-click to finish. Saved as this block’s geometry (geom_source = manual).'),
       s.err?ce('div',{className:'band',style:{color:'var(--red)',borderColor:'var(--red)',background:'var(--red-bg)',marginTop:8}}, s.err):null));
 }
 
