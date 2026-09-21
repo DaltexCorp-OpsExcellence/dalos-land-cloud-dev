@@ -888,34 +888,57 @@ function loadBench(crop,year,cb){
   });
 }
 // combo chart: production bars + yield line, dual-scaled; bars call onBar(seasonYear)
-function comboSVG(seasons,onBar){
-  var W=440,H=152,x0=34,x1=430,base=126,top=14,plotH=base-top,plotW=x1-x0;
-  var prods=seasons.map(function(s){ return (s.metrics&&s.metrics.actual_production!=null)?Number(s.metrics.actual_production):null; });
-  var yields=seasons.map(function(s){ var v=(s.metrics&&s.metrics.actual_production),a=Number(s.bearing_area_fed||0); return (v!=null&&a>0)?v/a:null; });
-  var maxP=Math.max.apply(null,prods.map(function(v){return v||0;}).concat([1]));
-  var maxY=Math.max.apply(null,yields.map(function(v){return v||0;}).concat([1]));
-  var n=seasons.length,slot=plotW/n,bw=Math.min(26,slot*0.6);
-  var els=[],latest=seasons.length?seasons[seasons.length-1].season_year:null,pts=[];
-  // gridlines + axes
+// Production+yield chart. `prior` (optional) overlays the plot's earlier variety as amber bars
+// before the current planting, with a replant divider; prior bars open that predecessor's record.
+function comboSVG(seasons,onBar,prior){
+  prior = prior||{};
+  var alloc=prior.alloc||{}, owner=prior.owner||{}, AMBER='#b87820', YINK='var(--text2)';
+  var W=440,H=152,x0=34,x1=430,base=126,top=16,plotH=base-top,plotW=x1-x0;
+  var byYear={}; seasons.forEach(function(s){ byYear[s.season_year]=s; });
+  var span=Object.keys(byYear).map(Number).concat(Object.keys(alloc).filter(function(y){return alloc[y]>0;}).map(Number));
+  if(!span.length) return ce('svg',{viewBox:'0 0 '+W+' '+H,width:'100%'});
+  var y0=Math.min.apply(null,span), y1=Math.max.apply(null,span), years=[];
+  for(var yy=y0;yy<=y1;yy++) years.push(yy);
+  var data=years.map(function(y){
+    var s=byYear[y], cur=(s&&s.metrics&&s.metrics.actual_production!=null)?Number(s.metrics.actual_production):null;
+    if(cur!=null){ var a=Number(s.bearing_area_fed||0); return {y:y,prod:cur,yld:(a>0?cur/a:null),kind:'cur'}; }
+    if(alloc[y]!=null&&alloc[y]>0) return {y:y,prod:alloc[y],yld:null,kind:'prior'};
+    return {y:y,prod:null,yld:null,kind:'pre'};
+  });
+  var hasPrior=data.some(function(d){return d.kind==='prior';});
+  var maxP=Math.max.apply(null,data.map(function(d){return d.prod||0;}).concat([1]));
+  var maxY=Math.max.apply(null,data.map(function(d){return d.yld||0;}).concat([1]));
+  var n=data.length,slot=plotW/n,bw=Math.min(26,slot*0.6);
+  var latestCur=null; data.forEach(function(d){ if(d.kind==='cur') latestCur=d.y; });
+  var els=[],pts=[];
   els.push(ce('line',{key:'g0',x1:x0,y1:top,x2:x1,y2:top,stroke:'var(--border)'}));
   els.push(ce('line',{key:'g1',x1:x0,y1:(top+base)/2,x2:x1,y2:(top+base)/2,stroke:'var(--border)'}));
   els.push(ce('line',{key:'g2',x1:x0,y1:base,x2:x1,y2:base,stroke:'var(--border2)'}));
   els.push(ce('text',{key:'ymax',x:30,y:top+3,textAnchor:'end',fontFamily:'var(--font-mono)',fontSize:8,fill:'var(--text3)'},Math.round(maxP)));
   els.push(ce('text',{key:'y0',x:30,y:base+3,textAnchor:'end',fontFamily:'var(--font-mono)',fontSize:8,fill:'var(--text3)'},'0'));
-  els.push(ce('text',{key:'yr',x:x1+3,y:top+3,textAnchor:'start',fontFamily:'var(--font-mono)',fontSize:8,fill:'var(--amber)'},Math.round(maxY)));
-  seasons.forEach(function(s,i){
-    var cx=x0+(i+0.5)*slot,pv=prods[i],yv=yields[i];
-    var h=pv!=null?Math.max(2,pv/maxP*plotH):2, y=base-h, pre=pv==null;
+  els.push(ce('text',{key:'yr',x:x1+3,y:top+3,textAnchor:'start',fontFamily:'var(--font-mono)',fontSize:8,fill:YINK},Math.round(maxY)));
+  data.forEach(function(d,i){
+    var cx=x0+(i+0.5)*slot,pv=d.prod,yv=d.yld,pre=pv==null,isPrior=d.kind==='prior';
+    var h=pv!=null?Math.max(2,pv/maxP*plotH):2, y=base-h;
+    var own=isPrior?(owner[d.y]||prior.target):null;
+    var click=isPrior?(own&&prior.onPrior?function(){prior.onPrior(own);}:null):(pv!=null&&onBar?function(){onBar(d.y);}:null);
+    var tip=isPrior?((prior.name||'prior')+' '+d.y+' · '+(prior.pct!=null&&prior.pct<100?'allocated ':'')+fmt(Math.round(pv))+' t'+(own?' — open record':'')):(pv!=null?(d.y+' · '+fmt(Math.round(pv))+' t — open record'):(d.y+' · pre-bearing'));
     els.push(ce('rect',{key:'b'+i,x:cx-bw/2,y:y,width:bw,height:h,rx:2,
-      fill:pre?'var(--bg3)':(s.season_year===latest?'var(--accent)':'var(--accent2)'),
-      style:{cursor:pv!=null?'pointer':'default'},onClick:pv!=null&&onBar?function(){onBar(s.season_year);}:null},
-      ce('title',null,pv!=null?(s.season_year+' · '+fmt(Math.round(pv))+' t — open record'):(s.season_year+' · pre-bearing'))));
+      fill:pre?'var(--bg3)':(isPrior?AMBER:(d.y===latestCur?'var(--accent)':'var(--accent2)')),opacity:isPrior?0.85:1,
+      style:{cursor:click?'pointer':'default'},onClick:click||null},
+      ce('title',null,tip)));
     els.push(ce('text',{key:'v'+i,x:cx,y:y-3,textAnchor:'middle',fontFamily:'var(--font-mono)',fontSize:7.5,fill:pre?'var(--text3)':'var(--text2)'},pv!=null?fmt(Math.round(pv)):'·'));
-    els.push(ce('text',{key:'x'+i,x:cx,y:base+13,textAnchor:'middle',fontFamily:'var(--font-mono)',fontSize:8.5,fill:'var(--text3)'},"'"+String(s.season_year).slice(2)));
+    els.push(ce('text',{key:'x'+i,x:cx,y:base+13,textAnchor:'middle',fontFamily:'var(--font-mono)',fontSize:8.5,fill:'var(--text3)'},"'"+String(d.y).slice(2)));
     if(yv!=null) pts.push([cx,base-yv/maxY*plotH]);
   });
-  if(pts.length>1) els.push(ce('polyline',{key:'yl',points:pts.map(function(p){return p[0]+','+p[1];}).join(' '),fill:'none',stroke:'var(--amber)',strokeWidth:2}));
-  pts.forEach(function(p,i){ els.push(ce('circle',{key:'yc'+i,cx:p[0],cy:p[1],r:2.4,fill:'var(--amber)'})); });
+  if(hasPrior){                                   // dashed divider at the replant boundary
+    var firstCur=-1; for(var k=0;k<data.length;k++){ if(data[k].kind==='cur'){ firstCur=k; break; } }
+    if(firstCur>0){ var bx=x0+firstCur*slot;
+      els.push(ce('line',{key:'rl',x1:bx,y1:top,x2:bx,y2:base,stroke:'var(--accent2)',strokeWidth:1,strokeDasharray:'3 3'}));
+      els.push(ce('text',{key:'rt',x:bx,y:top-4,textAnchor:'middle',fontSize:9,fill:'var(--accent)'},'↻'+(prior.plantYear?(" '"+String(prior.plantYear).slice(2)):''))); }
+  }
+  if(pts.length>1) els.push(ce('polyline',{key:'yl',points:pts.map(function(p){return p[0]+','+p[1];}).join(' '),fill:'none',stroke:YINK,strokeWidth:2}));
+  pts.forEach(function(p,i){ els.push(ce('circle',{key:'yc'+i,cx:p[0],cy:p[1],r:2.4,fill:YINK})); });
   return ce('svg',{viewBox:'0 0 '+W+' '+H,width:'100%',role:'img','aria-label':'Production and yield by season'},els);
 }
 // small parcel-boundary tile for the Area section (renders the real geometry, or an add affordance)
@@ -1017,7 +1040,7 @@ function BlockDetail(p){
     sankeySVG(flowProd,flowParts.exp,flowParts.rej,flowParts.trd,flowParts.fld,480)):null;
 
   // ── Plot lineage: this plot's own production + its area-share of prior plantings ──
-  var lineageSection=null;
+  var lineageSection=null, chartPrior=null;   // chartPrior feeds the prior-variety bars into the production chart below
   if(!lin.loading){
     var lname=function(pl){ return (pl.varieties&&pl.varieties.name)||'unknown'; };
     var prior=lin.plantings.filter(function(pl){ return pl.lifecycle==='retired'; });
@@ -1041,21 +1064,8 @@ function BlockDetail(p){
       // which retired planting produced each prior year → click a bar/row to open its own record
       var powner={}; prior.forEach(function(pl){ var s=lin.series[pl.id]||{}; Object.keys(s).forEach(function(y){ if(s[y]>0 && !powner[y]) powner[y]=pl.id; }); });
       var priorTarget = prior.length===1 ? prior[0].id : null;
-      // prior-only production chart (amber) — the current planting's own bars live in the combo chart below, so no duplication
-      var priorChart=null, pYrs=Object.keys(allocP).map(Number).filter(function(y){return allocP[y]>0;});
-      if(pYrs.length){
-        var py0=Math.min.apply(null,pYrs), py1=Math.max.apply(null,pYrs), pyears=[];
-        for(var pyy=py0;pyy<=py1;pyy++) pyears.push(pyy);
-        var pmax=0; pyears.forEach(function(y){ pmax=Math.max(pmax, allocP[y]||0); }); pmax=pmax||1;
-        priorChart=ce('div',{style:{display:'flex',alignItems:'flex-end',gap:0,height:130,padding:'16px 4px 0',border:'1px solid var(--border)',borderRadius:10,background:'var(--bg2)',marginTop:10}},
-          pyears.map(function(y){ var v=allocP[y]||0, own=powner[y]||priorTarget;
-            return ce('div',{key:y,style:{flex:1,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'flex-end',height:'100%',padding:'0 1px'}},
-              ce('div',{style:{fontSize:10,fontFamily:'var(--font-mono)',color:v>0?'var(--text2)':'var(--text3)',marginBottom:4}}, v>0?fmt(Math.round(v)):'·'),
-              v>0 ? ce('div',{onClick:own?function(){openBlock(own);}:null,title:(prior.length===1?lname(prior[0]):priorVars)+' '+y+' · '+(pct<100?'allocated ':'')+fmt(Math.round(v))+' t'+(own?' — open record':''),style:{width:'66%',maxWidth:26,height:Math.max(3,Math.round(v/pmax*88))+'px',background:AMBER,opacity:0.82,borderRadius:'3px 3px 0 0',cursor:own?'pointer':'default'}})
-                : ce('div',{style:{width:'66%',maxWidth:26,height:4,borderRadius:2,border:'1.5px dashed var(--border2)'}}),
-              ce('div',{style:{fontSize:10,fontFamily:'var(--font-mono)',color:'var(--text3)',marginTop:6}}, "'"+String(y).slice(2)));
-          }));
-      }
+      // feed the prior variety's per-year production into the single production chart below (amber bars)
+      chartPrior = { alloc:allocP, owner:powner, target:priorTarget, onPrior:openBlock, pct:pct, name:priorVars, plantYear:bStart };
       var listRow=function(color,name,sub,tot,unit,onClick){ return ce('div',{onClick:onClick||null,title:onClick?'Open '+name+'’s full record':null,style:{display:'flex',alignItems:'center',gap:11,padding:'8px 10px',border:'1px solid var(--border)',borderRadius:9,marginBottom:7,cursor:onClick?'pointer':'default'}},
         ce('span',{style:{width:11,height:11,borderRadius:'50%',background:color,flex:'none'}}),
         ce('div',null, ce('div',{style:{fontWeight:600,fontSize:14}}, name), ce('div',{style:{fontSize:11.5,color:'var(--text3)'}}, sub+(onClick?' · tap to open':''))),
@@ -1065,7 +1075,6 @@ function BlockDetail(p){
         ce('div',{className:'section-title'},ce('span',{className:'section-title-bar'}),'Plot lineage'),
         listRow(TEAL, lname(b), (bStart||'?')+'–now · this plot', bTot, bTot>0?'t · own':'no data yet'),
         listRow(AMBER, priorVars, pMin+'–'+pMax+' · prior land', priorAllocTot, 't · '+pct+'% of area', priorTarget?function(){openBlock(priorTarget);}:null),
-        priorChart,
         ce('div',{style:{fontSize:11.5,color:'var(--text2)',lineHeight:1.5,marginTop:12,padding:'9px 11px',background:'var(--bg2)',border:'1px solid var(--border)',borderRadius:8}},
           current.length>1
             ? ('This plot is '+pct+'% of the old '+priorVars+', so its prior production is shown at '+pct+' % (area share). The rest belongs to the other plot(s) from the split; the full old tonnes stay with '+priorVars+'.')
@@ -1110,11 +1119,12 @@ function BlockDetail(p){
   else if(hist.err) historySection=ce('div',{className:'band'},'Could not load history: '+hist.err);
   else if(withProd.length===0) historySection=ce('div',{className:'band',style:{background:'var(--bg2)',borderColor:'var(--border)',color:'var(--text3)'}}, seasons.length?'No production recorded for this block yet.':'No seasons on record.');
   else historySection=ce('div',null,
-    ce('div',{style:{border:'1px solid var(--border)',borderRadius:10,padding:'10px 6px 4px',background:'var(--bg2)'}}, comboSVG(seasons,setRawY),
+    ce('div',{style:{border:'1px solid var(--border)',borderRadius:10,padding:'10px 6px 4px',background:'var(--bg2)'}}, comboSVG(seasons,setRawY,chartPrior),
       ce('div',{style:{display:'flex',gap:14,justifyContent:'center',marginTop:2,fontSize:10.5,color:'var(--text3)',flexWrap:'wrap'}},
-        ce('span',null,ce('span',{style:{display:'inline-block',width:10,height:10,borderRadius:2,background:'var(--accent)',verticalAlign:'-1px',marginRight:4}}),'Production t'),
-        ce('span',null,ce('span',{style:{display:'inline-block',width:10,height:10,borderRadius:2,background:'var(--amber)',verticalAlign:'-1px',marginRight:4}}),'Yield t/fed'))),
-    ce('div',{style:{fontSize:11,color:'var(--text3)',margin:'8px 0 2px'}}, 'Tap a bar or a row to open that season’s full original record.'),
+        ce('span',null,ce('span',{style:{display:'inline-block',width:10,height:10,borderRadius:2,background:'var(--accent2)',verticalAlign:'-1px',marginRight:4}}),'Production t'),
+        chartPrior?ce('span',null,ce('span',{style:{display:'inline-block',width:10,height:10,borderRadius:2,background:'#b87820',verticalAlign:'-1px',marginRight:4}}),(chartPrior.name||'prior')+' (prior)'):null,
+        ce('span',null,ce('span',{style:{display:'inline-block',width:12,height:2,background:'var(--text2)',verticalAlign:'2px',marginRight:4}}),'Yield t/fed'))),
+    ce('div',{style:{fontSize:11,color:'var(--text3)',margin:'8px 0 2px'}}, chartPrior?'Tap a bar or a row to open its full original record — amber bars open the prior variety.':'Tap a bar or a row to open that season’s full original record.'),
     ce('div',{className:'table-wrap',style:{marginTop:6}},
       ce('table',null,
         ce('thead',null,ce('tr',null,['Year','Bearing','Prod t','t/fed','Export t','Exp %','Rej %','Loss %','Balance'].map(function(x){return ce('th',{key:x},x);}))),
@@ -1258,7 +1268,7 @@ function BlockDetail(p){
         kpiSection ? ce('div',{style:{marginTop:18}}, kpiSection) : null,
         lineageSection ? ce('div',{style:{marginTop:18}}, lineageSection) : null,
         replantNote,
-        ce('div',{className:'section-title',style:{marginTop:18}},ce('span',{className:'section-title-bar'}), (lineageSection||replantNote)?'This planting’s seasons':'Production history'),
+        ce('div',{className:'section-title',style:{marginTop:18}},ce('span',{className:'section-title-bar'}), (replantNote&&!lineageSection)?'This planting’s seasons':'Production history'),
         historySection,
         benchSection,
         segFlow
