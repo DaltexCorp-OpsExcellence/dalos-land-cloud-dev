@@ -186,6 +186,9 @@ tr.rowlink:hover td{background:var(--bg)}
 .drawer{position:fixed;top:0;right:0;bottom:0;width:520px;max-width:94vw;background:var(--bg);z-index:51;box-shadow:-4px 0 24px rgba(0,0,0,.14);display:flex;flex-direction:column;transform:translateX(100%);animation:slidein .22s cubic-bezier(.32,.72,0,1) forwards;overflow-y:auto}
 @keyframes slidein{to{transform:translateX(0)}}
 .rawover{position:fixed;top:0;right:0;bottom:0;width:520px;max-width:94vw;background:var(--bg);z-index:60;display:flex;flex-direction:column;overflow:hidden}
+.rawover table{min-width:0}
+.rawover .rmet{font-size:13px;color:var(--text)}
+.rawover .rmet .lot{margin-left:6px;color:var(--text3)}
 .drawer-head{position:sticky;top:0;background:var(--bg2);border-bottom:1px solid var(--border);padding:14px 18px;display:flex;align-items:center;gap:10px}
 .drawer-head h2{font-family:var(--font-display);font-size:19px;font-weight:400}
 .drawer-body{padding:16px 18px}
@@ -1173,10 +1176,10 @@ function BlockDetail(p){
         row('Detail mode', rawSeason.detail_mode||'none'),
         row('Updated', rawSeason.updated_at?String(rawSeason.updated_at).slice(0,10):'—')),
       ce('div',{className:'section-title',style:{marginTop:16}},ce('span',{className:'section-title-bar'}),'Stored metrics'),
-      ce('div',{className:'table-wrap'}, ce('table',{style:{minWidth:0}},
-        ce('thead',null,ce('tr',null,['Metric','Code','Value (t)'].map(function(x){return ce('th',{key:x},x);}))),
+      ce('div',{className:'table-wrap'}, ce('table',null,
+        ce('thead',null,ce('tr',null,['Metric','Value (t)'].map(function(x){return ce('th',{key:x},x);}))),
         ce('tbody',null, METORDER.filter(function(k){return rawSeason.metrics&&rawSeason.metrics[k]!=null;}).concat(extraKeys).map(function(k){ var v=Number(rawSeason.metrics[k]);
-          return ce('tr',{key:k}, ce('td',null,METLABEL[k]||k), ce('td',null,ce('span',{className:'lot'},k)), ce('td',{className:'num',style:v===0?{color:'var(--text3)'}:null}, fmt(Math.round(v*100)/100))); }))))
+          return ce('tr',{key:k}, ce('td',null,ce('span',{className:'rmet'},METLABEL[k]||k,ce('span',{className:'lot'},k))), ce('td',{className:'num',style:v===0?{color:'var(--text3)'}:null}, fmt(Math.round(v*100)/100))); }))))
       )) : null;
 
   return ce('div',null,
