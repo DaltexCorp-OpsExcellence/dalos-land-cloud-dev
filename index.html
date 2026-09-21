@@ -1101,16 +1101,18 @@ function BlockDetail(p){
       ):null);
   }
 
+  // when a lineage/replant chart already plots this planting's production bars, don't repeat them here
+  var hasLineageChart=!!(lineageSection||replantNote);
   var historySection;
   if(hist.loading) historySection=ce('div',{className:'skel',style:{height:70,marginTop:8}});
   else if(hist.err) historySection=ce('div',{className:'band'},'Could not load history: '+hist.err);
   else if(withProd.length===0) historySection=ce('div',{className:'band',style:{background:'var(--bg2)',borderColor:'var(--border)',color:'var(--text3)'}}, seasons.length?'No production recorded for this block yet.':'No seasons on record.');
   else historySection=ce('div',null,
-    ce('div',{style:{border:'1px solid var(--border)',borderRadius:10,padding:'10px 6px 4px',background:'var(--bg2)'}}, comboSVG(seasons,setRawY),
+    hasLineageChart ? null : ce('div',{style:{border:'1px solid var(--border)',borderRadius:10,padding:'10px 6px 4px',background:'var(--bg2)'}}, comboSVG(seasons,setRawY),
       ce('div',{style:{display:'flex',gap:14,justifyContent:'center',marginTop:2,fontSize:10.5,color:'var(--text3)',flexWrap:'wrap'}},
         ce('span',null,ce('span',{style:{display:'inline-block',width:10,height:10,borderRadius:2,background:'var(--accent)',verticalAlign:'-1px',marginRight:4}}),'Production t'),
         ce('span',null,ce('span',{style:{display:'inline-block',width:10,height:10,borderRadius:2,background:'var(--amber)',verticalAlign:'-1px',marginRight:4}}),'Yield t/fed'))),
-    ce('div',{style:{fontSize:11,color:'var(--text3)',margin:'8px 0 2px'}},'Tap a bar or a row to open that season’s full original record.'),
+    ce('div',{style:{fontSize:11,color:'var(--text3)',margin:'8px 0 2px'}}, hasLineageChart ? 'Tap a row to open that season’s full original record.' : 'Tap a bar or a row to open that season’s full original record.'),
     ce('div',{className:'table-wrap',style:{marginTop:6}},
       ce('table',null,
         ce('thead',null,ce('tr',null,['Year','Bearing','Prod t','t/fed','Export t','Exp %','Rej %','Loss %','Balance'].map(function(x){return ce('th',{key:x},x);}))),
