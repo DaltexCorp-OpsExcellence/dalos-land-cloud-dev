@@ -999,7 +999,7 @@ function BlockDetail(p){
       });
   },[b.id]);
   useEffect(function(){   // all plantings on this LAND (same product/farm/sector/plot, any block-add) + production
-    setLin({loading:true,plantings:[],series:{}});
+    setLin({loading:true,plantings:[],series:{},rows:{}});
     var sec=b.sector_code, plt=b.plot_code;
     if(sec==null||plt==null){ var parts=String(b.aydi_block_number||'').split('-'); sec=sec!=null?sec:parts[0]; plt=plt!=null?plt:String(parts[1]||'').replace(/[A-Za-z]+$/,''); }
     // the split's authoritative area-share for THIS block (denominator is inheriting
@@ -1009,13 +1009,13 @@ function BlockDetail(p){
       var storedRatio=(hm&&hm.data&&hm.data.ratio!=null)?Number(hm.data.ratio):null;
       supabase.from('farm_blocks').select('id,aydi_block_number,planting_year,lifecycle,total_area_fed,varieties(name)')
         .eq('product_id',b.product_id).eq('farm_code',b.farm_code).eq('sector_code',sec).eq('plot_code',plt).then(function(pr){
-          if(pr.error||!pr.data){ setLin({loading:false,plantings:[],series:{},ratio:storedRatio}); return; }
+          if(pr.error||!pr.data){ setLin({loading:false,plantings:[],series:{},rows:{},ratio:storedRatio}); return; }
           var plantings=pr.data.slice().sort(function(a,c){return (a.planting_year||0)-(c.planting_year||0);});
           var ids=plantings.map(function(x){return x.id;});
-          supabase.from('v_farm_season_wide').select('block_id,season_year,metrics').eq('scenario','actual')
+          supabase.from('v_farm_season_wide').select('block_id,season_year,bearing_area_fed,balance_status,metrics').eq('scenario','actual')
             .in('block_id',ids.length?ids:['00000000-0000-0000-0000-000000000000']).then(function(sr){
-              var series={}; (sr.data||[]).forEach(function(w){ var v=Number((w.metrics||{}).actual_production||0); (series[w.block_id]=series[w.block_id]||{})[w.season_year]=v; });
-              setLin({loading:false,plantings:plantings,series:series,ratio:storedRatio});
+              var series={},rows={}; (sr.data||[]).forEach(function(w){ var v=Number((w.metrics||{}).actual_production||0); (series[w.block_id]=series[w.block_id]||{})[w.season_year]=v; (rows[w.block_id]=rows[w.block_id]||{})[w.season_year]=w; });
+              setLin({loading:false,plantings:plantings,series:series,rows:rows,ratio:storedRatio});
             });
         });
     });
@@ -1064,8 +1064,8 @@ function BlockDetail(p){
       // which retired planting produced each prior year → click a bar/row to open its own record
       var powner={}; prior.forEach(function(pl){ var s=lin.series[pl.id]||{}; Object.keys(s).forEach(function(y){ if(s[y]>0 && !powner[y]) powner[y]=pl.id; }); });
       var priorTarget = prior.length===1 ? prior[0].id : null;
-      // feed the prior variety's per-year production into the single production chart below (amber bars)
-      chartPrior = { alloc:allocP, owner:powner, target:priorTarget, onPrior:openBlock, pct:pct, name:priorVars, plantYear:bStart };
+      // feed the prior variety's per-year production into the single production chart below (amber bars, display-only)
+      chartPrior = { alloc:allocP, pct:pct, name:priorVars, plantYear:bStart };
       var listRow=function(color,name,sub,tot,unit,onClick){ return ce('div',{onClick:onClick||null,title:onClick?'Open '+name+'’s full record':null,style:{display:'flex',alignItems:'center',gap:11,padding:'8px 10px',border:'1px solid var(--border)',borderRadius:9,marginBottom:7,cursor:onClick?'pointer':'default'}},
         ce('span',{style:{width:11,height:11,borderRadius:'50%',background:color,flex:'none'}}),
         ce('div',null, ce('div',{style:{fontWeight:600,fontSize:14}}, name), ce('div',{style:{fontSize:11.5,color:'var(--text3)'}}, sub+(onClick?' · tap to open':''))),
@@ -1074,7 +1074,7 @@ function BlockDetail(p){
       lineageSection=ce('div',null,
         ce('div',{className:'section-title'},ce('span',{className:'section-title-bar'}),'Plot lineage'),
         listRow(TEAL, lname(b), (bStart||'?')+'–now · this plot', bTot, bTot>0?'t · own':'no data yet'),
-        listRow(AMBER, priorVars, pMin+'–'+pMax+' · prior land', priorAllocTot, 't · '+pct+'% of area', priorTarget?function(){openBlock(priorTarget);}:null),
+        listRow(AMBER, priorVars, pMin+'–'+pMax+' · prior land', priorAllocTot, 't · '+pct+'% of area'),
         ce('div',{style:{fontSize:11.5,color:'var(--text2)',lineHeight:1.5,marginTop:12,padding:'9px 11px',background:'var(--bg2)',border:'1px solid var(--border)',borderRadius:8}},
           current.length>1
             ? ('This plot is '+pct+'% of the old '+priorVars+', so its prior production is shown at '+pct+' % (area share). The rest belongs to the other plot(s) from the split; the full old tonnes stay with '+priorVars+'.')
@@ -1114,6 +1114,17 @@ function BlockDetail(p){
       ):null);
   }
 
+  // table rows = this planting's producing seasons + the prior variety's producing seasons, tagged by variety
+  var vnameCur=(b.varieties&&b.varieties.name)||b.variety_code||'—';
+  var tableRows=withProd.map(function(s){ return {s:s,variety:vnameCur,cur:true}; });
+  if(chartPrior && !lin.loading && lin.rows){
+    lin.plantings.filter(function(pl){ return pl.lifecycle==='retired' && pl.id!==b.id; }).forEach(function(pl){
+      var rws=lin.rows[pl.id]||{}, vn=(pl.varieties&&pl.varieties.name)||'prior';
+      Object.keys(rws).forEach(function(y){ var w=rws[y]; if(w&&w.metrics&&Number(w.metrics.actual_production)>0) tableRows.push({s:w,variety:vn,cur:false}); });
+    });
+  }
+  tableRows.sort(function(a,c){ return Number(c.s.season_year)-Number(a.s.season_year); });
+
   var historySection;
   if(hist.loading) historySection=ce('div',{className:'skel',style:{height:70,marginTop:8}});
   else if(hist.err) historySection=ce('div',{className:'band'},'Could not load history: '+hist.err);
@@ -1124,17 +1135,18 @@ function BlockDetail(p){
         ce('span',null,ce('span',{style:{display:'inline-block',width:10,height:10,borderRadius:2,background:'var(--accent2)',verticalAlign:'-1px',marginRight:4}}),'Production t'),
         chartPrior?ce('span',null,ce('span',{style:{display:'inline-block',width:10,height:10,borderRadius:2,background:'#b87820',verticalAlign:'-1px',marginRight:4}}),(chartPrior.name||'prior')+' (prior)'):null,
         ce('span',null,ce('span',{style:{display:'inline-block',width:12,height:2,background:'var(--text2)',verticalAlign:'2px',marginRight:4}}),'Yield t/fed'))),
-    ce('div',{style:{fontSize:11,color:'var(--text3)',margin:'8px 0 2px'}}, chartPrior?'Tap a bar or a row to open its full original record — amber bars open the prior variety.':'Tap a bar or a row to open that season’s full original record.'),
+    ce('div',{style:{fontSize:11,color:'var(--text3)',margin:'8px 0 2px'}}, chartPrior?'Amber = the prior variety on this land. Tap a current-planting bar or row to open that season’s full original record.':'Tap a bar or a row to open that season’s full original record.'),
     ce('div',{className:'table-wrap',style:{marginTop:6}},
       ce('table',null,
-        ce('thead',null,ce('tr',null,['Year','Bearing','Prod t','t/fed','Export t','Exp %','Rej %','Loss %','Balance'].map(function(x){return ce('th',{key:x},x);}))),
-        ce('tbody',null, withProd.slice().reverse().map(function(s){
-          var m=s.metrics, prod=m.actual_production, ba=+s.bearing_area_fed;
+        ce('thead',null,ce('tr',null,['Year','Variety','Bearing','Prod t','t/fed','Export t','Exp %','Rej %','Loss %','Balance'].map(function(x){return ce('th',{key:x},x);}))),
+        ce('tbody',null, tableRows.map(function(r){
+          var s=r.s, m=s.metrics, prod=m.actual_production, ba=+s.bearing_area_fed;
           var exp=pickExport(m), ep=expPct(m), rp=rejPct(m), lt=lossT(m), lp=(prod>0&&lt>0)?Math.round(lt/prod*1000)/10:null;
           var bal=BAL[s.balance_status]||BAL.unchecked;
           var mut=function(x){return ce('span',{style:{color:'var(--text3)'}},x);};
-          return ce('tr',{key:s.season_year,onClick:function(){setRawY(s.season_year);},style:{cursor:'pointer'},title:'Open '+s.season_year+' record'},
-            ce('td',{className:'num'}, s.season_year, ce('span',{style:{color:'var(--text3)',marginLeft:4}},'›')),
+          return ce('tr',{key:(r.cur?'c':'p')+s.season_year,onClick:r.cur?function(){setRawY(s.season_year);}:null,style:{cursor:r.cur?'pointer':'default'},title:r.cur?'Open '+s.season_year+' record':null},
+            ce('td',{className:'num'}, s.season_year, r.cur?ce('span',{style:{color:'var(--text3)',marginLeft:4}},'›'):null),
+            ce('td',{className:r.cur?null:'ar',dir:'auto',style:{whiteSpace:'nowrap'}}, ce('span',{style:{display:'inline-flex',alignItems:'center',gap:5}}, ce('span',{style:{width:8,height:8,borderRadius:2,flex:'none',background:r.cur?'var(--accent2)':'#b87820'}}), r.variety)),
             ce('td',{className:'num'}, ba>0?fmt(ba):mut('—')),
             ce('td',{className:'num'}, fmt(prod)),
             ce('td',{className:'num'}, ba>0?fmt(Math.round(prod/ba*100)/100):'—'),
