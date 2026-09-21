@@ -859,6 +859,61 @@ function exportCsv(base, prodMap){
 
 /* ── Block detail slide-over (§6.3) — identity, area, real production history ── */
 var BAL = { balanced:{c:'var(--green)',t:'balanced'}, breach:{c:'var(--red)',t:'breach'}, residual:{c:'var(--amber)',t:'residual'}, unchecked:{c:'var(--text3)',t:'—'} };
+
+/* ── enriched-drawer helpers (all read from already-loaded season metrics) ── */
+var METLABEL={actual_production:'Actual production',raw_to_packhouse:'Raw to packhouse',export_total:'Export total',export_packhouse:'Export (packhouse)',export_carton:'Export — carton',export_supermarket:'Export — supermarket',export_supermarket_gifts:'Export — supermarket gifts',export_gifts:'Export — gifts',packhouse_reject:'Packhouse reject',field_reject_sales:'Field-reject sales',raw_to_traders:'Raw to traders',local_sales_combined:'Local sales',farm_gate_sales:'Farm-gate sales',weight_loss:'Weight loss',weight_loss_damaged:'Weight loss (damaged)',dry_weight:'Dry weight',shortage_dryout:'Shortage / dry-out'};
+var METORDER=['actual_production','raw_to_packhouse','export_total','export_packhouse','export_carton','export_supermarket','export_supermarket_gifts','export_gifts','packhouse_reject','field_reject_sales','raw_to_traders','local_sales_combined','farm_gate_sales','weight_loss','weight_loss_damaged','dry_weight','shortage_dryout'];
+function lossT(m){ m=m||{}; return Number(m.weight_loss||0)+Number(m.weight_loss_damaged||0)+Number(m.shortage_dryout||0); }
+function rejPct(m){ m=m||{}; var raw=Number(m.raw_to_packhouse||m.actual_production||0),r=Number(m.packhouse_reject||0); return raw>0?Math.round(r/raw*1000)/10:null; }
+function expPct(m){ m=m||{}; var p=Number(m.actual_production||0),e=pickExport(m); return (p>0&&e!=null)?Math.round(e/p*1000)/10:null; }
+function metricCount(m){ if(!m) return 0; var n=0; for(var k in m){ if(m[k]!=null) n++; } return n; }
+// benchmark: mean yield (t/fed) for peers in a season — cached per crop|year, no new DB object
+var BENCH_CACHE={};
+function loadBench(crop,year,cb){
+  var key=crop+'|'+year; if(BENCH_CACHE[key]){ cb(BENCH_CACHE[key]); return; }
+  supabase.from('farm_blocks').select('id,farm_code,variety_code,lifecycle').eq('product_id',crop).limit(3000).then(function(br){
+    var dim={}; (br.data||[]).forEach(function(x){ if(x.lifecycle!=='retired') dim[x.id]=x; });
+    supabase.from('v_farm_season_wide').select('block_id,bearing_area_fed,metrics').eq('scenario','actual').eq('season_year',year).limit(3000).then(function(sr){
+      var all=[],farm={},vary={};
+      (sr.data||[]).forEach(function(w){ var d=dim[w.block_id]; if(!d) return; var a=Number(w.bearing_area_fed||0),pr=Number((w.metrics||{}).actual_production||0);
+        if(a>0&&pr>0){ var y=pr/a; all.push(y); (farm[d.farm_code]=farm[d.farm_code]||[]).push(y); if(d.variety_code)(vary[d.variety_code]=vary[d.variety_code]||[]).push(y); } });
+      function avg(a){ return (a&&a.length)?a.reduce(function(s,x){return s+x;},0)/a.length:null; }
+      var res={all:avg(all),nAll:all.length,farm:farm,vary:vary,avg:avg}; BENCH_CACHE[key]=res; cb(res);
+    });
+  });
+}
+// combo chart: production bars + yield line, dual-scaled; bars call onBar(seasonYear)
+function comboSVG(seasons,onBar){
+  var W=440,H=152,x0=34,x1=430,base=126,top=14,plotH=base-top,plotW=x1-x0;
+  var prods=seasons.map(function(s){ return (s.metrics&&s.metrics.actual_production!=null)?Number(s.metrics.actual_production):null; });
+  var yields=seasons.map(function(s){ var v=(s.metrics&&s.metrics.actual_production),a=Number(s.bearing_area_fed||0); return (v!=null&&a>0)?v/a:null; });
+  var maxP=Math.max.apply(null,prods.map(function(v){return v||0;}).concat([1]));
+  var maxY=Math.max.apply(null,yields.map(function(v){return v||0;}).concat([1]));
+  var n=seasons.length,slot=plotW/n,bw=Math.min(26,slot*0.6);
+  var els=[],latest=seasons.length?seasons[seasons.length-1].season_year:null,pts=[];
+  // gridlines + axes
+  els.push(ce('line',{key:'g0',x1:x0,y1:top,x2:x1,y2:top,stroke:'var(--border)'}));
+  els.push(ce('line',{key:'g1',x1:x0,y1:(top+base)/2,x2:x1,y2:(top+base)/2,stroke:'var(--border)'}));
+  els.push(ce('line',{key:'g2',x1:x0,y1:base,x2:x1,y2:base,stroke:'var(--border2)'}));
+  els.push(ce('text',{key:'ymax',x:30,y:top+3,textAnchor:'end',fontFamily:'var(--font-mono)',fontSize:8,fill:'var(--text3)'},Math.round(maxP)));
+  els.push(ce('text',{key:'y0',x:30,y:base+3,textAnchor:'end',fontFamily:'var(--font-mono)',fontSize:8,fill:'var(--text3)'},'0'));
+  els.push(ce('text',{key:'yr',x:x1+3,y:top+3,textAnchor:'start',fontFamily:'var(--font-mono)',fontSize:8,fill:'var(--amber)'},Math.round(maxY)));
+  seasons.forEach(function(s,i){
+    var cx=x0+(i+0.5)*slot,pv=prods[i],yv=yields[i];
+    var h=pv!=null?Math.max(2,pv/maxP*plotH):2, y=base-h, pre=pv==null;
+    els.push(ce('rect',{key:'b'+i,x:cx-bw/2,y:y,width:bw,height:h,rx:2,
+      fill:pre?'var(--bg3)':(s.season_year===latest?'var(--accent)':'var(--accent2)'),
+      style:{cursor:pv!=null?'pointer':'default'},onClick:pv!=null&&onBar?function(){onBar(s.season_year);}:null},
+      ce('title',null,pv!=null?(s.season_year+' · '+fmt(Math.round(pv))+' t — open record'):(s.season_year+' · pre-bearing'))));
+    els.push(ce('text',{key:'v'+i,x:cx,y:y-3,textAnchor:'middle',fontFamily:'var(--font-mono)',fontSize:7.5,fill:pre?'var(--text3)':'var(--text2)'},pv!=null?fmt(Math.round(pv)):'·'));
+    els.push(ce('text',{key:'x'+i,x:cx,y:base+13,textAnchor:'middle',fontFamily:'var(--font-mono)',fontSize:8.5,fill:'var(--text3)'},"'"+String(s.season_year).slice(2)));
+    if(yv!=null) pts.push([cx,base-yv/maxY*plotH]);
+  });
+  if(pts.length>1) els.push(ce('polyline',{key:'yl',points:pts.map(function(p){return p[0]+','+p[1];}).join(' '),fill:'none',stroke:'var(--amber)',strokeWidth:2}));
+  pts.forEach(function(p,i){ els.push(ce('circle',{key:'yc'+i,cx:p[0],cy:p[1],r:2.4,fill:'var(--amber)'})); });
+  return ce('svg',{viewBox:'0 0 '+W+' '+H,width:'100%',role:'img','aria-label':'Production and yield by season'},els);
+}
+
 function BlockDetail(p){
   var bstate=useState(p.block); var b=bstate[0],setB=bstate[1];
   useEffect(function(){ setB(p.block); },[p.block]);   // follow parent's selection; sibling nav is internal
@@ -870,11 +925,16 @@ function BlockDetail(p){
   var h=useState({loading:true,err:null,seasons:[]}); var hist=h[0],setHist=h[1];
   var ln=useState({loading:true,plantings:[],series:{}}); var lin=ln[0],setLin=ln[1];
   var ac=useState(null); var action=ac[0],setAction=ac[1];   // 'edit'|'split'|'replant'|'retire'|'history'
+  var rw=useState(null); var rawY=rw[0],setRawY=rw[1];       // season_year whose raw record is open
+  var bms=useState(null); var bench=bms[0],setBench=bms[1];  // peer-yield benchmark for latest season
   var ctx=p.ctx||{}, canWrite=!!ctx.canWrite;
+  useEffect(function(){ if(b.variety_code!==undefined&&b.comments!==undefined&&b.rootstock_code!==undefined) return;
+    supabase.from('farm_blocks').select('variety_code,rootstock_code,comments').eq('id',b.id).maybeSingle().then(function(r){ if(r.data) setB(function(prev){return Object.assign({},prev,r.data);}); });
+  },[b.id]);
   function done(){ setAction(null); if(p.onChanged) p.onChanged(); }
   useEffect(function(){ function esc(e){ if(e.key==='Escape'&&!action) p.onClose(); } window.addEventListener('keydown',esc); return function(){window.removeEventListener('keydown',esc);}; },[action]);
   useEffect(function(){
-    supabase.from('v_farm_season_wide').select('season_year,scenario,bearing_area_fed,balance_status,metrics')
+    supabase.from('v_farm_season_wide').select('season_year,scenario,bearing_area_fed,bearing_area_source,balance_status,balance_residual_t,detail_mode,updated_at,metrics')
       .eq('block_id',b.id).eq('scenario','actual').order('season_year').then(function(r){
         if(r.error) setHist({loading:false,err:r.error.message,seasons:[]});
         else setHist({loading:false,err:null,seasons:r.data||[]});
@@ -905,6 +965,12 @@ function BlockDetail(p){
   function row(k,v){ return [ce('dt',{key:k+'k'},k), ce('dd',{key:k+'v',className:/[؀-ۿ]/.test(String(v))?'ar':null,dir:'auto'},v)]; }
 
   var seasons=hist.seasons;
+  var producing=seasons.filter(function(s){return s.metrics&&Number(s.metrics.actual_production)>0;});
+  var latestSeason=producing.length?producing[producing.length-1]:null;
+  useEffect(function(){ setBench(null); if(!latestSeason||b.variety_code===undefined) return;
+    loadBench(b.product_id,latestSeason.season_year,function(res){ setBench({year:latestSeason.season_year,res:res}); });
+  },[b.id,latestSeason&&latestSeason.season_year,b.variety_code]);
+
   var withProd=seasons.filter(function(s){return s.metrics&&s.metrics.actual_production!=null;});
   var maxP=withProd.reduce(function(m,s){return Math.max(m,s.metrics.actual_production);},0)||1;
   // ── Segment flow (§6.4): latest season with a recorded segment breakdown ──
@@ -1005,41 +1071,117 @@ function BlockDetail(p){
   else if(hist.err) historySection=ce('div',{className:'band'},'Could not load history: '+hist.err);
   else if(withProd.length===0) historySection=ce('div',{className:'band',style:{background:'var(--bg2)',borderColor:'var(--border)',color:'var(--text3)'}}, seasons.length?'No production recorded for this block yet.':'No seasons on record.');
   else historySection=ce('div',null,
-    ce('div',{style:{display:'flex',alignItems:'flex-end',gap:6,height:120,padding:'8px 0',borderBottom:'1px solid var(--border)'}},
-      seasons.map(function(s){
-        var v=s.metrics&&s.metrics.actual_production; var bearing=+s.bearing_area_fed;
-        var h=v!=null?Math.max(3,Math.round(v/maxP*100)):3;
-        var pre=v==null;
-        return ce('div',{key:s.season_year,title:(v!=null?fmt(v)+' t':(bearing>0?'not recorded':'pre-bearing')),style:{flex:1,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'flex-end',height:'100%'}},
-          ce('div',{style:{fontSize:8.5,color:v!=null?'var(--text2)':'var(--text3)',fontFamily:'var(--font-mono)',marginBottom:2,lineHeight:1}}, v!=null?fmt(Math.round(v)):'·'),
-          ce('div',{style:{width:'70%',height:h+'%',background:pre?'var(--bg3)':'var(--accent)',borderRadius:'3px 3px 0 0'}}),
-          ce('div',{style:{fontSize:9,color:'var(--text3)',marginTop:3,fontFamily:'var(--font-mono)'}}, String(s.season_year).slice(2))
-        );
-      })),
-    ce('div',{className:'table-wrap',style:{marginTop:12}},
+    ce('div',{style:{border:'1px solid var(--border)',borderRadius:10,padding:'10px 6px 4px',background:'var(--bg2)'}}, comboSVG(seasons,setRawY),
+      ce('div',{style:{display:'flex',gap:14,justifyContent:'center',marginTop:2,fontSize:10.5,color:'var(--text3)',flexWrap:'wrap'}},
+        ce('span',null,ce('span',{style:{display:'inline-block',width:10,height:10,borderRadius:2,background:'var(--accent)',verticalAlign:'-1px',marginRight:4}}),'Production t'),
+        ce('span',null,ce('span',{style:{display:'inline-block',width:10,height:10,borderRadius:2,background:'var(--amber)',verticalAlign:'-1px',marginRight:4}}),'Yield t/fed'))),
+    ce('div',{style:{fontSize:11,color:'var(--text3)',margin:'8px 0 2px'}},'Tap a bar or a row to open that season’s full original record.'),
+    ce('div',{className:'table-wrap',style:{marginTop:6}},
       ce('table',null,
-        ce('thead',null,ce('tr',null,['Year','Bearing','Production t','t/fed','Export t','Balance'].map(function(x){return ce('th',{key:x},x);}))),
+        ce('thead',null,ce('tr',null,['Year','Bearing','Prod t','t/fed','Export t','Exp %','Rej %','Loss %','Balance'].map(function(x){return ce('th',{key:x},x);}))),
         ce('tbody',null, withProd.slice().reverse().map(function(s){
           var m=s.metrics, prod=m.actual_production, ba=+s.bearing_area_fed;
-          var exp=pickExport(m);
+          var exp=pickExport(m), ep=expPct(m), rp=rejPct(m), lt=lossT(m), lp=(prod>0&&lt>0)?Math.round(lt/prod*1000)/10:null;
           var bal=BAL[s.balance_status]||BAL.unchecked;
-          return ce('tr',{key:s.season_year},
-            ce('td',{className:'num'}, s.season_year),
-            ce('td',{className:'num'}, ba>0?fmt(ba):ce('span',{style:{color:'var(--text3)'}},'—')),
+          var mut=function(x){return ce('span',{style:{color:'var(--text3)'}},x);};
+          return ce('tr',{key:s.season_year,onClick:function(){setRawY(s.season_year);},style:{cursor:'pointer'},title:'Open '+s.season_year+' record'},
+            ce('td',{className:'num'}, s.season_year, ce('span',{style:{color:'var(--text3)',marginLeft:4}},'›')),
+            ce('td',{className:'num'}, ba>0?fmt(ba):mut('—')),
             ce('td',{className:'num'}, fmt(prod)),
             ce('td',{className:'num'}, ba>0?fmt(Math.round(prod/ba*100)/100):'—'),
             ce('td',{className:'num'}, exp!=null?fmt(exp):'—'),
+            ce('td',{className:'num'}, ep!=null?ep:mut('—')),
+            ce('td',{className:'num'}, rp!=null?rp:mut('—')),
+            ce('td',{className:'num'}, lp!=null?lp:mut('—')),
             ce('td',null, ce('span',{style:{display:'inline-flex',alignItems:'center',gap:5,fontSize:11}}, ce('span',{style:{width:8,height:8,borderRadius:'50%',background:bal.c,display:'inline-block'}}), bal.t))
           );
         }))
-      ))
+      )),
+    ce('div',{style:{display:'flex',gap:3,marginTop:10}}, seasons.map(function(s){
+      var c=metricCount(s.metrics), prod=s.metrics&&Number(s.metrics.actual_production)>0;
+      var st = !prod ? {bg:'var(--bg2)',bd:'var(--border)',fg:'var(--text3)',o:0.55}
+             : c>=8 ? {bg:'var(--green-bg)',bd:'var(--green-border)',fg:'var(--green)',o:1}
+             : {bg:'var(--amber-bg)',bd:'var(--amber-border)',fg:'var(--amber)',o:1};
+      return ce('span',{key:s.season_year,title:c+' metrics stored'+(prod?'':' · non-bearing'),style:{flex:1,textAlign:'center',fontFamily:'var(--font-mono)',fontSize:9,padding:'3px 0',borderRadius:3,background:st.bg,border:'1px solid '+st.bd,color:st.fg,opacity:st.o}}, String(s.season_year).slice(2));
+    })),
+    ce('div',{style:{fontSize:10.5,color:'var(--text3)',marginTop:5,lineHeight:1.45}},'Metric coverage — ',ce('span',{style:{color:'var(--green)'}},'full'),' breakdown vs ',ce('span',{style:{color:'var(--amber)'}},'partial'),'; flags where the unified scheme still has gaps.')
   );
+
+  // header chips (variety · rootstock · lifecycle+age) and data-quality comment
+  var age = b.planting_year ? (new Date().getFullYear()-b.planting_year) : null;
+  var chp=function(bg,bd,fg,t){ return ce('span',{key:t,style:{fontSize:11,fontWeight:500,borderRadius:20,padding:'2px 9px',border:'1px solid '+bd,background:bg,color:fg,whiteSpace:'nowrap'}},t); };
+  var headChips=ce('div',{style:{display:'flex',gap:6,flexWrap:'wrap',marginTop:6}},
+    (b.varieties&&b.varieties.name)?chp('#f0e8ff','#c090e0','#6a10b0',b.varieties.name):null,
+    (b.farm_rootstocks&&b.farm_rootstocks.name)?chp('var(--bg2)','var(--border2)','var(--text2)','rootstock '+b.farm_rootstocks.name):null,
+    chp('var(--green-bg)','var(--green-border)','var(--green)', b.lifecycle+(age!=null?(' · yr '+age):'')));
+  var commentBand = b.comments ? ce('div',{className:'band',style:{marginTop:14}}, '⚠ '+b.comments) : null;
+
+  // season-snapshot KPI tiles (derived from the latest producing season)
+  var kpiSection=null;
+  if(latestSeason){
+    var lm=latestSeason.metrics, lprod=Number(lm.actual_production||0), lba=Number(latestSeason.bearing_area_fed||0);
+    var lyield=lba>0?lprod/lba:null, ep=expPct(lm), rp=rejPct(lm);
+    var prevS=producing.length>1?producing[producing.length-2]:null;
+    var pprod=prevS?Number(prevS.metrics.actual_production||0):null;
+    var yoy=(pprod!=null&&pprod>0)?Math.round((lprod-pprod)/pprod*100):null;
+    var tile=function(label,val,sub,col){ return ce('div',{className:'kpi'}, ce('div',{className:'kpi-label'},label), ce('div',{className:'kpi-val'},val), ce('div',{className:'kpi-sub',style:col?{color:col}:null},sub)); };
+    kpiSection=ce('div',null,
+      ce('div',{className:'section-title'},ce('span',{className:'section-title-bar'}),'Season snapshot — '+latestSeason.season_year),
+      ce('div',{className:'kpi-grid',style:{gridTemplateColumns:'repeat(auto-fit,minmax(108px,1fr))',marginBottom:0}},
+        tile('Production', fmt(Math.round(lprod))+' t', yoy!=null?((yoy>=0?'▲ +':'▼ ')+yoy+'% YoY'):'first crop', yoy!=null?(yoy>=0?'var(--green)':'var(--red)'):null),
+        tile('Yield', lyield!=null?fmt(Math.round(lyield*100)/100):'—', 't/fed'),
+        tile('Export rate', ep!=null?ep+'%':'—', 'of production'),
+        tile('Reject rate', rp!=null?rp+'%':'—', 'of intake')));
+  }
+
+  // yield vs peers (variety / crop / farm) for the latest season — client benchmark
+  var benchSection=null;
+  if(latestSeason){
+    var bTitle=ce('div',{className:'section-title'},ce('span',{className:'section-title-bar'}),'Yield vs peers — '+(bench?bench.year:latestSeason.season_year)+' · t/fed');
+    if(!bench) benchSection=ce('div',{style:{marginTop:18}}, bTitle, ce('div',{style:{fontSize:12,color:'var(--text3)',padding:'6px 0'}},'Loading peer yields…'));
+    else {
+      var res=bench.res, lba2=Number(latestSeason.bearing_area_fed||0), myY=lba2>0?Number(latestSeason.metrics.actual_production||0)/lba2:null;
+      var brows=[['This block',myY,true],
+        [(b.varieties&&b.varieties.name)||'Variety', b.variety_code?res.avg(res.vary[b.variety_code]):null,false],
+        ['All '+b.product_id, res.all,false],
+        [(b.farms&&b.farms.name)||b.farm_code, res.avg(res.farm[b.farm_code]),false]];
+      var bmx=Math.max.apply(null,brows.map(function(r){return r[1]||0;}).concat([0.001]));
+      benchSection=ce('div',{style:{marginTop:18}}, bTitle,
+        ce('div',null, brows.map(function(r,i){ return r[1]==null?null:ce('div',{key:i,style:{display:'flex',alignItems:'center',gap:8,fontSize:11.5,marginBottom:7}},
+          ce('span',{style:{width:132,flex:'none',color:r[2]?'var(--text)':'var(--text2)',fontWeight:r[2]?600:400}}, r[0]),
+          ce('span',{style:{flex:1,height:14,background:'var(--bg2)',borderRadius:3,overflow:'hidden'}}, ce('span',{style:{display:'block',height:'100%',width:Math.round(r[1]/bmx*100)+'%',background:r[2]?'var(--accent)':'var(--border2)',borderRadius:3}})),
+          ce('span',{style:{width:52,textAlign:'right',fontFamily:'var(--font-mono)',color:'var(--text2)',flex:'none'}}, fmt(Math.round(r[1]*100)/100))); })));
+    }
+  }
+
+  // raw season-record overlay (full original detail)
+  var rawSeason = rawY!=null ? seasons.filter(function(s){return s.season_year===rawY;})[0] : null;
+  var extraKeys = rawSeason&&rawSeason.metrics ? Object.keys(rawSeason.metrics).filter(function(k){return METORDER.indexOf(k)<0 && rawSeason.metrics[k]!=null;}) : [];
+  var rawPanel = rawSeason ? ce('div',{style:{position:'absolute',inset:0,background:'var(--bg)',zIndex:3,display:'flex',flexDirection:'column'}},
+    ce('div',{className:'drawer-head'},
+      ce('button',{className:'btn btn-secondary btn-sm',onClick:function(){setRawY(null);}},'‹ Back'),
+      ce('h2',{style:{fontSize:15,fontFamily:'var(--font-mono)',margin:0}}, b.aydi_block_number+' · '+rawSeason.season_year),
+      ce('button',{className:'drawer-x','aria-label':'Close',onClick:p.onClose},'×')),
+    ce('div',{className:'drawer-body',style:{overflowY:'auto'}},
+      ce('div',{style:{display:'flex',gap:6,flexWrap:'wrap',marginBottom:12}}, [['scenario',rawSeason.scenario],['area',(rawSeason.bearing_area_source||'—')],['balance',(rawSeason.balance_status||'—')],['detail',(rawSeason.detail_mode||'none')]].map(function(f,i){return ce('span',{key:i,className:'lot'},f[0]+': '+f[1]);})),
+      ce('dl',{className:'kv'},
+        row('Season', rawSeason.season_year+' · '+rawSeason.scenario),
+        row('Bearing area', (rawSeason.bearing_area_fed!=null?fmt(rawSeason.bearing_area_fed)+' fed':'—')+' · '+(rawSeason.bearing_area_source||'—')),
+        row('Balance', (rawSeason.balance_status||'—')+(rawSeason.balance_residual_t!=null?(' · residual '+fmt(rawSeason.balance_residual_t)+' t'):'')),
+        row('Detail mode', rawSeason.detail_mode||'none'),
+        row('Updated', rawSeason.updated_at?String(rawSeason.updated_at).slice(0,10):'—')),
+      ce('div',{className:'section-title',style:{marginTop:16}},ce('span',{className:'section-title-bar'}),'Stored metrics'),
+      ce('div',{className:'table-wrap'}, ce('table',null,
+        ce('thead',null,ce('tr',null,['Metric','Code','Value (t)'].map(function(x){return ce('th',{key:x},x);}))),
+        ce('tbody',null, METORDER.filter(function(k){return rawSeason.metrics&&rawSeason.metrics[k]!=null;}).concat(extraKeys).map(function(k){ var v=Number(rawSeason.metrics[k]);
+          return ce('tr',{key:k}, ce('td',null,METLABEL[k]||k), ce('td',null,ce('span',{className:'lot'},k)), ce('td',{className:'num',style:v===0?{color:'var(--text3)'}:null}, fmt(Math.round(v*100)/100))); }))))
+      )) : null;
 
   return ce('div',null,
     ce('div',{className:'drawer-scrim',onClick:p.onClose}),
     ce('div',{className:'drawer',role:'dialog','aria-label':'Block detail'},
-      ce('div',{className:'drawer-head'},
-        ce('h2',{className:'ar',dir:'auto'}, b.aydi_block_number),
+      ce('div',{className:'drawer-head',style:{alignItems:'flex-start'}},
+        ce('div',{style:{minWidth:0,flex:1}}, ce('h2',{className:'ar',dir:'auto',style:{margin:0}}, b.aydi_block_number), headChips),
         ce('button',{className:'drawer-x','aria-label':'Close',onClick:p.onClose},'×')),
       ce('div',{className:'drawer-body'},
         ce('div',{className:'section-title'},ce('span',{className:'section-title-bar'}),'Identity'),
@@ -1062,6 +1204,8 @@ function BlockDetail(p){
           row('Variance', variance==null?'—':(variance+' %'))
         ),
         (variance!=null && Math.abs(variance)>10) ? ce('div',{className:'band'}, 'Area variance '+variance+'% exceeds ±10% — flag for reconciliation (§6.10).') : null,
+        commentBand,
+        kpiSection ? ce('div',{style:{marginTop:18}}, kpiSection) : null,
         canWrite && b.lifecycle!=='retired' ? ce('div',{className:'action-row',style:{marginTop:16}},
           ce('button',{className:'btn btn-secondary btn-sm',onClick:function(){setAction('edit');}},'Edit identity'),
           ce('button',{className:'btn btn-secondary btn-sm',onClick:function(){setAction('split');}},'Split block'),
@@ -1074,8 +1218,10 @@ function BlockDetail(p){
         replantNote,
         ce('div',{className:'section-title',style:{marginTop:18}},ce('span',{className:'section-title-bar'}), (lineageSection||replantNote)?'This planting’s seasons':'Production history'),
         historySection,
+        benchSection,
         segFlow
-      )
+      ),
+      rawPanel
     ),
     action==='edit'    ? ce(EditIdentityModal,{block:b,onClose:function(){setAction(null);},onDone:done}) : null,
     action==='retire'  ? ce(RetireModal,{block:b,onClose:function(){setAction(null);},onDone:done}) : null,
