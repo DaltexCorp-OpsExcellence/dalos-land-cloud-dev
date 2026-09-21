@@ -918,6 +918,30 @@ function comboSVG(seasons,onBar){
   pts.forEach(function(p,i){ els.push(ce('circle',{key:'yc'+i,cx:p[0],cy:p[1],r:2.4,fill:'var(--amber)'})); });
   return ce('svg',{viewBox:'0 0 '+W+' '+H,width:'100%',role:'img','aria-label':'Production and yield by season'},els);
 }
+// small parcel-boundary tile for the Area section (renders the real geometry, or an add affordance)
+function geomTile(geo, addable, onAdd){
+  var W=104,H=76;
+  if(geo===undefined) return ce('div',{style:{width:112,flex:'none'}}, ce('div',{className:'skel',style:{height:H+20,borderRadius:8}}));
+  if(geo&&geo.g){
+    var ll=geomToLatLngs(geo.g), poly=null;
+    if(ll&&ll.length){
+      var las=ll.map(function(p){return p[0];}), los=ll.map(function(p){return p[1];});
+      var laMin=Math.min.apply(null,las),laMax=Math.max.apply(null,las),loMin=Math.min.apply(null,los),loMax=Math.max.apply(null,los);
+      var pad=7, spanLo=(loMax-loMin)||1e-6, spanLa=(laMax-laMin)||1e-6, sc=Math.min((W-2*pad)/spanLo,(H-2*pad)/spanLa);
+      var ox=(W-spanLo*sc)/2, oy=(H-spanLa*sc)/2;
+      var pts=ll.map(function(p){ return (ox+(p[1]-loMin)*sc).toFixed(1)+','+(oy+(laMax-p[0])*sc).toFixed(1); }).join(' ');
+      poly=ce('svg',{viewBox:'0 0 '+W+' '+H,width:'100%',height:H,'aria-label':'Plot boundary'},
+        ce('polygon',{points:pts,fill:'color-mix(in srgb,var(--accent2) 42%,transparent)',stroke:'var(--accent)',strokeWidth:1.5,strokeLinejoin:'round'}));
+    }
+    return ce('div',{style:{width:112,flex:'none',border:'1px solid var(--border)',borderRadius:8,background:'var(--bg2)',padding:5}},
+      poly||ce('div',{style:{height:H}}),
+      ce('div',{style:{fontSize:9,fontFamily:'var(--font-mono)',color:'var(--text3)',textAlign:'center',marginTop:3}}, 'boundary'+(geo.src?' · '+geo.src:'')));
+  }
+  var inner=ce('div',{style:{width:112,flex:'none',border:'1px dashed var(--border2)',borderRadius:8,background:'var(--bg2)',height:H+20,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',textAlign:'center'}},
+    ce('div',{style:{fontSize:20,color:'var(--text3)',lineHeight:1}},'⬡'),
+    ce('div',{style:{fontSize:9.5,color:addable?'var(--accent)':'var(--text3)',marginTop:5,fontWeight:addable?600:400}}, addable?'+ Add boundary':'No boundary'));
+  return addable ? ce('button',{onClick:onAdd,title:'Draw this plot’s boundary on the map',style:{padding:0,border:'none',background:'none',cursor:'pointer'}}, inner) : inner;
+}
 
 function BlockDetail(p){
   var bstate=useState(p.block); var b=bstate[0],setB=bstate[1];
@@ -932,6 +956,11 @@ function BlockDetail(p){
   var ac=useState(null); var action=ac[0],setAction=ac[1];   // 'edit'|'split'|'replant'|'retire'|'history'
   var rw=useState(null); var rawY=rw[0],setRawY=rw[1];       // season_year whose raw record is open
   var bms=useState(null); var bench=bms[0],setBench=bms[1];  // peer-yield benchmark for latest season
+  var gg=useState(undefined); var geo=gg[0],setGeo=gg[1];    // {g:geojson,src} | null(none) | undefined(loading)
+  useEffect(function(){ setGeo(undefined);
+    supabase.from('v_farm_block_geom').select('geojson,geom_source').eq('id',b.id).maybeSingle().then(function(r){
+      if(r.data&&r.data.geojson){ try{ setGeo({g:JSON.parse(r.data.geojson),src:r.data.geom_source}); }catch(e){ setGeo(null); } } else setGeo(null); });
+  },[b.id,action]);
   var ctx=p.ctx||{}, canWrite=!!ctx.canWrite;
   useEffect(function(){ if(b.variety_code!==undefined&&b.comments!==undefined&&b.rootstock_code!==undefined) return;
     supabase.from('farm_blocks').select('variety_code,rootstock_code,comments').eq('id',b.id).maybeSingle().then(function(r){ if(r.data) setB(function(prev){return Object.assign({},prev,r.data);}); });
@@ -1202,11 +1231,14 @@ function BlockDetail(p){
           row('Lifecycle', b.lifecycle)
         ),
         ce('div',{className:'section-title',style:{marginTop:18}},ce('span',{className:'section-title-bar'}),'Area'),
-        ce('dl',{className:'kv'},
-          row('Book area', fmt(b.total_area_fed)+' fed'),
-          row('Bearing area', b.planted_area_fed==null?'—':(fmt(b.planted_area_fed)+' fed')),
-          row('Aerobotics', b.aerobotics_area_ha==null?'not measured':(fmt(b.aerobotics_area_ha)+' ha · '+fmt(aeroFed)+' fed')),
-          row('Variance', variance==null?'—':(variance+' %'))
+        ce('div',{style:{display:'flex',gap:12,alignItems:'flex-start'}},
+          ce('dl',{className:'kv',style:{flex:1,minWidth:0}},
+            row('Book area', fmt(b.total_area_fed)+' fed'),
+            row('Bearing area', b.planted_area_fed==null?'—':(fmt(b.planted_area_fed)+' fed')),
+            row('Aerobotics', b.aerobotics_area_ha==null?'not measured':(fmt(b.aerobotics_area_ha)+' ha · '+fmt(aeroFed)+' fed')),
+            row('Variance', variance==null?'—':(variance+' %'))
+          ),
+          geomTile(geo, canWrite && b.lifecycle!=='retired', function(){ setAction('geom'); })
         ),
         (variance!=null && Math.abs(variance)>10) ? ce('div',{className:'band'}, 'Area variance '+variance+'% exceeds ±10% — flag for reconciliation (§6.10).') : null,
         commentBand,
@@ -1228,6 +1260,7 @@ function BlockDetail(p){
       )
     ),
     rawPanel,
+    action==='geom'    ? ce(SetGeomModal,{block:b,onClose:function(){setAction(null);},onDone:done}) : null,
     action==='edit'    ? ce(EditIdentityModal,{block:b,onClose:function(){setAction(null);},onDone:done}) : null,
     action==='retire'  ? ce(RetireModal,{block:b,onClose:function(){setAction(null);},onDone:done}) : null,
     action==='replant' ? ce(ReplantModal,{block:b,onClose:function(){setAction(null);},onDone:done}) : null,
@@ -2807,6 +2840,28 @@ function EditIdentityModal(p){
   return ce(Modal,{title:'Edit identity',sub:b.aydi_block_number,onClose:p.onClose,busy:s.busy,
     footer:[ce('button',{key:'c',className:'btn btn-secondary btn-sm',onClick:p.onClose,disabled:s.busy},'Cancel'),
             ce('button',{key:'s',className:'btn btn-primary btn-sm',onClick:save,disabled:s.busy||f==null}, s.busy?'Saving…':'Save changes')]}, body);
+}
+
+/* ── Set plot boundary (geometry) — reuses MiniMap + fn_set_block_geom ──── */
+function SetGeomModal(p){
+  var b=p.block;
+  var g=useState(null); var geom=g[0],setGeomV=g[1];
+  var st=useState({busy:false,err:null}); var s=st[0],setS=st[1];
+  useEffect(function(){   // seed the editor with any existing boundary
+    supabase.from('v_farm_block_geom').select('geojson').eq('id',b.id).maybeSingle().then(function(r){
+      if(r.data&&r.data.geojson){ try{ setGeomV(JSON.parse(r.data.geojson)); }catch(e){} } });
+  },[b.id]);
+  function save(){ if(!geom){ setS({busy:false,err:'Draw the plot boundary on the map first.'}); return; } setS({busy:true,err:null});
+    supabase.rpc('fn_set_block_geom',{p_block_id:b.id,p_geojson:geom,p_source:'manual'}).then(function(r){
+      if(r.error){ setS({busy:false,err:r.error.message}); return; } p.onDone(); },
+      function(e){ setS({busy:false,err:String((e&&e.message)||e)}); }); }
+  return ce(Modal,{title:'Set plot boundary',sub:b.aydi_block_number,onClose:p.onClose,busy:s.busy,
+    footer:[ce('button',{key:'c',className:'btn btn-secondary btn-sm',onClick:p.onClose,disabled:s.busy},'Cancel'),
+            ce('button',{key:'s',className:'btn btn-primary btn-sm',onClick:save,disabled:s.busy||!geom}, s.busy?'Saving…':'Save boundary')]},
+    ce('div',null,
+      ce(MiniMap,{seed:null,targets:[{id:'plot',label:'Plot boundary',color:'#2b5c3f'}],geoms:geom?{plot:geom}:{},height:300,onSet:function(id,gj){ setGeomV(gj); }}),
+      ce('div',{className:'form-hint',style:{marginTop:6}},'Click “Draw” on the map legend, click points to trace the plot, double-click to finish. Saved as this block’s geometry (geom_source = manual).'),
+      s.err?ce('div',{className:'band',style:{color:'var(--red)',borderColor:'var(--red)',background:'var(--red-bg)',marginTop:8}}, s.err):null));
 }
 
 /* ── Retire ───────────────────────────────────────────────────────────── */
