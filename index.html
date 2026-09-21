@@ -1033,21 +1033,6 @@ function BlockDetail(p){
       var yset={}; Object.keys(allocP).forEach(function(y){ yset[y]=1; }); Object.keys(bProd).forEach(function(y){ if(bProd[y]>0) yset[y]=1; });
       var yrs=Object.keys(yset).map(Number);
       var bStart=b.planting_year;
-      var chart=null;
-      if(yrs.length){
-        var y0=Math.min.apply(null,yrs), y1=Math.max.apply(null,yrs), years=[];
-        for(var yy=y0;yy<=y1;yy++) years.push(yy);
-        var maxV=0; years.forEach(function(y){ maxV=Math.max(maxV, allocP[y]||0, bProd[y]||0); }); maxV=maxV||1;
-        chart=ce('div',{style:{display:'flex',alignItems:'flex-end',gap:0,height:150,padding:'16px 4px 0',border:'1px solid var(--border)',borderRadius:10,background:'var(--bg2)'}},
-          years.map(function(y){ var isCur=bProd[y]>0, isPri=!isCur&&allocP[y]>0, v=isCur?bProd[y]:(isPri?allocP[y]:0), isB=(y===bStart);
-            return ce('div',{key:y,style:{flex:1,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'flex-end',height:'100%',position:'relative',padding:'0 1px',borderLeft:isB?'2px dashed var(--accent2)':'none'}},
-              isB?ce('div',{title:'Replanted '+y,style:{position:'absolute',top:-13,left:-7,fontSize:12,color:'var(--accent)',fontWeight:700}},'↻'):null,
-              ce('div',{style:{fontSize:10,fontFamily:'var(--font-mono)',color:v>0?'var(--text2)':'var(--text3)',marginBottom:4}}, v>0?fmt(Math.round(v)):'·'),
-              v>0 ? ce('div',{title:(isPri?'allocated ':'')+fmt(Math.round(v))+' t',style:{width:'66%',maxWidth:26,height:Math.max(3,Math.round(v/maxV*104))+'px',background:isCur?TEAL:AMBER,opacity:isPri?0.72:1,borderRadius:'3px 3px 0 0'}})
-                : ce('div',{style:{width:'66%',maxWidth:26,height:4,borderRadius:2,border:'1.5px dashed var(--border2)'}}),
-              ce('div',{style:{fontSize:10,fontFamily:'var(--font-mono)',color:'var(--text3)',marginTop:6}}, "'"+String(y).slice(2)));
-          }));
-      }
       var priorVars=prior.map(lname).filter(function(v,i,a){return a.indexOf(v)===i;}).join(', ');
       var priorAllocTot=Object.keys(allocP).reduce(function(a,y){return a+allocP[y];},0);
       var bTot=Object.keys(bProd).reduce(function(a,y){return a+(bProd[y]>0?bProd[y]:0);},0);
@@ -1061,7 +1046,6 @@ function BlockDetail(p){
         ce('div',{className:'section-title'},ce('span',{className:'section-title-bar'}),'Plot lineage'),
         listRow(TEAL, lname(b), (bStart||'?')+'–now · this plot', bTot, bTot>0?'t · own':'no data yet'),
         listRow(AMBER, priorVars, pMin+'–'+pMax+' · prior land', priorAllocTot, 't · '+pct+'% of area'),
-        chart,
         ce('div',{style:{fontSize:11.5,color:'var(--text2)',lineHeight:1.5,marginTop:12,padding:'9px 11px',background:'var(--bg2)',border:'1px solid var(--border)',borderRadius:8}},
           current.length>1
             ? ('This plot is '+pct+'% of the old '+priorVars+', so its prior production is shown at '+pct+' % (area share). The rest belongs to the other plot(s) from the split; the full old tonnes stay with '+priorVars+'.')
@@ -1101,18 +1085,16 @@ function BlockDetail(p){
       ):null);
   }
 
-  // when a lineage/replant chart already plots this planting's production bars, don't repeat them here
-  var hasLineageChart=!!(lineageSection||replantNote);
   var historySection;
   if(hist.loading) historySection=ce('div',{className:'skel',style:{height:70,marginTop:8}});
   else if(hist.err) historySection=ce('div',{className:'band'},'Could not load history: '+hist.err);
   else if(withProd.length===0) historySection=ce('div',{className:'band',style:{background:'var(--bg2)',borderColor:'var(--border)',color:'var(--text3)'}}, seasons.length?'No production recorded for this block yet.':'No seasons on record.');
   else historySection=ce('div',null,
-    hasLineageChart ? null : ce('div',{style:{border:'1px solid var(--border)',borderRadius:10,padding:'10px 6px 4px',background:'var(--bg2)'}}, comboSVG(seasons,setRawY),
+    ce('div',{style:{border:'1px solid var(--border)',borderRadius:10,padding:'10px 6px 4px',background:'var(--bg2)'}}, comboSVG(seasons,setRawY),
       ce('div',{style:{display:'flex',gap:14,justifyContent:'center',marginTop:2,fontSize:10.5,color:'var(--text3)',flexWrap:'wrap'}},
         ce('span',null,ce('span',{style:{display:'inline-block',width:10,height:10,borderRadius:2,background:'var(--accent)',verticalAlign:'-1px',marginRight:4}}),'Production t'),
         ce('span',null,ce('span',{style:{display:'inline-block',width:10,height:10,borderRadius:2,background:'var(--amber)',verticalAlign:'-1px',marginRight:4}}),'Yield t/fed'))),
-    ce('div',{style:{fontSize:11,color:'var(--text3)',margin:'8px 0 2px'}}, hasLineageChart ? 'Tap a row to open that season’s full original record.' : 'Tap a bar or a row to open that season’s full original record.'),
+    ce('div',{style:{fontSize:11,color:'var(--text3)',margin:'8px 0 2px'}}, 'Tap a bar or a row to open that season’s full original record.'),
     ce('div',{className:'table-wrap',style:{marginTop:6}},
       ce('table',null,
         ce('thead',null,ce('tr',null,['Year','Bearing','Prod t','t/fed','Export t','Exp %','Rej %','Loss %','Balance'].map(function(x){return ce('th',{key:x},x);}))),
