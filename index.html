@@ -1038,14 +1038,34 @@ function BlockDetail(p){
       var bTot=Object.keys(bProd).reduce(function(a,y){return a+(bProd[y]>0?bProd[y]:0);},0);
       var pMin=Math.min.apply(null,prior.map(function(pl){return pl.planting_year||9999;}));
       var pMax=Math.max.apply(null,Object.keys(priorProd).map(Number).concat([0]));
-      var listRow=function(color,name,sub,tot,unit){ return ce('div',{style:{display:'flex',alignItems:'center',gap:11,padding:'8px 10px',border:'1px solid var(--border)',borderRadius:9,marginBottom:7}},
+      // which retired planting produced each prior year → click a bar/row to open its own record
+      var powner={}; prior.forEach(function(pl){ var s=lin.series[pl.id]||{}; Object.keys(s).forEach(function(y){ if(s[y]>0 && !powner[y]) powner[y]=pl.id; }); });
+      var priorTarget = prior.length===1 ? prior[0].id : null;
+      // prior-only production chart (amber) — the current planting's own bars live in the combo chart below, so no duplication
+      var priorChart=null, pYrs=Object.keys(allocP).map(Number).filter(function(y){return allocP[y]>0;});
+      if(pYrs.length){
+        var py0=Math.min.apply(null,pYrs), py1=Math.max.apply(null,pYrs), pyears=[];
+        for(var pyy=py0;pyy<=py1;pyy++) pyears.push(pyy);
+        var pmax=0; pyears.forEach(function(y){ pmax=Math.max(pmax, allocP[y]||0); }); pmax=pmax||1;
+        priorChart=ce('div',{style:{display:'flex',alignItems:'flex-end',gap:0,height:130,padding:'16px 4px 0',border:'1px solid var(--border)',borderRadius:10,background:'var(--bg2)',marginTop:10}},
+          pyears.map(function(y){ var v=allocP[y]||0, own=powner[y]||priorTarget;
+            return ce('div',{key:y,style:{flex:1,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'flex-end',height:'100%',padding:'0 1px'}},
+              ce('div',{style:{fontSize:10,fontFamily:'var(--font-mono)',color:v>0?'var(--text2)':'var(--text3)',marginBottom:4}}, v>0?fmt(Math.round(v)):'·'),
+              v>0 ? ce('div',{onClick:own?function(){openBlock(own);}:null,title:(prior.length===1?lname(prior[0]):priorVars)+' '+y+' · '+(pct<100?'allocated ':'')+fmt(Math.round(v))+' t'+(own?' — open record':''),style:{width:'66%',maxWidth:26,height:Math.max(3,Math.round(v/pmax*88))+'px',background:AMBER,opacity:0.82,borderRadius:'3px 3px 0 0',cursor:own?'pointer':'default'}})
+                : ce('div',{style:{width:'66%',maxWidth:26,height:4,borderRadius:2,border:'1.5px dashed var(--border2)'}}),
+              ce('div',{style:{fontSize:10,fontFamily:'var(--font-mono)',color:'var(--text3)',marginTop:6}}, "'"+String(y).slice(2)));
+          }));
+      }
+      var listRow=function(color,name,sub,tot,unit,onClick){ return ce('div',{onClick:onClick||null,title:onClick?'Open '+name+'’s full record':null,style:{display:'flex',alignItems:'center',gap:11,padding:'8px 10px',border:'1px solid var(--border)',borderRadius:9,marginBottom:7,cursor:onClick?'pointer':'default'}},
         ce('span',{style:{width:11,height:11,borderRadius:'50%',background:color,flex:'none'}}),
-        ce('div',null, ce('div',{style:{fontWeight:600,fontSize:14}}, name), ce('div',{style:{fontSize:11.5,color:'var(--text3)'}}, sub)),
-        ce('div',{style:{marginLeft:'auto',textAlign:'right'}}, ce('div',{style:{fontFamily:'var(--font-mono)',fontSize:15}}, tot>0?fmt(Math.round(tot)):'—'), ce('div',{style:{fontSize:9,color:'var(--text3)',letterSpacing:'.03em'}}, unit))); };
+        ce('div',null, ce('div',{style:{fontWeight:600,fontSize:14}}, name), ce('div',{style:{fontSize:11.5,color:'var(--text3)'}}, sub+(onClick?' · tap to open':''))),
+        ce('div',{style:{marginLeft:'auto',textAlign:'right'}}, ce('div',{style:{fontFamily:'var(--font-mono)',fontSize:15}}, tot>0?fmt(Math.round(tot)):'—'), ce('div',{style:{fontSize:9,color:'var(--text3)',letterSpacing:'.03em'}}, unit)),
+        onClick?ce('span',{style:{marginLeft:8,color:'var(--text3)',fontSize:15,flex:'none'}},'›'):null); };
       lineageSection=ce('div',null,
         ce('div',{className:'section-title'},ce('span',{className:'section-title-bar'}),'Plot lineage'),
         listRow(TEAL, lname(b), (bStart||'?')+'–now · this plot', bTot, bTot>0?'t · own':'no data yet'),
-        listRow(AMBER, priorVars, pMin+'–'+pMax+' · prior land', priorAllocTot, 't · '+pct+'% of area'),
+        listRow(AMBER, priorVars, pMin+'–'+pMax+' · prior land', priorAllocTot, 't · '+pct+'% of area', priorTarget?function(){openBlock(priorTarget);}:null),
+        priorChart,
         ce('div',{style:{fontSize:11.5,color:'var(--text2)',lineHeight:1.5,marginTop:12,padding:'9px 11px',background:'var(--bg2)',border:'1px solid var(--border)',borderRadius:8}},
           current.length>1
             ? ('This plot is '+pct+'% of the old '+priorVars+', so its prior production is shown at '+pct+' % (area share). The rest belongs to the other plot(s) from the split; the full old tonnes stay with '+priorVars+'.')
