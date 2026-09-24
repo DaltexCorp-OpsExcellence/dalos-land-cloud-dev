@@ -714,10 +714,11 @@ var PAGE = 50;
 var CROP_COLORS = { citrus:'#e08a1e', grapes:'#6a3d9a', mango:'#d94f2a', pomegranate:'#b03060', olives:'#5a6b2a', berries:'#2a5a8a' };
 var ACTIVE_LC = ['bearing','pre_bearing','planned'];   // a cost centre is only expected on active blocks
 // Lifecycle is one track: planned → pre_bearing → bearing → retired (superseded = replant lineage).
-// pre_bearing/bearing are age-derived (season year − planting year vs product threshold); planned/retired/superseded are manual.
-var LC_LABELS={planned:'Planned',pre_bearing:'Pre-bearing',bearing:'Bearing',retired:'Retired',superseded:'Superseded',nursery:'Pre-bearing',fallow:'Fallow'};
+// pre_bearing/bearing are age-derived (season year − planting year vs product threshold).
+// planned/retired/superseded/nursery are manual — never auto-derived (nursery = propagation block, never bears fruit).
+var LC_LABELS={planned:'Planned',pre_bearing:'Pre-bearing',bearing:'Bearing',retired:'Retired',superseded:'Superseded',nursery:'Nursery',fallow:'Fallow'};
 function lcLabel(l){ return LC_LABELS[l]||l||'—'; }
-function lcBadge(l){ return l==='bearing'?'badge-pass':(l==='pre_bearing'||l==='nursery')?'badge-warn':'badge-neutral'; }
+function lcBadge(l){ return l==='bearing'?'badge-pass':l==='pre_bearing'?'badge-warn':'badge-neutral'; }
 function isActive(lc){ return ACTIVE_LC.indexOf(lc)>=0; }
 function fmt(n){ return n==null ? '—' : Number(n).toLocaleString(undefined,{maximumFractionDigits:2}); }
 
@@ -2751,7 +2752,8 @@ function useRefData(product_id){
   return d;
 }
 // One lifecycle track. pre_bearing/bearing are normally age-derived; kept selectable for manual correction.
-var LIFECYCLES=[['planned','Planned (not yet planted)'],['pre_bearing','Pre-bearing'],['bearing','Bearing (producing)'],['retired','Retired']];
+// nursery = propagation block (rootstock/berry), outside the bearing track — never auto-derived.
+var LIFECYCLES=[['planned','Planned (not yet planted)'],['pre_bearing','Pre-bearing'],['bearing','Bearing (producing)'],['nursery','Nursery (propagation)'],['retired','Retired']];
 
 /* ── Geometry helpers (client draw ↔ GeoJSON ↔ area) ──────────────────── */
 function ringHa(latlngs){ var a=0,n=latlngs.length; for(var i=0,j=n-1;i<n;j=i++){ a+=(latlngs[j].lng+latlngs[i].lng)*(latlngs[j].lat-latlngs[i].lat); }
