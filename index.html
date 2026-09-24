@@ -713,6 +713,11 @@ function StructureScreen(ctx){
 var PAGE = 50;
 var CROP_COLORS = { citrus:'#e08a1e', grapes:'#6a3d9a', mango:'#d94f2a', pomegranate:'#b03060', olives:'#5a6b2a', berries:'#2a5a8a' };
 var ACTIVE_LC = ['bearing','pre_bearing','planned'];   // a cost centre is only expected on active blocks
+// Lifecycle is one track: planned → pre_bearing → bearing → retired (superseded = replant lineage).
+// pre_bearing/bearing are age-derived (season year − planting year vs product threshold); planned/retired/superseded are manual.
+var LC_LABELS={planned:'Planned',pre_bearing:'Pre-bearing',bearing:'Bearing',retired:'Retired',superseded:'Superseded',nursery:'Pre-bearing',fallow:'Fallow'};
+function lcLabel(l){ return LC_LABELS[l]||l||'—'; }
+function lcBadge(l){ return l==='bearing'?'badge-pass':(l==='pre_bearing'||l==='nursery')?'badge-warn':'badge-neutral'; }
 function isActive(lc){ return ACTIVE_LC.indexOf(lc)>=0; }
 function fmt(n){ return n==null ? '—' : Number(n).toLocaleString(undefined,{maximumFractionDigits:2}); }
 
@@ -834,7 +839,7 @@ function RegisterScreen(ctx){
               ce('td',{className:'num'}, b.aerobotics_area_ha==null?ce('span',{style:{color:'var(--text3)'}},'—'):fmt(b.aerobotics_area_ha)),
               ce('td',{className:'num',style:b.jde_cost_center_id?null:{color:'var(--amber)'}}, b.jde_cost_center_id||'—'),
               ce('td',null, ce('span',{style:{display:'inline-flex',alignItems:'center',gap:6,flexWrap:'wrap'}},
-                ce('span',{className:'badge '+(b.lifecycle==='nursery'?'badge-warn':b.lifecycle==='bearing'?'badge-pass':'badge-neutral')}, b.lifecycle),
+                ce('span',{className:'badge '+lcBadge(b.lifecycle)}, lcLabel(b.lifecycle)),
                 chainSet[b.id]?ce('span',{title:'This plot has a replant lineage — open to see the timeline',style:{fontSize:10,fontWeight:600,color:'var(--accent)',border:'1px solid var(--accent2)',background:'color-mix(in srgb,var(--accent2) 12%,transparent)',borderRadius:20,padding:'1px 7px',whiteSpace:'nowrap'}},'↻ replanted'):null))
             );
           }))
@@ -2745,7 +2750,8 @@ function useRefData(product_id){
   },[product_id]);
   return d;
 }
-var LIFECYCLES=[['planned','Planned (not yet planted)'],['nursery','Nursery'],['pre_bearing','Pre-bearing'],['bearing','Bearing (producing)'],['fallow','Fallow']];
+// One lifecycle track. pre_bearing/bearing are normally age-derived; kept selectable for manual correction.
+var LIFECYCLES=[['planned','Planned (not yet planted)'],['pre_bearing','Pre-bearing'],['bearing','Bearing (producing)'],['retired','Retired']];
 
 /* ── Geometry helpers (client draw ↔ GeoJSON ↔ area) ──────────────────── */
 function ringHa(latlngs){ var a=0,n=latlngs.length; for(var i=0,j=n-1;i<n;j=i++){ a+=(latlngs[j].lng+latlngs[i].lng)*(latlngs[j].lat-latlngs[i].lat); }
