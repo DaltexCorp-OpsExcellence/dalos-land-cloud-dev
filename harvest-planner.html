@@ -102,8 +102,8 @@ tr.grandtot .num{text-align:right;color:#fff}
 tr.grandtot .stlab{position:sticky;left:0;background:#38352f;color:#fff;text-transform:uppercase;letter-spacing:.04em;font-size:10px}
 .tot td{background:var(--bg2);font-weight:600;color:var(--text)}
 .pill{display:inline-flex;align-items:center;border-radius:20px;padding:1px 7px;font-size:10px;font-weight:500;border:1px solid;white-space:nowrap}
-.p-P{background:var(--green-bg);color:var(--green);border-color:var(--green-border)}
-.p-NP{background:var(--bg2);color:var(--text3);border-color:var(--border2)}
+.p-EXP{background:var(--green-bg);color:var(--green);border-color:var(--green-border)}
+.p-WIP{background:var(--amber-bg);color:var(--amber);border-color:var(--amber-border)}
 /* editable cells — persistent affordance so touch users see what's editable */
 .cin{width:40px;background:var(--card);border:1px solid var(--border);border-bottom-width:2px;border-radius:5px;padding:4px 3px;font-family:var(--font-num);font-size:13px;font-weight:500;text-align:center;color:var(--text);font-variant-numeric:tabular-nums}
 .cin:focus{outline:none;border-color:var(--accent);background:#fff}
@@ -681,7 +681,7 @@ function setGroup(g){groupBy=g;
 }
 let showNP=true; // show P and NP by default (Tarek); NP = no planned tonnage and no actuals — toggle can hide them
 function hasAnyActual(i){for(const k in actStore){if(k.indexOf(i+'|')===0&&(actStore[k]||0)>0)return true;}return false;}
-function isNP(i){ if(plots[i]&&plots[i].pnp==='NP') return true; const p=(planStore[i]||{}).planned; return (typeof p==='number') && p<=0 && !hasAnyActual(i);} // WIP (pre-bearing) plots are non-productive; also explicit 0 planned + no actuals. Blank planned on an EXP plot = not-yet-set, shown.
+function isNP(i){ if(plots[i]&&plots[i].pnp==='WIP') return true; const p=(planStore[i]||{}).planned; return (typeof p==='number') && p<=0 && !hasAnyActual(i);} // WIP (pre-bearing) plots are non-productive; also explicit 0 planned + no actuals. Blank planned on an EXP plot = not-yet-set, shown.
 function npCount(){let n=0;plots.forEach((p,i)=>{if(isNP(i))n++;});return n;}
 function setShowNP(v){showNP=v;
   const t=document.getElementById('npToggle'); if(t)t.classList.toggle('on',v);
@@ -1365,7 +1365,7 @@ function renderOv(){
   vb+=`<tr class="tot"><td class="frozen f0">Total</td><td class="num">${plots.length}</td><td class="num">${T.planWkTD.toLocaleString()}</td><td class="num">${T.actWk.toLocaleString()}</td><td class="num">${dchip(T.actWk-T.planWkTD,T.planWkTD)}</td><td class="num">${T.next2.toLocaleString()}</td><td class="num">${T.latest.toLocaleString()}</td><td class="num">${T.harv.toLocaleString()}</td><td class="num">${T.latest?Math.round(T.harv/T.latest*100):0}%</td><td class="num">${dchip(T.actTD-T.planTD,T.planTD)}</td><td class="num">${T.rem.toLocaleString()}</td><td></td></tr>`;
   document.getElementById('ovVar').innerHTML=vh+vb;
   // plot table — from the same model
-  let ph=`<tr><th class="frozen of0">Farm</th><th class="frozen of1">Plot</th><th class="frozen of2">Variety</th><th>P/NP</th><th class="num">Area</th><th class="num">Season plan</th><th class="num">Harvested</th><th class="num">% done</th><th class="num">Remaining</th></tr>`;
+  let ph=`<tr><th class="frozen of0">Farm</th><th class="frozen of1">Plot</th><th class="frozen of2">Variety</th><th>Status</th><th class="num">Area</th><th class="num">Season plan</th><th class="num">Harvested</th><th class="num">% done</th><th class="num">Remaining</th></tr>`;
   const psorted=plots.map((p,i)=>({p,i})).sort((a,b)=>a.p.v.localeCompare(b.p.v)||a.p.f.localeCompare(b.p.f));
   let pb=psorted.map(({p,i})=>{const latest=sum(WK.map((_,w)=>sum(WD.map((__,d)=>dayPlan(i,w,d))))); const harv=sumTo(getActual,i,CUR,CURDAY);
     return `<tr>
@@ -1647,7 +1647,7 @@ async function loadSeason(season){
     buildWeeks(lo, hi);
     const ti=wkIndexOfDate(ymd(new Date())); const beforeSeason=new Date()<WKDATE[0]; CUR=ti>=0?ti:(beforeSeason?0:WK.length-1); CURDAY=ti>=0?new Date().getDay():(beforeSeason?0:3); selWeek=CUR;
     const planBy={},farmName={},varName={}; plan.forEach(p=>planBy[p.block_id]=p);
-    plots=blocks.map(b=>{const code=b.farm_code+'-'+b.sector_code+'-'+b.plot_code+(b.block_add||'');const fn=(b.farms&&b.farms.name)||b.farm_code,vn=(b.varieties&&b.varieties.name)||'—';farmName[b.farm_id]=fn;varName[b.variety_id]=vn;const pl=planBy[b.id]||{};const aydi=(b.aydi_block_number&&String(b.aydi_block_number).trim())||code;return {blockId:b.id,farmId:b.farm_id,varId:b.variety_id,f:fn,p:code,aydi:aydi,v:vn,vt:PRODUCT_LABEL[product]||product,pnp:(b.lifecycle==='bearing'?'P':'NP'),area:Number(b.total_area_fed||0),planted:Number(b.planted_area_fed||0),latest:Number(pl.planned_t||0),budget:null,jul:null,nov:null,plan:Array(WK.length).fill(0),actual:Array(WK.length).fill(null)};});
+    plots=blocks.map(b=>{const code=b.farm_code+'-'+b.sector_code+'-'+b.plot_code+(b.block_add||'');const fn=(b.farms&&b.farms.name)||b.farm_code,vn=(b.varieties&&b.varieties.name)||'—';farmName[b.farm_id]=fn;varName[b.variety_id]=vn;const pl=planBy[b.id]||{};const aydi=(b.aydi_block_number&&String(b.aydi_block_number).trim())||code;return {blockId:b.id,farmId:b.farm_id,varId:b.variety_id,f:fn,p:code,aydi:aydi,v:vn,vt:PRODUCT_LABEL[product]||product,pnp:(b.lifecycle==='bearing'?'EXP':'WIP'),area:Number(b.total_area_fed||0),planted:Number(b.planted_area_fed||0),latest:Number(pl.planned_t||0),budget:null,jul:null,nov:null,plan:Array(WK.length).fill(0),actual:Array(WK.length).fill(null)};});
     farmsList=[...new Set(plots.map(p=>p.f))];
     seasonHasPlan = plots.some(pt=>planBy[pt.blockId]); // product-specific: does THIS crop have a plan this season
     const idx={}; plots.forEach((pt,i)=>{idx[pt.blockId]=i;const pl=planBy[pt.blockId];if(pl){planStore[i]={planted:pt.planted, planned: pl.planned_t==null?null:Number(pl.planned_t)};if(pl.updated_at)planBaseTs[pt.blockId]=pl.updated_at;
