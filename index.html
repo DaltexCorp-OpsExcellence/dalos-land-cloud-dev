@@ -718,7 +718,7 @@ var ACTIVE_LC = ['bearing','pre_bearing','planned'];   // a cost centre is only 
 // planned/retired/superseded/nursery are manual — never auto-derived (nursery = propagation block, never bears fruit).
 // Status display terms: pre_bearing = WIP (Work in progress), bearing = EXP (Expensed). Stored values unchanged.
 var LC_LABELS={planned:'Planned',pre_bearing:'WIP',bearing:'EXP',retired:'Retired',superseded:'Superseded',nursery:'Nursery',fallow:'Fallow'};
-var LC_TIPS={planned:'Planned (not yet planted)',pre_bearing:'WIP — Work in progress (pre-bearing)',bearing:'EXP — Expensed (bearing)',retired:'Retired',superseded:'Superseded (replant lineage)',nursery:'Nursery (propagation)',fallow:'Fallow'};
+var LC_TIPS={planned:'Planned (not yet planted)',pre_bearing:'WIP — Work in progress',bearing:'EXP — Expensed',retired:'Retired',superseded:'Superseded (replant lineage)',nursery:'Nursery (propagation)',fallow:'Fallow'};
 function lcLabel(l){ return LC_LABELS[l]||l||'—'; }
 function lcTip(l){ return LC_TIPS[l]||lcLabel(l); }
 function lcBadge(l){ return l==='bearing'?'badge-pass':l==='pre_bearing'?'badge-warn':'badge-neutral'; }
@@ -2700,7 +2700,7 @@ function SeasonEntryScreen(ctx){
             var tfed=(bear&&isFinite(actual)&&planted>0)?(actual/planted).toFixed(2):'';
             var ovSel=ov===true?'P':(ov===false?'NP':'auto');
             var age=(b.planting_year!=null)?(Number(ctx.season)-Number(b.planting_year)):null;
-            var statusTitle=(ov!=null?'forced ':'auto · ')+(bear?'EXP — expensed (bearing)':'WIP — work in progress (pre-bearing)')+(age!=null?(' · age '+age+(thr!=null?'/'+thr:'')):'');
+            var statusTitle=(ov!=null?'forced ':'auto · ')+(bear?'EXP — expensed':'WIP — work in progress')+(age!=null?(' · age '+age+(thr!=null?'/'+thr:'')):'');
             return ce('tr',{key:b.id},
               ce('td',{className:'stickyc'}, ce('span',{className:'lot',title:b.operational_block_id},b.aydi_block_number||b.operational_block_id), ce('div',{className:'ar',dir:'auto',style:{fontSize:10,color:'var(--text3)',marginTop:1}}, (b.varieties&&b.varieties.name)||'')),
               ce('td',null, ce('input',{className:'derived',readOnly:true,value:Number(b.total_area_fed||0).toFixed(2),title:'total_area_fed — lives on the block'})),

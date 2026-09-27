@@ -1486,8 +1486,8 @@ let revs=[
   diff:[{p:"Layla 00-01A · Star Ruby",was:760,now:821},{p:"Kheir 08-02B · Star Ruby",was:144,now:155}]},
  {t:"November estimate",d:"08 Nov 2025 · 14:00",who:"Tarek G.",in:"TG",locked:true,note:"Post-bloom count — the season baseline. Locked as the as-presented plan.",
   diff:[{p:"Hana 01-01A · Eureka",was:270,now:310},{p:"Hana 03-10A · Olinda",was:600,now:655},{p:"Kheir 09-05B · Tango",was:430,now:497}]},
- {t:"July estimate",d:"20 Jul 2025 · 12:30",who:"Agronomy",in:"AG",locked:true,note:"First-pass on tree age, bearing area and windows.",
-  diff:[{p:"All bearing plots",was:0,now:0,txt:"Per-plot yield model + harvest windows applied"}]},
+ {t:"July estimate",d:"20 Jul 2025 · 12:30",who:"Agronomy",in:"AG",locked:true,note:"First-pass on tree age, planted area and windows.",
+  diff:[{p:"All EXP plots",was:0,now:0,txt:"Per-plot yield model + harvest windows applied"}]},
  {t:"Budget (موازنة)",d:"01 Jul 2025 · 08:00",who:"Tarek G.",in:"TG",locked:true,note:"Board budget locked.",
   diff:[{p:"Season total",was:0,now:0,txt:"Committed budget by variety"}]},
 ];
@@ -1606,13 +1606,13 @@ function renderStartBanner(){
   if(seasonHasPlan){ b.innerHTML=''; return; }
   const nm=SEASON?SEASON.name:'this season';
   b.innerHTML = canWrite
-    ? `<div class="modebanner plan" style="margin-bottom:12px"><span class="tag">Empty</span><span><b>${nm}</b> hasn't been started for <b>${(PRODUCT_LABEL[product]||product)}</b> yet — no plan grid exists. Start it to create a blank plan for every ${(PRODUCT_LABEL[product]||product).toLowerCase()} plot (bearing areas filled in; yields &amp; windows left blank for you to set).</span><button class="btn btn-primary btn-sm" style="margin-left:auto" onclick="startSeason()">Start ${(PRODUCT_LABEL[product]||product)} ${nm}</button></div>`
+    ? `<div class="modebanner plan" style="margin-bottom:12px"><span class="tag">Empty</span><span><b>${nm}</b> hasn't been started for <b>${(PRODUCT_LABEL[product]||product)}</b> yet — no plan grid exists. Start it to create a blank plan for every ${(PRODUCT_LABEL[product]||product).toLowerCase()} plot (planted areas filled in; yields &amp; windows left blank for you to set).</span><button class="btn btn-primary btn-sm" style="margin-left:auto" onclick="startSeason()">Start ${(PRODUCT_LABEL[product]||product)} ${nm}</button></div>`
     : `<div class="modebanner harv" style="margin-bottom:12px"><span class="tag">Empty</span><span><b>${nm}</b> hasn't been started yet. Ask an agronomy admin to start this season's plan.</span></div>`;
 }
 async function startSeason(){
   if(!SEASON)return;
   const pl=(PRODUCT_LABEL[product]||product);
-  const ok=await uiConfirm('Start '+pl+' '+SEASON.name+'?','This creates a blank plan for every '+pl.toLowerCase()+' plot in '+SEASON.name+' — bearing areas are filled from Land Cloud; yields and harvest windows are left blank for the team to set. It won\'t touch any other crop or season.','Start season');
+  const ok=await uiConfirm('Start '+pl+' '+SEASON.name+'?','This creates a blank plan for every '+pl.toLowerCase()+' plot in '+SEASON.name+' — planted areas are filled from Land Cloud; yields and harvest windows are left blank for the team to set. It won\'t touch any other crop or season.','Start season');
   if(!ok)return;
   try{
     const {data,error}=await SB.rpc('hp_start_season',{p_season_id:SEASON.id,p_product:product});
