@@ -383,7 +383,7 @@ body.present .diff-row{font-size:15px}
         <span id="daySelWrap" style="display:none"><input type="date" id="daySelInp" onchange="pickDay(this.value)" title="Pick a day to log"></span>
         <div class="wkstep"><div class="nav" onclick="stepWeek(-1)">‹</div><div class="lbl" id="wkLbl"></div><div class="nav" onclick="stepWeek(1)">›</div></div>
         <div class="grpby"><span class="gl">Group by</span><div class="seg"><b class="active" id="gbVar" onclick="setGroup('variety')">Variety</b><b id="gbFarm" onclick="setGroup('farm')">Farm</b></div></div>
-        <button class="btn btn-sec btn-sm" id="npToggle" onclick="setShowNP(!showNP)" title="Non-productive = no plan yield and no harvest (Ibrahim: if NP then no production anyway)"></button>
+        <button class="btn btn-sec btn-sm" id="npToggle" onclick="setShowNP(!showNP)" title="Non-productive (NP) = WIP / pre-bearing plots, plus any plot with no planned yield and no harvest (Ibrahim: if NP then no production anyway)"></button>
         <div class="spacer"></div>
         <button class="btn btn-sec btn-sm" id="pasteBtn" onclick="openPaste()">⎘ Paste from Excel</button>
         <button class="btn btn-sec btn-sm" id="copyLsBtn" onclick="openCopyLast()">↧ Copy last season</button>
@@ -681,7 +681,7 @@ function setGroup(g){groupBy=g;
 }
 let showNP=true; // show P and NP by default (Tarek); NP = no planned tonnage and no actuals — toggle can hide them
 function hasAnyActual(i){for(const k in actStore){if(k.indexOf(i+'|')===0&&(actStore[k]||0)>0)return true;}return false;}
-function isNP(i){const p=(planStore[i]||{}).planned; return (typeof p==='number') && p<=0 && !hasAnyActual(i);} // blank (null) planned = not-yet-set, shown; explicit 0 = non-productive, hideable
+function isNP(i){ if(plots[i]&&plots[i].pnp==='NP') return true; const p=(planStore[i]||{}).planned; return (typeof p==='number') && p<=0 && !hasAnyActual(i);} // WIP (pre-bearing) plots are non-productive; also explicit 0 planned + no actuals. Blank planned on an EXP plot = not-yet-set, shown.
 function npCount(){let n=0;plots.forEach((p,i)=>{if(isNP(i))n++;});return n;}
 function setShowNP(v){showNP=v;
   const t=document.getElementById('npToggle'); if(t)t.classList.toggle('on',v);
@@ -1627,7 +1627,7 @@ async function loadSeason(season){
   clearSeasonStores();
   {
     const [bR,pR,pdR,adR,tkR,rvR]=await Promise.all([
-      SB.from('farm_blocks').select('id,farm_code,sector_code,plot_code,block_add,aydi_block_number,total_area_fed,planted_area_fed,variety_id,farm_id,varieties(name),farms(name)').eq('product_id',product).eq('lifecycle','bearing').not('variety_id','is',null).not('farm_id','is',null),
+      SB.from('farm_blocks').select('id,farm_code,sector_code,plot_code,block_add,aydi_block_number,total_area_fed,planted_area_fed,lifecycle,variety_id,farm_id,varieties(name),farms(name)').eq('product_id',product).in('lifecycle',['bearing','pre_bearing']).not('variety_id','is',null).not('farm_id','is',null),
       SB.from('hp_plan').select('*').eq('season_id',SEASON.id),
       SB.from('hp_plan_day').select('block_id,plan_date,planned_t').eq('season_id',SEASON.id),
       SB.from('hp_actual_day').select('block_id,harvest_date,actual_t,harvest_sorting_t,local_sales_t,waste_t,review_status').eq('season_id',SEASON.id),
@@ -1647,7 +1647,7 @@ async function loadSeason(season){
     buildWeeks(lo, hi);
     const ti=wkIndexOfDate(ymd(new Date())); const beforeSeason=new Date()<WKDATE[0]; CUR=ti>=0?ti:(beforeSeason?0:WK.length-1); CURDAY=ti>=0?new Date().getDay():(beforeSeason?0:3); selWeek=CUR;
     const planBy={},farmName={},varName={}; plan.forEach(p=>planBy[p.block_id]=p);
-    plots=blocks.map(b=>{const code=b.farm_code+'-'+b.sector_code+'-'+b.plot_code+(b.block_add||'');const fn=(b.farms&&b.farms.name)||b.farm_code,vn=(b.varieties&&b.varieties.name)||'—';farmName[b.farm_id]=fn;varName[b.variety_id]=vn;const pl=planBy[b.id]||{};const aydi=(b.aydi_block_number&&String(b.aydi_block_number).trim())||code;return {blockId:b.id,farmId:b.farm_id,varId:b.variety_id,f:fn,p:code,aydi:aydi,v:vn,vt:PRODUCT_LABEL[product]||product,pnp:'P',area:Number(b.total_area_fed||0),planted:Number(b.planted_area_fed||0),latest:Number(pl.planned_t||0),budget:null,jul:null,nov:null,plan:Array(WK.length).fill(0),actual:Array(WK.length).fill(null)};});
+    plots=blocks.map(b=>{const code=b.farm_code+'-'+b.sector_code+'-'+b.plot_code+(b.block_add||'');const fn=(b.farms&&b.farms.name)||b.farm_code,vn=(b.varieties&&b.varieties.name)||'—';farmName[b.farm_id]=fn;varName[b.variety_id]=vn;const pl=planBy[b.id]||{};const aydi=(b.aydi_block_number&&String(b.aydi_block_number).trim())||code;return {blockId:b.id,farmId:b.farm_id,varId:b.variety_id,f:fn,p:code,aydi:aydi,v:vn,vt:PRODUCT_LABEL[product]||product,pnp:(b.lifecycle==='bearing'?'P':'NP'),area:Number(b.total_area_fed||0),planted:Number(b.planted_area_fed||0),latest:Number(pl.planned_t||0),budget:null,jul:null,nov:null,plan:Array(WK.length).fill(0),actual:Array(WK.length).fill(null)};});
     farmsList=[...new Set(plots.map(p=>p.f))];
     seasonHasPlan = plots.some(pt=>planBy[pt.blockId]); // product-specific: does THIS crop have a plan this season
     const idx={}; plots.forEach((pt,i)=>{idx[pt.blockId]=i;const pl=planBy[pt.blockId];if(pl){planStore[i]={planted:pt.planted, planned: pl.planned_t==null?null:Number(pl.planned_t)};if(pl.updated_at)planBaseTs[pt.blockId]=pl.updated_at;
