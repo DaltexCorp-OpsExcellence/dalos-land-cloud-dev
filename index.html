@@ -1189,7 +1189,11 @@ function BlockDetail(p){
   var headChips=ce('div',{style:{display:'flex',gap:6,flexWrap:'wrap',marginTop:6}},
     (b.varieties&&b.varieties.name)?chp('#f0e8ff','#c090e0','#6a10b0',b.varieties.name):null,
     (b.farm_rootstocks&&b.farm_rootstocks.name)?chp('var(--bg2)','var(--border2)','var(--text2)','rootstock '+b.farm_rootstocks.name):null,
-    chp('var(--green-bg)','var(--green-border)','var(--green)', b.lifecycle+(age!=null?(' · yr '+age):'')));
+    (function(){ var lc=b.lifecycle;
+      var c = lc==='bearing'?['var(--green-bg)','var(--green-border)','var(--green)']
+            : lc==='pre_bearing'?['var(--amber-bg)','var(--amber-border)','var(--amber)']
+            : ['var(--bg2)','var(--border2)','var(--text2)'];
+      return chp(c[0],c[1],c[2], lcLabel(lc)+(age!=null?(' · yr '+age):'')); })());
   var commentBand = b.comments ? ce('div',{className:'band',style:{marginTop:14}}, '⚠ '+b.comments) : null;
 
   // season-snapshot KPI tiles (derived from the latest producing season)
@@ -1278,7 +1282,7 @@ function BlockDetail(p){
           row('Rootstock', (b.farm_rootstocks&&b.farm_rootstocks.name)||'own-rooted / none'),
           row('Planting year', b.planting_year),
           row('Cost centre', b.jde_cost_center_id||'— not assigned'),
-          row('Lifecycle', b.lifecycle)
+          row('Lifecycle', lcLabel(b.lifecycle))
         ),
         ce('div',{className:'section-title',style:{marginTop:18}},ce('span',{className:'section-title-bar'}),'Area'),
         ce('div',{style:{display:'flex',gap:12,alignItems:'flex-start'}},
