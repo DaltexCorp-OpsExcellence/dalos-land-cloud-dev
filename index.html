@@ -760,9 +760,12 @@ function RegisterScreen(ctx){
     }
     return query;
   }
+  var loadSeq=React.useRef(0);
   function load(){
+    var my=++loadSeq.current;   // ignore out-of-order responses when filters change quickly
     set(function(x){return Object.assign({},x,{loading:true,err:null});});
     base().order('operational_block_id').range(page*PAGE,page*PAGE+PAGE-1).then(function(r){
+      if(my!==loadSeq.current) return;
       if(r.error){ set({loading:false,err:r.error.message,rows:[],total:0}); return; }
       set({loading:false,err:null,rows:r.data||[],total:r.count||0});
     });
