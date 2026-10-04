@@ -738,8 +738,9 @@ function RegisterScreen(ctx){
   var cs=useState({}); var chainSet=cs[0],setChainSet=cs[1];  // block_ids that belong to a replant lineage
   var nb=useState(false); var newOpen=nb[0],setNewOpen=nb[1];
   var ex=useState(null); var exporting=ex[0],setExporting=ex[1];
+  var ee=useState(null); var expErr=ee[0],setExpErr=ee[1];
 
-  useEffect(function(){ setPage(0); }, [ctx.crop, search, chip, farmF]);
+  useEffect(function(){ setPage(0); setExpErr(null); }, [ctx.crop, search, chip, farmF]);
   useEffect(function(){ load(); }, [ctx.crop, page, search, chip, farmF, chainSet]);
   useEffect(function(){ loadMeta(); }, [ctx.crop]);
 
@@ -811,9 +812,10 @@ function RegisterScreen(ctx){
       ce('input',{className:'search',placeholder:'Search block ID or Aydi…',value:search,onChange:function(e){setSearch(e.target.value);}}),
       ce('select',{className:'tb-select',value:farmF,onChange:function(e){setFarmF(e.target.value);}},
         ce('option',{value:''},'All farms'), farms.map(function(fm){return ce('option',{key:fm.code,value:fm.code}, fm.name);})),
-      ce('button',{className:'btn btn-secondary btn-sm',disabled:!!exporting,title:'Orchards Master Plot List (.xlsx) — block details + full yield history for the blocks matching the current filters',onClick:function(){
-        setExporting('Preparing…'); exportPlotList(base,{crop:ctx.crop,farm:farmF,search:search,chip:chip},setExporting).catch(function(e){ alert('Export failed: '+(e&&e.message||e)); }).then(function(){ setExporting(null); }); }},
+      ce('button',{className:'btn btn-secondary btn-sm',disabled:!!exporting||st.loading||!st.total,title:st.total?'Orchards Master Plot List (.xlsx) — block details + full yield history for the '+st.total+' blocks matching the current filters':'No blocks match the current filters',onClick:function(){
+        setExpErr(null); setExporting('Preparing…'); exportPlotList(base,{crop:ctx.crop,farm:farmF,search:search,chip:chip},setExporting).catch(function(e){ setExpErr('Export failed: '+(e&&e.message||e)); }).then(function(){ setExporting(null); }); }},
         exporting||'Export'),
+      expErr?ce('span',{style:{fontSize:12,color:'var(--red)'}},expErr):null,
       ctx.canWrite?ce('button',{className:'btn btn-primary btn-sm',style:{marginLeft:'auto'},onClick:function(){ setNewOpen(true); }},'+ New block'):null
     ),
     ce('div',{className:'toolbar'}, chips.map(function(ch){
