@@ -737,13 +737,14 @@ function RegisterScreen(ctx){
   var pm=useState({}); var prodMap=pm[0],setProdMap=pm[1];   // block_id -> {y:last prod year, t:tonnes}
   var cs=useState({}); var chainSet=cs[0],setChainSet=cs[1];  // block_ids that belong to a replant lineage
   var nb=useState(false); var newOpen=nb[0],setNewOpen=nb[1];
+  var ex=useState(null); var exporting=ex[0],setExporting=ex[1];
 
   useEffect(function(){ setPage(0); }, [ctx.crop, search, chip, farmF]);
   useEffect(function(){ load(); }, [ctx.crop, page, search, chip, farmF, chainSet]);
   useEffect(function(){ loadMeta(); }, [ctx.crop]);
 
-  function base(){
-    var sel='id,operational_block_id,aydi_block_number,product_id,farm_code,sector_code,plot_code,planting_year,total_area_fed,planted_area_fed,aerobotics_area_ha,jde_cost_center_id,rootstock_id,lifecycle,last_producing_season,farms(name),varieties(name,breeders(name)),farm_rootstocks(name)';
+  function base(selOverride){
+    var sel=selOverride||'id,operational_block_id,aydi_block_number,product_id,farm_code,sector_code,plot_code,planting_year,total_area_fed,planted_area_fed,aerobotics_area_ha,jde_cost_center_id,rootstock_id,lifecycle,last_producing_season,farms(name),varieties(name,breeders(name)),farm_rootstocks(name)';
     var query=supabase.from('farm_blocks').select(sel,{count:'exact'});
     if(ctx.crop!=='all') query=query.eq('product_id',ctx.crop);
     if(farmF) query=query.eq('farm_code',farmF);
@@ -810,7 +811,9 @@ function RegisterScreen(ctx){
       ce('input',{className:'search',placeholder:'Search block ID or Aydi…',value:search,onChange:function(e){setSearch(e.target.value);}}),
       ce('select',{className:'tb-select',value:farmF,onChange:function(e){setFarmF(e.target.value);}},
         ce('option',{value:''},'All farms'), farms.map(function(fm){return ce('option',{key:fm.code,value:fm.code}, fm.name);})),
-      ce('button',{className:'btn btn-secondary btn-sm',onClick:function(){ exportCsv(base, prodMap); }},'Export CSV'),
+      ce('button',{className:'btn btn-secondary btn-sm',disabled:!!exporting,title:'Orchards Master Plot List (.xlsx) — block details + full yield history for the blocks matching the current filters',onClick:function(){
+        setExporting('Preparing…'); exportPlotList(base,{crop:ctx.crop,farm:farmF,search:search,chip:chip},setExporting).catch(function(e){ alert('Export failed: '+(e&&e.message||e)); }).then(function(){ setExporting(null); }); }},
+        exporting||'Export'),
       ctx.canWrite?ce('button',{className:'btn btn-primary btn-sm',style:{marginLeft:'auto'},onClick:function(){ setNewOpen(true); }},'+ New block'):null
     ),
     ce('div',{className:'toolbar'}, chips.map(function(ch){
@@ -860,14 +863,97 @@ function RegisterScreen(ctx){
   );
 }
 
-function exportCsv(base, prodMap){
-  prodMap=prodMap||{};
-  base().order('operational_block_id').range(0,9999).then(function(r){
-    var rows=r.data||[]; if(!rows.length) return;
-    var cols=['operational_block_id','product_id','farm_code','aydi_block_number','planting_year','total_area_fed','planted_area_fed','aerobotics_area_ha','jde_cost_center_id','lifecycle','last_season','last_prod_year','last_prod_t'];
-    var lines=[cols.join(',')].concat(rows.map(function(b){var pm=prodMap[b.id]||{};var ext={last_season:(b.lifecycle==='EXP'?'On':(b.last_producing_season==null?'':b.last_producing_season)),last_prod_year:pm.y==null?'':pm.y,last_prod_t:pm.t==null?'':pm.t};return cols.map(function(c){var v=(c in ext)?ext[c]:b[c];return v==null?'':(''+v).indexOf(',')>=0?'"'+v+'"':v;}).join(',');}));
-    var blob=new Blob([lines.join('\n')],{type:'text/csv'}); var a=document.createElement('a');
-    a.href=URL.createObjectURL(blob); a.download='farm_blocks.csv'; a.click();
+/* ── Register export: "Orchards Master Plot List" layout ──
+   One sheet per crop: block identity columns, then one column group per season (actual scenario).
+   Respects the register filters (crop, farm, search, chip) by reusing base(). Values come from
+   farm_blocks + v_farm_season_wide; the only derived cells are the per-year area (see README sheet)
+   and the t/fed rates. */
+var PL_AR={raw_to_packhouse:'فعلى خام محطة',export_packhouse:'فعلى صادر محطة',export_carton:'فعلى صادر كرتونة',export_supermarket:'سوبر ماركت',export_gifts:'هدايا',export_supermarket_gifts:'سوبر ماركت+هدايا',dry_weight:'الوزن الجاف',export_total:'اجمالى الصادر',packhouse_reject:'فعلى فرزة محطة',weight_loss:'فقد الوزن',weight_loss_damaged:'فقد الوزن+التالف',shortage_dryout:'عجز+جفاف',local_sales_combined:'مبيعات محلى',raw_to_traders:'مبيعات خام للتجار',trader_reject:'فرزة تاجر',field_reject_sales:'مبيعات فرزة ارض',farm_gate_sales:'فعلى بيع محلى',condemned:'اعدام',actual_production:'فعلى انتاج'};
+var PL_ORDER=['raw_to_packhouse','export_packhouse','export_carton','export_supermarket','export_gifts','export_supermarket_gifts','dry_weight','export_total','packhouse_reject','weight_loss','weight_loss_damaged','shortage_dryout','local_sales_combined','raw_to_traders','trader_reject','field_reject_sales','farm_gate_sales','condemned','actual_production'];
+var PL_RATE={raw_to_packhouse:1,export_packhouse:1,export_total:1,actual_production:1};
+var PL_PROD=['actual_production','raw_to_packhouse','export_packhouse','local_sales_combined','farm_gate_sales','field_reject_sales'];
+var PL_TABS=[['Citrus',['citrus']],['Grapes',['grapes']],['Mango&Pomegranate',['mango','pomegranate']],['Olives',['olives']],['Berries',['berries']]];
+function plPaged(mk, onPage){ var PG=1000, out=[];
+  return new Promise(function(res,rej){ (function pg(from){ mk().range(from,from+PG-1).then(function(r){
+    if(r.error){ rej(r.error); return; } var d=r.data||[]; out=out.concat(d); if(onPage) onPage(out.length);
+    if(d.length===PG) pg(from+PG); else res(out); }); })(0); }); }
+function exportPlotList(base, f, progress){
+  var sel='id,operational_block_id,aydi_block_number,product_id,farm_code,sector_code,plot_code,block_add,block_code,variety_code,planting_year,financial_block_id,jde_cost_center_id,rootstock_code,legacy_old_plot,tree_count_planted,tree_count_actual,last_producing_season,total_area_fed,planted_area_fed,aerobotics_area_ha,lifecycle,comments,farms(name),varieties(name),farm_rootstocks(name)';
+  if(!window.XLSX) return Promise.reject(new Error('Spreadsheet library still loading — try again in a moment.'));
+  progress('Loading blocks…');
+  return plPaged(function(){ return base(sel).order('operational_block_id'); }).then(function(blocks){
+    if(!blocks.length) throw new Error('No blocks match the current filters.');
+    var ids={}; blocks.forEach(function(b){ ids[b.id]=1; });
+    var prods={}; blocks.forEach(function(b){ prods[b.product_id]=1; }); var plist=Object.keys(prods);
+    progress('Loading yield history…');
+    return plPaged(function(){ var q=supabase.from('v_farm_season_wide').select('block_id,season_year,is_exp,metrics').eq('scenario','actual');
+        if(plist.length===1) q=q.eq('product_id',plist[0]); return q.order('block_id').order('season_year'); },
+      function(n){ progress('Loading yield history… '+n); })
+    .then(function(seas){
+      progress('Building workbook…');
+      var S={}; seas.forEach(function(w){ if(ids[w.block_id]) S[w.block_id+'|'+w.season_year]=w; });
+      var U=XLSX.utils, wb=U.book_new(), num=function(v){ return v==null||v===''?null:Number(v); }, r2=function(v){ return Math.round(v*100)/100; }, r1=function(v){ return Math.round(v*10)/10; };
+      var ID=['Crop','Farm','Sector','Old Plot','Farm Code','Sector Code','Plot Code','Block Add','Block Code','Variety Code','Year Code','Aydi Block Number','Financial Block ID','JD. E. Cost Center ID','Rootstock Code','Operational Block ID','Count','Rootstock','Variety','Planting Year','Number of trees','Last produc. season','Total Area','Area Planted','Aerobotics Area (ha)','Lifecycle','Comments'];
+      var summary=[];
+      PL_TABS.forEach(function(tab){
+        var bl=blocks.filter(function(b){ return tab[1].indexOf(b.product_id)>=0; }); if(!bl.length) return;
+        bl.sort(function(a,b){ var k=function(x){ return [x.product_id,(x.farms&&x.farms.name)||x.farm_code||'',x.sector_code||'',x.plot_code||'',x.block_add||'',x.planting_year||0].join('|'); }; return k(a)<k(b)?-1:k(a)>k(b)?1:0; });
+        var tabIds={}; bl.forEach(function(b){ tabIds[b.id]=1; }); var ys={};
+        seas.forEach(function(w){ if(tabIds[w.block_id]) ys[w.season_year]=1; });
+        var years=Object.keys(ys).map(Number).sort();
+        var ymet={}; years.forEach(function(y){ ymet[y]=PL_ORDER.filter(function(m){ return bl.some(function(b){ var w=S[b.id+'|'+y]; return w&&w.metrics&&w.metrics[m]!=null; }); }); if(ymet[y].indexOf('actual_production')<0) ymet[y].push('actual_production'); });
+        var cols=[]; years.forEach(function(y){ cols.push([y,'area']); cols.push([y,'pnp']); ymet[y].forEach(function(m){ cols.push([y,'val',m]); if(PL_RATE[m]) cols.push([y,'rate',m]); }); });
+        var row1=ID.map(function(){return null;}).concat(cols.map(function(c){return c[0];})).concat([null]);
+        var row2=ID.concat(cols.map(function(c){ return c[1]==='area'?'المساحة المنزرعة':c[1]==='pnp'?'منتج/غير منتج':c[1]==='val'?(PL_AR[c[2]]||c[2]):'معدل ف '+(PL_AR[c[2]]||c[2]); })).concat(['ملاحظات']);
+        var aoa=[row1,row2], tot={}, fb=0;
+        bl.forEach(function(b){
+          var pl=num(b.planted_area_fed), ta=num(b.total_area_fed);
+          var row=[ b.product_id.charAt(0).toUpperCase()+b.product_id.slice(1), (b.farms&&b.farms.name)||b.farm_code,
+            /^\d+$/.test(b.sector_code||'')?Number(b.sector_code):b.sector_code, b.legacy_old_plot||null,
+            b.farm_code,b.sector_code,b.plot_code,b.block_add,b.block_code,b.variety_code,
+            b.planting_year?String(b.planting_year).slice(-2):null, b.aydi_block_number,b.financial_block_id,b.jde_cost_center_id,
+            b.rootstock_code,b.operational_block_id,1,(b.farm_rootstocks&&b.farm_rootstocks.name)||null,(b.varieties&&b.varieties.name)||null,
+            b.planting_year, b.tree_count_actual!=null?b.tree_count_actual:b.tree_count_planted,
+            b.lifecycle==='EXP'?'On':(b.last_producing_season!=null?b.last_producing_season:null),
+            ta,pl,num(b.aerobotics_area_ha),lcLabel(b.lifecycle),b.comments||null ];
+          var notes=[];
+          cols.forEach(function(c){
+            var y=c[0], w=S[b.id+'|'+y]; if(!w){ row.push(null); return; }
+            var m=w.metrics||{}, prePlant=b.planting_year&&y<b.planting_year;
+            var area=prePlant?0:(pl||0), produced=PL_PROD.some(function(k){ return Number(m[k]||0)>0; });
+            var useTot=!prePlant && area===0 && produced && (ta||0)>0; if(useTot) area=ta;
+            if(c[1]==='area'){ row.push(area); tot[y+'|area']=(tot[y+'|area']||0)+(area||0); if(useTot){ fb++; notes.push(y+': planted area is 0 but the block produced — total area used'); } }
+            else if(c[1]==='pnp') row.push(w.is_exp?'P':'NP');
+            else if(c[1]==='val'){ var v=m[c[2]]; if(v==null){ row.push(null); } else { row.push(r2(Number(v))); tot[y+'|'+c[2]]=(tot[y+'|'+c[2]]||0)+Number(v); } }
+            else { var v2=m[c[2]]; row.push(v2==null?null:(area?r1(Number(v2)/area):'-')); }
+          });
+          row.push(notes.length?notes.join('; '):null); aoa.push(row);
+        });
+        var trow=ID.map(function(h,i){ return i===0?'TOTAL':(h==='Total Area'||h==='Area Planted'||h==='Aerobotics Area (ha)')?r2(bl.reduce(function(s,b){ return s+(num(b[{ 'Total Area':'total_area_fed','Area Planted':'planted_area_fed','Aerobotics Area (ha)':'aerobotics_area_ha'}[h]])||0); },0)):null; });
+        cols.forEach(function(c){ var y=c[0], a=tot[y+'|area']||0;
+          if(c[1]==='area') trow.push(r2(a)); else if(c[1]==='val') trow.push(tot[y+'|'+c[2]]==null?null:r1(tot[y+'|'+c[2]])); else if(c[1]==='rate') trow.push(a&&tot[y+'|'+c[2]]!=null?r1(tot[y+'|'+c[2]]/a):null); else trow.push(null); });
+        aoa.push(trow);
+        var ws=U.aoa_to_sheet(aoa);
+        ws['!cols']=row2.map(function(h,i){ return {wch: i===row2.length-1?50:(['Farm','Financial Block ID','Operational Block ID','Rootstock','Variety','Comments'].indexOf(h)>=0?16:9)}; });
+        ws['!autofilter']={ref:U.encode_range({s:{r:1,c:0},e:{r:aoa.length-2,c:row2.length-1}})};
+        U.book_append_sheet(wb, ws, tab[0]);
+        summary.push([tab[0], bl.length, years[0]||'', years[years.length-1]||'', fb]);
+      });
+      var chipName={retired:'Retired',replanted:'Replanted',no_cc:'Missing cost centre',no_aero:'No Aerobotics',no_root:'Rootstock blank'};
+      var readme=[['DalOS Land Cloud — Orchards Master Plot List (block details + yield history)'],[],
+        ['Exported', new Date().toISOString().slice(0,16).replace('T',' ')],
+        ['Filters','Crop: '+(f.crop==='all'?'All crops':f.crop)+' · Farm: '+(f.farm||'All farms')+' · Search: '+(f.search&&f.search.trim()?f.search.trim():'—')+' · List: '+(chipName[f.chip]||'Current (non-retired)')],
+        ['Source','farm_blocks + v_farm_season_wide (scenario = actual). Tonnages, P/NP and block details are stored DB values.'],
+        ['Per-year area','Not stored per season — the DB holds one planted area per block. Year area = block planted area; 0 for years before the planting year; where planted area is 0 but the block produced that year, total area is used (noted in ملاحظات).'],
+        ['Rates','معدل ف = metric ÷ year area (t/fed). TOTAL row rates = column total ÷ total area.'],
+        ['Last produc. season','"On" for EXP blocks (same as the register), otherwise the stored last producing season.'],
+        ['Columns per year','Only metrics recorded for that crop-year are shown, so the column set varies by year.'],
+        [],['Sheet','Blocks','First season','Last season','Area fallbacks']].concat(summary);
+      var rs=U.aoa_to_sheet(readme); rs['!cols']=[{wch:20},{wch:110},{wch:12},{wch:12},{wch:14}];
+      U.book_append_sheet(wb, rs, 'README'); wb.SheetNames.unshift(wb.SheetNames.pop());
+      var tag=[f.crop==='all'?'AllCrops':f.crop, f.farm||'', f.chip||''].filter(Boolean).join('_');
+      XLSX.writeFile(wb, 'Orchards_Master_Plot_List_'+tag+'_'+new Date().toISOString().slice(0,10)+'.xlsx');
+    });
   });
 }
 
