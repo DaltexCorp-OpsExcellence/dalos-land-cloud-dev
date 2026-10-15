@@ -1691,7 +1691,8 @@ async function boot(){
   try{
     try{canWrite=!!(await SB.rpc('hp_can_write')).data;}catch(e){canWrite=false;}
     const ssr=await SB.from('seasons').select('id,name,active').order('name'); SEASONS=ssr.data||[];
-    SEASON=SEASONS.find(s=>s.active)||SEASONS[SEASONS.length-1];
+    let lastSeason=null; try{ lastSeason=localStorage.getItem('hp_season'); }catch(e){}   // remember this browser's last pick
+    SEASON=SEASONS.find(s=>s.id===lastSeason)||SEASONS.find(s=>s.active)||SEASONS[SEASONS.length-1];
     if(!SEASON){document.body.insertAdjacentHTML('afterbegin','<div style=\'padding:14px;font-family:sans-serif\'>No season set in Land Cloud.</div>');return;}
     buildSeasonPicker();
     await loadSeason(SEASON);
@@ -1707,6 +1708,7 @@ function clearSeasonStores(){
 }
 async function pickSeason(id){
   if(!SEASON||id===SEASON.id)return;
+  try{ localStorage.setItem('hp_season',id); }catch(e){}
   if(dirty.size){const ok=await uiConfirm('Switch season?','You have '+dirty.size+' unsaved change'+(dirty.size>1?'s':'')+' in '+SEASON.name+'. Switching seasons will discard them.','Switch');
     if(!ok){document.getElementById('seasonSel').value=SEASON.id;return;}}
   const s=SEASONS.find(x=>x.id===id);
