@@ -1708,9 +1708,9 @@ function clearSeasonStores(){
 }
 async function pickSeason(id){
   if(!SEASON||id===SEASON.id)return;
-  try{ localStorage.setItem('hp_season',id); }catch(e){}
   if(dirty.size){const ok=await uiConfirm('Switch season?','You have '+dirty.size+' unsaved change'+(dirty.size>1?'s':'')+' in '+SEASON.name+'. Switching seasons will discard them.','Switch');
     if(!ok){document.getElementById('seasonSel').value=SEASON.id;return;}}
+  try{ localStorage.setItem('hp_season',id); }catch(e){}   // remembered across refreshes (this browser)
   const s=SEASONS.find(x=>x.id===id);
   if(!s){document.getElementById('seasonSel').value=(SEASON&&SEASON.id)||'';return;}
   try{ await loadSeason(s); uiToast('Now viewing '+s.name+(s.active?' (active)':'')); }
