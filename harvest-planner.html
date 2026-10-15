@@ -168,6 +168,11 @@ td.daycell.dtot2:hover{background:var(--bg2)}
 .dirtybadge{font-size:11px;color:var(--amber);background:var(--amber-bg);border:1px solid var(--amber-border);border-radius:20px;padding:2px 9px;font-weight:600;white-space:nowrap}
 .rotxt{font-family:var(--font-mono);font-size:12px;color:var(--text2)}
 .wchip.ro{cursor:default;opacity:.8}
+.aerocol{white-space:nowrap;min-width:92px}
+.aerocellin{font-family:var(--font-mono);font-size:11px;color:var(--text2);line-height:1.35}
+.aerocellin b{font-weight:600;color:var(--text)}
+.aerogap{font-size:10px;font-weight:600}.aerogap.early{color:var(--amber)}.aerogap.late{color:var(--accent)}
+.aeromute{color:var(--text3)}
 .aeroline{font-size:10px;color:var(--text3);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:240px;font-family:var(--font-mono)}
 th.todayh{color:var(--amber);font-weight:700}
 .wkhead{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text3);margin-bottom:10px;flex-wrap:wrap}
@@ -830,7 +835,7 @@ function renderLog(){
     ? (isToday?'Today · ':'')+cols[0].wd+' '+cols[0].d+' '+cols[0].mon
     : (cols.length>7?('Weeks of '+WK[selWeek]+' – '+WK[Math.min(selWeek+1,WK.length-1)]):('Week of '+WK[selWeek]));
   document.getElementById('logHint').innerHTML=
-    m==='plan' ? '<b>Setting the plan.</b> Enter the <b>Planned</b> season total (t) — Planted area is from Land Cloud (read-only) and <b>Yield</b> is calculated (Planned ÷ Planted). Then click the <b>harvest-window</b> chip to set start/peak/end/shape — the tool draws the curve. Two weeks shown; day cells can be hand-tweaked (edited cells get a green outline). Faint number = actual harvest.'+(product==='citrus'&&aeroHP.state==='ok'?(Object.keys(aeroHP.by).length>=Math.max(3,plots.length*0.1)?' <span style="color:var(--accent)">●</span> Under each window: Aerobotics TrueFruit fruit size now · peak size class at harvest start · “Aero” = the weeks Aerobotics forecasts size for (not your window).':(aeroHP.skipped?' <span style="color:var(--accent)">●</span> Aerobotics fruit sizes are for the coming harvest ('+aeroShort(aeroHP.skipped.s)+' onward) — open that season to see them under each window.':'')):'')
+    m==='plan' ? '<b>Setting the plan.</b> Enter the <b>Planned</b> season total (t) — Planted area is from Land Cloud (read-only) and <b>Yield</b> is calculated (Planned ÷ Planted). Then click the <b>harvest-window</b> chip to set start/peak/end/shape — the tool draws the curve. Two weeks shown; day cells can be hand-tweaked (edited cells get a green outline). Faint number = actual harvest.'+(product==='citrus'&&aeroHP.state==='ok'?(Object.keys(aeroHP.by).length>=Math.max(3,plots.length*0.1)?' <span style="color:var(--accent)">●</span> Under each window: Aerobotics TrueFruit fruit size now · peak size class at harvest start · Aero ±d = days Aerobotics’ forecast starts before/after this window (hover for dates).':(aeroHP.skipped?' <span style="color:var(--accent)">●</span> Aerobotics fruit sizes are for the coming harvest ('+aeroShort(aeroHP.skipped.s)+' onward) — open that season to see them under each window.':'')):'')
   : isToday ? '<b>Logging today.</b> Each plot\'s pick is split by destination — To Packhouse (vs plan), Field Sorting, Local Sales, Waste. <b>Blank = not logged yet</b>; type <b>0</b> for “no pick”. Rows = plots in window today or already logged today. Plan fields are read-only here.'
   : actView==='day' ? '<b>Logging a day.</b> Pick any date on the right; one column — type each plot\'s tonnes and press <b>Enter</b> (or ↓) for the next plot. Blank = not logged; 0 = no pick. Plan fields are read-only here.'
   :         '<b>Two-week overview.</b> Each cell is the day\'s <b>total pick</b> (all four destinations); the faint <b>PH</b> = the To-Packhouse portion. Tap any day to open its four-way split and log it. Row total = tonnes picked over the fortnight; <b>vs plan</b> tracks To Packhouse.';
@@ -845,7 +850,7 @@ function renderLog(){
     }
     updateDirtyBadge(); return;
   }
-  const NCOL=7+cols.length+2;
+  const AC=AERO_ON(); const NCOL=7+(AC?1:0)+cols.length+2;
   const wkLbl = (cols.length>7?'2-wk ':'')+(m==='plan'?'plan':(wk2act?'total':'harv'));
   const varLbl= m==='plan'?'':'vs plan';
   document.getElementById('cellLegend').innerHTML=
@@ -854,7 +859,7 @@ function renderLog(){
     `<span><b style="color:var(--text2)">big</b> = ${m==='plan'?'planned tonnes you\'re setting':'harvest tonnes you\'re logging'} · <b style="color:var(--text2)">small</b> = ${m==='plan'?'actual harvest, for reference':'the plan, for reference'} · <b style="color:var(--text2)">all values in tonnes (t)</b></span>`;
   let head=`<tr>
     <th class="frozen f0">Farm</th><th class="frozen f1">Plot</th><th class="frozen f2">Var.</th>
-    <th class="num hidecol">Planted</th><th class="num hidecol">Yield</th><th class="num hidecol">Planned</th><th class="hidecol wincol">Harvest window</th>`
+    <th class="num hidecol">Planted</th><th class="num hidecol">Yield</th><th class="num hidecol">Planned</th><th class="hidecol wincol">Harvest window</th>${AC?'<th class="hidecol aerocol" title="Aerobotics TrueFruit: fruit size at the last field visit · most common size class (count) forecast for harvest start · Aero ±d = how many days Aerobotics\u2019 forecast starts before (−) or after (+) this window">TrueFruit</th>':''}`
     +cols.map(c=>`<th class="dayh${c.wkStart?' wkstart':''}${isToday?' todayh':''}">${isToday?'Today · ':''}${c.wd}<br>${c.d}</th>`).join('')
     +`<th class="num">${wkLbl}</th><th class="num">${varLbl}</th></tr>`;
   const groups=logGroups();
@@ -908,16 +913,16 @@ function renderLog(){
         <td class="num hidecol">${areaCell}</td>
         <td class="num hidecol">${yldCell}</td>
         <td class="num hidecol">${plannedInputCell}</td>
-        <td class="hidecol wincol">${wchip}${aeroWinLine(i)}</td>
+        <td class="hidecol wincol">${wchip}</td>${AC?`<td class="hidecol aerocol">${aeroCell(i,w)}</td>`:''}
         ${cells}
         <td class="num" id="wp_${i}">${wkTot}</td>
         <td class="num">${m==='plan'?'':varCell}</td>
       </tr>`;
     });
     grandWk+=gwk;
-    body+=`<tr class="subtot"><td class="stlab" colspan="3">${g.key} — subtotal</td><td class="hidecol"></td><td class="hidecol"></td><td class="hidecol"></td><td class="hidecol"></td>`+gsum.map((s,c)=>`<td class="num${cols[c].wkStart?' wkstart':''}" id="st_${gi}_${c}">${s}</td>`).join('')+`<td class="num" id="stwk_${gi}">${gwk}</td><td></td></tr>`;
+    body+=`<tr class="subtot"><td class="stlab" colspan="3">${g.key} — subtotal</td><td class="hidecol"></td><td class="hidecol"></td><td class="hidecol"></td><td class="hidecol"></td>${AC?'<td class="hidecol"></td>':''}`+gsum.map((s,c)=>`<td class="num${cols[c].wkStart?' wkstart':''}" id="st_${gi}_${c}">${s}</td>`).join('')+`<td class="num" id="stwk_${gi}">${gwk}</td><td></td></tr>`;
   });
-  body+=`<tr class="grandtot"><td class="stlab" colspan="3">All plots — total per day</td><td class="hidecol"></td><td class="hidecol"></td><td class="hidecol"></td><td class="hidecol"></td>`+grand.map((s,c)=>`<td class="num${cols[c].wkStart?' wkstart':''}" id="gt_${c}">${s}</td>`).join('')+`<td class="num" id="gtwk">${grandWk}</td><td></td></tr>`;
+  body+=`<tr class="grandtot"><td class="stlab" colspan="3">All plots — total per day</td><td class="hidecol"></td><td class="hidecol"></td><td class="hidecol"></td><td class="hidecol"></td>${AC?'<td class="hidecol"></td>':''}`+grand.map((s,c)=>`<td class="num${cols[c].wkStart?' wkstart':''}" id="gt_${c}">${s}</td>`).join('')+`<td class="num" id="gtwk">${grandWk}</td><td></td></tr>`;
   {const _lt=document.getElementById('logTable'); _lt.style.width=''; _lt.innerHTML='<thead>'+head+'</thead><tbody>'+body+'</tbody>';}
   // banner (structural mode statement + today completeness)
   document.getElementById('modeBanner').innerHTML= m==='plan'
@@ -1433,6 +1438,16 @@ function aeroWinLine(i){
   if(!parts.length) return '';
   const tip='Aerobotics TrueFruit'+(a.md?' · last visit '+aeroShort(a.md)+': '+(a.m!=null?a.m.toFixed(1)+' mm':'—'):'')+(pk?' · most common size class at harvest start: '+pk.label+' ('+Math.round(pk.c)+'%)':'')+(a.ws?' · Aerobotics forecast weeks '+aeroShort(a.ws)+' → '+aeroShort(a.we)+' (chosen by Aerobotics, not this plan)':'');
   return `<div class="aeroline" title="${esc(tip)}"><span style="color:var(--accent)">●</span> ${parts.join(' · ')}</div>`;
+}
+// TrueFruit column in the plan grid: size now · harvest count (fcst) + timing gap vs this plot's window
+function aeroCell(i,w){
+  const p=plots[i], a=p&&aeroHP.by[p.blockId]; if(!a) return '<span class="aeromute">—</span>';
+  const pk=a.ranges&&a.ranges.length?a.ranges.reduce((x,r)=>r.c>x.c?r:x,a.ranges[0]):null;
+  let gap='';
+  if(a.ws&&w&&WKDATE[w.start]){ const d=Math.round((new Date(a.ws+'T00:00:00')-new Date(dateOf(w.start,0)+'T00:00:00'))/864e5);
+    if(Math.abs(d)>=7) gap=`<div class="aerogap ${d<0?'early':'late'}">Aero ${d>0?'+':'−'}${Math.abs(d)} d</div>`; }
+  const tip='Aerobotics TrueFruit'+(a.md?' · last visit '+aeroShort(a.md)+': '+(a.m!=null?a.m.toFixed(1)+' mm':'—'):'')+(pk?' · forecast harvest count '+pk.label+' ('+Math.round(pk.c)+'% of fruit)':'')+(a.ws?' · Aerobotics forecast weeks '+aeroShort(a.ws)+' → '+aeroShort(a.we)+' (chosen by Aerobotics, not this plan)':'');
+  return `<div class="aerocellin" title="${esc(tip)}"><div><b>${a.m!=null?a.m.toFixed(1)+' mm':'—'}</b>${pk?` · ct ${esc(pk.label)}`:''}</div>${gap}</div>`;
 }
 function aeroShort(iso){if(!iso)return '—';const d=new Date(iso+'T00:00:00');return d.getDate()+' '+MON[d.getMonth()];}
 function aeroPlotRem(i){const latest=sum(WK.map((_,w)=>sum(WD.map((__,d)=>dayPlan(i,w,d)))));return Math.max(0,latest-sumTo(getActual,i,CUR,CURDAY));}
