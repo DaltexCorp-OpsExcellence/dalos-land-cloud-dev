@@ -1798,13 +1798,15 @@ function FarmMapScreen(ctx){
     if(sampleRef.current&&map){ map.removeLayer(sampleRef.current); sampleRef.current=null; }
     setAeroSel(null);
     if(!sel) return;
-    var a=sizeMap[sel.id];
-    if(a&&a.samples&&a.samples.length&&map&&window.L){ var g=L.layerGroup();
-      a.samples.forEach(function(sp,i){ if(sp.latitude==null||sp.longitude==null) return;
+    var a=sizeMap[sel.id], alive=true, id=sel.id;
+    if(a&&map&&window.L) supabase.from('aero_fruit_measurements').select('measurement_date,sample_positions').eq('orchard_id',a.oid).not('sample_positions','is',null).order('measurement_date',{ascending:false}).limit(1).then(function(r){
+      var sps=(r.data&&r.data[0]&&r.data[0].sample_positions)||[]; if(!alive||!sps.length) return; var g=L.layerGroup();
+      sps.forEach(function(sp,i){ if(sp.latitude==null||sp.longitude==null) return;
         g.addLayer(L.circleMarker([sp.latitude,sp.longitude],{radius:6,color:'#fff',weight:2,fillColor:'#6d3fd4',fillOpacity:0.95})
           .bindTooltip('TrueFruit sample '+(i+1)+' · '+(sp.average_fruit_size_mm!=null?Number(sp.average_fruit_size_mm).toFixed(1)+' mm':'—')+' · '+(sp.count_fruit_measured||0)+' fruit')); });
-      g.addTo(map); sampleRef.current=g; }
-    var alive=true, id=sel.id; aeroBlockSummary([id]).then(function(m){ if(alive) setAeroSel(m[id]||{none:true}); });
+      if(sampleRef.current&&mapRef.current) mapRef.current.removeLayer(sampleRef.current);
+      g.addTo(mapRef.current); sampleRef.current=g; setAeroSel(function(cur){ return Object.assign({},cur||{},{nSamples:sps.length}); }); });
+    aeroBlockSummary([id]).then(function(m){ if(alive) setAeroSel(function(cur){ return Object.assign({},m[id]||{none:true},cur&&cur.nSamples?{nSamples:cur.nSamples}:{}); }); });
     return function(){ alive=false; };
   },[sel,sizeMap]);
   useEffect(function(){ if(mapRef.current) setBase(mapRef.current,basemap); },[basemap]);
@@ -2752,13 +2754,12 @@ function aeroCurve(cur,prev){
 var AERO_SIZEMAP=null;
 function aeroSizeMap(){
   if(AERO_SIZEMAP) return AERO_SIZEMAP;
-  AERO_SIZEMAP=supabase.from('aero_fruit_measurements').select('orchard_id,measurement_date,avg_size_mm,fruit_count,sample_positions').order('measurement_date',{ascending:false}).limit(5000).then(function(r){
-    if(r.error) return {};
-    var latest={}; (r.data||[]).forEach(function(x){ if(!latest[x.orchard_id]) latest[x.orchard_id]=x; }); var ids=Object.keys(latest);
+  AERO_SIZEMAP=plPaged(function(){ return supabase.from('aero_fruit_measurements').select('orchard_id,measurement_date,avg_size_mm,fruit_count').order('orchard_id').order('measurement_date',{ascending:false}); }).then(function(rows){
+    var latest={}; (rows||[]).forEach(function(x){ if(!latest[x.orchard_id]) latest[x.orchard_id]=x; }); var ids=Object.keys(latest);
     if(!ids.length) return {};
     return supabase.from('aero_block_links').select('block_id,orchard_id').eq('status','linked').in('orchard_id',ids).then(function(l){
       var out={}; (l.data||[]).forEach(function(x){ var m=latest[x.orchard_id]; if(!m) return; var cur=out[x.block_id];
-        if(!cur||m.measurement_date>cur.md) out[x.block_id]={oid:x.orchard_id,m:m.avg_size_mm!=null?Number(m.avg_size_mm):null,md:m.measurement_date,n:m.fruit_count,samples:m.sample_positions||[]}; });
+        if(!cur||m.measurement_date>cur.md) out[x.block_id]={oid:x.orchard_id,m:m.avg_size_mm!=null?Number(m.avg_size_mm):null,md:m.measurement_date,n:m.fruit_count}; });
       return out; });
   }).catch(function(){ AERO_SIZEMAP=null; return {}; });
   return AERO_SIZEMAP;
@@ -2773,7 +2774,7 @@ function aeroBlockSummary(blockIds){
     r.data.forEach(function(l){ var ha=Number(l.aero_orchards&&l.aero_orchards.hectares)||0, cur=byBlock[l.block_id]; if(!cur||ha>cur.ha) byBlock[l.block_id]={oid:l.orchard_id,ha:ha}; });
     var oids=Object.keys(byBlock).map(function(b){return byBlock[b].oid;});
     return Promise.all([
-      supabase.from('aero_fruit_measurements').select('orchard_id,measurement_date,avg_size_mm').in('orchard_id',oids).order('measurement_date',{ascending:false}).limit(2000),
+      plPaged(function(){ return supabase.from('aero_fruit_measurements').select('orchard_id,measurement_date,avg_size_mm').in('orchard_id',oids).order('orchard_id').order('measurement_date',{ascending:false}); }).then(function(d){ return {data:d}; }),
       supabase.from('aero_size_forecasts').select('orchard_id,processed_date,forecast_date,size_ranges').in('orchard_id',oids).not('size_ranges','is',null).order('processed_date',{ascending:false}).limit(2000)
     ]).then(function(rr){
       var meas={}, split={};
@@ -2816,10 +2817,10 @@ function aeroMapCard(a, sum){
     ce('div',{className:'kv'},
       kv('Fruit size', a&&a.m!=null?a.m.toFixed(1)+' mm':'—'),
       kv('Visit', a&&a.md?aeroD(a.md,true):'—'),
-      kv('Fruit · samples', a?((a.n||0)+' · '+((a.samples||[]).length)):'—'),
+      kv('Fruit · samples', a?((a.n||0)+' · '+((sum&&sum.nSamples)||'—')):'—'),
       kv('Peak at harvest', sum&&sum.peak?(sum.peak.label+' · '+Math.round(sum.peak.pct)+'%'):(sum?'—':'…')),
       kv('Forecast window', sum&&sum.ws?(aeroD(sum.ws)+' → '+aeroD(sum.we)):(sum?'—':'…'))),
-    (a&&a.samples&&a.samples.length)?ce('div',{className:'hint',style:{marginTop:8}},'Purple dots on the map are the TrueFruit sample points. Hover one for its size.'):null,
+    (sum&&sum.nSamples)?ce('div',{className:'hint',style:{marginTop:8}},'Purple dots on the map are the TrueFruit sample points. Hover one for its size.'):null,
     ce('div',{className:'hint',style:{marginTop:6}},'Full size split and forecast curve: Block Register → open this block.'));
 }
 
@@ -2834,7 +2835,7 @@ function AeroSection(p){
       if(!links.length){ set({loading:false,links:[]}); return; }
       var ids=links.map(function(l){return l.orchard_id;}), oid=ids[0];
       Promise.all([
-        supabase.from('aero_fruit_measurements').select('*').in('orchard_id',ids).order('measurement_date',{ascending:false}).limit(1),
+        supabase.from('aero_fruit_measurements').select('*').eq('orchard_id',oid).order('measurement_date',{ascending:false}).limit(400),
         supabase.from('aero_size_forecasts').select('processed_date,forecast_date,avg_size_mm,size_ranges').eq('orchard_id',oid).order('processed_date',{ascending:false}).order('forecast_date').limit(600)
       ]).then(function(rr){
         if(!alive) return;
@@ -2842,7 +2843,9 @@ function AeroSection(p){
         var fc=rr[1].data||[], runs={}; fc.forEach(function(f){ (runs[f.processed_date]=runs[f.processed_date]||[]).push(f); });
         var keys=Object.keys(runs).sort().reverse(), latest=keys[0]||null, prevKey=null;
         if(latest){ var cut=new Date(latest+'T00:00:00').getTime()-150*864e5; prevKey=keys.filter(function(k){return new Date(k+'T00:00:00').getTime()<=cut;})[0]||null; }
-        set({loading:false,links:links,meas:(rr[0].data||[])[0]||null,latest:latest,run:latest?runs[latest]:[],prev:prevKey?runs[prevKey]:[]});
+        var visits=rr[0].data||[], det=visits.filter(function(v){return v.size_dist;})[0]||null, last=visits[0]||null;
+        var meas=last?Object.assign({},last, det&&det.measurement_date===last.measurement_date?{}:{size_dist:det&&det.size_dist,blemish_dist:det&&det.blemish_dist,colour_dist:det&&det.colour_dist,sample_positions:det&&det.sample_positions,_detDate:det&&det.measurement_date}):null;
+        set({loading:false,links:links,meas:meas,visits:visits,latest:latest,run:latest?runs[latest]:[],prev:prevKey?runs[prevKey]:[]});
       });
     });
     return function(){ alive=false; };
@@ -2867,7 +2870,13 @@ function AeroSection(p){
       tile('Average size', m.avg_size_mm!=null?Number(m.avg_size_mm).toFixed(1)+' mm':'—', (m.fruit_count||0)+' fruit · '+((m.sample_positions||[]).length)+' sample points'),
       tile('Peak size class', peak?peak.label:'—', peak?(Number(peak.percentage).toFixed(1)+'% of fruit'):''),
       unb?tile('Unblemished', Number(unb.percentage).toFixed(1)+'%', 'of measured fruit'):null));
-    if(sd.length) out.push(ce('div',{key:'mb'}, ce('div',{style:{fontSize:11,color:'var(--text3)',marginBottom:6}},'Size split (class · diameter mm)'),
+    var vs=(st.visits||[]).filter(function(v){return v.avg_size_mm!=null;}).slice().reverse();
+    var cutoff=new Date(new Date(m.measurement_date+'T00:00:00').getTime()-300*864e5).toISOString().slice(0,10);
+    vs=vs.filter(function(v){return v.measurement_date>=cutoff;});     // this season's visits only
+    if(vs.length>1) out.push(ce('div',{key:'tr',style:{marginBottom:10}},
+      ce('div',{style:{fontSize:11,color:'var(--text3)',marginBottom:2}},'Size by visit — '+vs.length+' visits, '+aeroD(vs[0].measurement_date)+' → '+aeroD(vs[vs.length-1].measurement_date)),
+      aeroCurve(vs.map(function(v){return {d:v.measurement_date,v:Number(v.avg_size_mm)};}),[])));
+    if(sd.length) out.push(ce('div',{key:'mb'}, ce('div',{style:{fontSize:11,color:'var(--text3)',marginBottom:6}},'Size split (class · diameter mm)'+(m._detDate?' — from the '+aeroD(m._detDate)+' visit':'')),
       aeroBars(sd.map(function(r){return {label:r.label,pct:Number(r.percentage),sub:String(r.bin_range||'').replace(' - ','–')};}))));
     if((m.blemish_dist||[]).length||(m.colour_dist||[]).length) out.push(ce('div',{key:'bc',style:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:14,marginTop:10}},
       ce('div',null, ce('div',{style:{fontSize:11,color:'var(--text3)',marginBottom:5}},'Blemish'), aeroSeg(m.blemish_dist||[],AERO_BLEM,function(r){return r.label;})),

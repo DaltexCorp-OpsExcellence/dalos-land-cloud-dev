@@ -3,7 +3,8 @@
 // Auth: either the cron header x-sync-key (== Vault 'aero_sync_key') or a signed-in user for
 // whom farm_can_approve() is true ("Sync now" in Data Health). Deployed with verify_jwt=false
 // because the cron call carries no user JWT; both paths are checked here.
-// Incremental: grade details are fetched only for new (orchard, date) pairs; forecast size
+// Incremental: every TrueFruit visit since 2024 is stored (size, count, date); the detail call
+// (size split, blemish, colour, sample GPS) runs once per orchard's latest visit; forecast size
 // splits only for the first week of runs not yet stored.
 import { createClient } from "npm:@supabase/supabase-js@2.45.4";
 
@@ -82,6 +83,16 @@ Deno.serve(async (req) => {
       }
     };
     const now = new Date().toISOString();
+    // PostgREST caps a read at 1,000 rows — page every read of our own tables
+    const readAll = async (mk: () => any) => {
+      const out: any[] = [];
+      for (let from = 0; ; from += 1000) {
+        const { data, error } = await mk().range(from, from + 999);
+        if (error) throw new Error(error.message);
+        out.push(...(data || [])); if (!data || data.length < 1000) break;
+      }
+      return out;
+    };
 
     // 1. farms + orchards
     const farms = await all("/farms/");
@@ -98,33 +109,57 @@ Deno.serve(async (req) => {
     if (ids.length) await svc.from("aero_orchards").update({ active: false }).not("id", "in", `(${ids.join(",")})`);
     stats.farms = farms.length; stats.orchards = orchards.length;
 
-    // 2. TrueFruit measurements (size list for length/mass, grade detail for distributions)
-    const sizeList = await all("/truefruit/size/measurements/");
+    // 2. TrueFruit measurements. NOTE: without a date filter the API returns only the latest
+    //    processing batch (82 rows) — always pass measurement_date__gte to get the full history.
+    //    List-level fields (size, count, date) are stored for EVERY visit; the detail call
+    //    (size split, blemish, colour, sample GPS) only for each orchard's latest visit.
+    const SINCE = "measurement_date__gte=2024-01-01";
+    const sizeList = await all("/truefruit/size/measurements/?" + SINCE);
     const sizeBy = new Map(sizeList.map((m) => [m.orchard_id + "|" + m.measurement_date, m]));
-    const gradeList = await all("/truefruit/grade/measurements/");
-    const { data: have } = await svc.from("aero_fruit_measurements").select("orchard_id,measurement_date,processed_date").limit(20000);
-    const haveKey = new Set((have || []).map((h) => h.orchard_id + "|" + h.measurement_date + "|" + h.processed_date));
-    const todo = gradeList.filter((g) => !haveKey.has(g.orchard_id + "|" + g.measurement_date + "|" + g.processed_date));
-    const details = await pool(todo, 6, (g) => get(`/truefruit/grade/measurements/${g.orchard_id}/${g.measurement_date}/`));
-    const mRows = todo.map((g, i) => {
-      const d = details[i] || {}; const s: any = sizeBy.get(g.orchard_id + "|" + g.measurement_date) || {};
+    const gradeRaw = await all("/truefruit/grade/measurements/?" + SINCE);
+    const gMap = new Map<string, any>();            // API repeats some (orchard, date) rows — keep latest processing
+    for (const g of gradeRaw) {
+      const k = g.orchard_id + "|" + g.measurement_date, c = gMap.get(k);
+      if (!c || (g.processed_date || "") > (c.processed_date || "")) gMap.set(k, g);
+    }
+    const gradeList = [...gMap.values()];
+    await upsert("aero_fruit_measurements", gradeList.map((g) => {
+      const s: any = sizeBy.get(g.orchard_id + "|" + g.measurement_date) || {};
       return {
         orchard_id: g.orchard_id, measurement_date: g.measurement_date, processed_date: g.processed_date,
-        avg_size_mm: d.average_fruit_size_mm ?? g.average_fruit_size_mm, avg_length_mm: s.average_length_mm ?? null,
-        avg_mass_g: s.average_mass_g ?? null, fruit_count: d.count_fruit_measured ?? g.count_fruit_measured,
-        fruit_unit: d.fruit_unit ?? g.fruit_unit, size_dist: d.size_distribution ?? null,
-        blemish_dist: d.blemish_distribution ?? null, colour_dist: d.color_distribution ?? null,
-        sample_positions: d.sample_positions ?? null, synced_at: now,
+        avg_size_mm: g.average_fruit_size_mm ?? s.average_fruit_size_mm ?? null, avg_length_mm: s.average_length_mm ?? null,
+        avg_mass_g: s.average_mass_g ?? null, fruit_count: g.count_fruit_measured ?? s.count_fruit_measured ?? null,
+        fruit_unit: g.fruit_unit ?? null, synced_at: now,
       };
-    });
-    await upsert("aero_fruit_measurements", mRows, "orchard_id,measurement_date");
-    stats.measurements = gradeList.length; stats.measurements_new = mRows.length;
+    }), "orchard_id,measurement_date");
+    // latest visit per orchard → fetch its detail once (size split, blemish, colour, sample GPS)
+    const latestVisit = new Map<number, any>();
+    for (const g of gradeList) { const c = latestVisit.get(g.orchard_id); if (!c || g.measurement_date > c.measurement_date) latestVisit.set(g.orchard_id, g); }
+    const have = await readAll(() => svc.from("aero_fruit_measurements").select("orchard_id,measurement_date")
+      .not("size_dist", "is", null).order("orchard_id").order("measurement_date"));
+    const haveDetail = new Set(have.map((h) => h.orchard_id + "|" + h.measurement_date));
+    const todo = [...latestVisit.values()].filter((g) => !haveDetail.has(g.orchard_id + "|" + g.measurement_date));
+    const details = await pool(todo, 6, (g) => get(`/truefruit/grade/measurements/${g.orchard_id}/${g.measurement_date}/`));
+    for (let i = 0; i < todo.length; i++) {
+      const g = todo[i], d = details[i];
+      if (!d) continue;
+      const { error } = await svc.from("aero_fruit_measurements").update({
+        avg_size_mm: d.average_fruit_size_mm ?? g.average_fruit_size_mm, fruit_count: d.count_fruit_measured ?? g.count_fruit_measured,
+        size_dist: d.size_distribution ?? null, blemish_dist: d.blemish_distribution ?? null, colour_dist: d.color_distribution ?? null,
+        sample_positions: d.sample_positions ?? null,
+      }).eq("orchard_id", g.orchard_id).eq("measurement_date", g.measurement_date);
+      if (error) throw new Error("measurement detail: " + error.message);
+    }
+    stats.measurements = gradeList.length; stats.measurement_orchards = latestVisit.size; stats.measurements_new = todo.length;
 
     // 3. size forecasts (all weeks, avg size) + size split for the first week of each new run
-    const fc = await all("/truefruit/size/forecasts/");
-    const { data: haveSplit } = await svc.from("aero_size_forecasts").select("orchard_id,processed_date,forecast_date")
-      .not("size_ranges", "is", null).limit(20000);
-    const splitKey = new Set((haveSplit || []).map((h) => h.orchard_id + "|" + h.processed_date));
+    const fcRaw = await all("/truefruit/size/forecasts/?forecast_date__gte=2024-01-01");
+    const fMap = new Map<string, any>();             // API repeats some rows — dedupe on the table key
+    for (const f of fcRaw) fMap.set(f.orchard_id + "|" + f.processed_date + "|" + f.forecast_date, f);
+    const fc = [...fMap.values()];
+    const haveSplit = await readAll(() => svc.from("aero_size_forecasts").select("orchard_id,processed_date,forecast_date")
+      .not("size_ranges", "is", null).order("orchard_id").order("processed_date").order("forecast_date"));
+    const splitKey = new Set(haveSplit.map((h) => h.orchard_id + "|" + h.processed_date));
     await upsert("aero_size_forecasts", fc.map((f) => ({
       orchard_id: f.orchard_id, processed_date: f.processed_date, forecast_date: f.forecast_date,
       avg_size_mm: f.average_fruit_size_mm, synced_at: now,
