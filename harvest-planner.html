@@ -173,6 +173,9 @@ td.daycell.dtot2:hover{background:var(--bg2)}
 .aerocellin b{font-weight:600;color:var(--text)}
 .aerogap{font-size:10px;font-weight:600}.aerogap.early{color:var(--amber)}.aerogap.late{color:var(--accent)}
 .aeromute{color:var(--text3)}
+.aeroload{font-size:10px;font-style:italic;animation:aeropulse 1.2s ease-in-out infinite}
+@keyframes aeropulse{50%{opacity:.4}}
+@media(prefers-reduced-motion:reduce){.aeroload{animation:none}}
 .aeroline{font-size:10px;color:var(--text3);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:240px;font-family:var(--font-mono)}
 th.todayh{color:var(--amber);font-weight:700}
 .wkhead{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text3);margin-bottom:10px;flex-wrap:wrap}
@@ -850,7 +853,7 @@ function renderLog(){
     }
     updateDirtyBadge(); return;
   }
-  const AC=AERO_ON(); const NCOL=7+(AC?1:0)+cols.length+2;
+  const AC=AERO_ON()||(product==='citrus'&&aeroHP.state==='loading'); const NCOL=7+(AC?1:0)+cols.length+2;
   const wkLbl = (cols.length>7?'2-wk ':'')+(m==='plan'?'plan':(wk2act?'total':'harv'));
   const varLbl= m==='plan'?'':'vs plan';
   document.getElementById('cellLegend').innerHTML=
@@ -1399,6 +1402,7 @@ async function aeroEnsure(){
   const key=product+'|'+(SEASON&&SEASON.id)+'|'+plots.length;
   if(product!=='citrus'||aeroHP.key===key) return;
   aeroHP={key,state:'loading',by:{}};
+  if(page==='log'){ const ae=document.activeElement; if(!(ae&&/^(INPUT|TEXTAREA)$/.test(ae.tagName)&&ae.closest&&ae.closest('#logTable'))) renderLog(); }   // show the column in its loading state
   try{
     const ids=plots.map(p=>p.blockId).filter(Boolean), links=[];
     for(let i=0;i<ids.length;i+=150){const {data,error}=await SB.from('aero_block_links').select('block_id,orchard_id,aero_orchards(hectares)').eq('status','linked').in('block_id',ids.slice(i,i+150));if(error)throw error;links.push(...(data||[]));}
@@ -1426,7 +1430,11 @@ async function aeroEnsure(){
     if(aeroHP.key!==key)return; aeroHP={key,state:'ok',by,skipped};
   }catch(e){ if(aeroHP.key===key) aeroHP={key,state:'error',by:{},err:(e&&e.message)||String(e)}; console.warn('aerobotics',e); }
   if(page==='ov') renderOv();
-  else if(page==='log' && !(document.activeElement && /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName))) renderLog();   // don't redraw under the cursor while typing
+  else if(page==='log'){
+    const ae=document.activeElement, typing=ae && /^(INPUT|TEXTAREA)$/.test(ae.tagName) && ae.closest && ae.closest('#logTable');
+    if(!typing) renderLog();   // don't redraw under the cursor while typing in a grid cell…
+    else ae.addEventListener('blur',()=>{ if(page==='log') setTimeout(renderLog,0); },{once:true});   // …redraw as soon as they leave it
+  }
 }
 // one line under the harvest-window chip: TrueFruit size now · peak count · Aerobotics forecast weeks vs our window
 function aeroWinLine(i){
@@ -1441,6 +1449,7 @@ function aeroWinLine(i){
 }
 // TrueFruit column in the plan grid: size now · harvest count (fcst) + timing gap vs this plot's window
 function aeroCell(i,w){
+  if(aeroHP.state==='loading') return '<span class="aeromute aeroload">loading…</span>';
   const p=plots[i], a=p&&aeroHP.by[p.blockId]; if(!a) return '<span class="aeromute">—</span>';
   const pk=a.ranges&&a.ranges.length?a.ranges.reduce((x,r)=>r.c>x.c?r:x,a.ranges[0]):null;
   let gap='';
