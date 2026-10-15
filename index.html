@@ -841,7 +841,7 @@ function RegisterScreen(ctx){
     ce('div',null,
       ce('div',{className:'table-wrap'},
         ce('table',null,
-          ce('thead',null,ce('tr',null,['Aydi','Block ID','Crop','Farm','Variety','Breeder','Rootstock','Planting yr','Total fed','Planted fed','Last season','Aero ha','Cost ctr','Status'].concat(showAero?['Fruit size','Peak count','Size forecast']:[]).map(function(h){var numH={'Planting yr':1,'Total fed':1,'Planted fed':1,'Last season':1,'Aero ha':1,'Cost ctr':1,'Fruit size':1};return ce('th',{key:h,style:numH[h]?{textAlign:'right'}:null},h);}))),
+          ce('thead',null,ce('tr',null,['Aydi','Block ID','Crop','Farm','Variety','Breeder','Rootstock','Planting yr','Total fed','Planted fed','Last season','Aero ha','Cost ctr','Status'].concat(showAero?['Fruit size','Peak count','Harvest size forecast']:[]).map(function(h){var numH={'Planting yr':1,'Total fed':1,'Planted fed':1,'Last season':1,'Aero ha':1,'Cost ctr':1,'Fruit size':1};return ce('th',{key:h,style:numH[h]?{textAlign:'right'}:null},h);}))),
           ce('tbody',null, st.rows.map(function(b){
             return ce('tr',{key:b.id,className:'rowlink',onClick:function(){setSel(b);}},
               ce('td',{style:{whiteSpace:'nowrap'}}, ce('span',{className:'lot',style:{fontWeight:600}}, b.aydi_block_number||'—')),
@@ -2775,22 +2775,30 @@ function aeroBlockSummary(blockIds){
     var oids=Object.keys(byBlock).map(function(b){return byBlock[b].oid;});
     return Promise.all([
       plPaged(function(){ return supabase.from('aero_fruit_measurements').select('orchard_id,measurement_date,avg_size_mm').in('orchard_id',oids).order('orchard_id').order('measurement_date',{ascending:false}); }).then(function(d){ return {data:d}; }),
-      supabase.from('aero_size_forecasts').select('orchard_id,processed_date,forecast_date,size_ranges').in('orchard_id',oids).not('size_ranges','is',null).order('processed_date',{ascending:false}).limit(2000)
+      supabase.from('aero_size_forecasts').select('orchard_id,processed_date,forecast_date,size_ranges,avg_size_mm').in('orchard_id',oids).not('size_ranges','is',null).order('processed_date',{ascending:false}).limit(2000),
+      supabase.from('hp_plan').select('block_id,harvest_start,harvest_end,seasons(name)').in('block_id',Object.keys(byBlock)).not('harvest_start','is',null)
     ]).then(function(rr){
+      var plans={}; ((rr[2]&&rr[2].data)||[]).forEach(function(x){ (plans[x.block_id]=plans[x.block_id]||[]).push(x); });
       var meas={}, split={};
       (rr[0].data||[]).forEach(function(m){ if(!meas[m.orchard_id]) meas[m.orchard_id]=m; });
       (rr[1].data||[]).forEach(function(f){ if(!split[f.orchard_id]) split[f.orchard_id]=f; });
       var so=Object.keys(split), runs=so.map(function(o){return split[o].processed_date;}).filter(function(v,i,a){return a.indexOf(v)===i;});
-      var winQ=so.length ? plPaged(function(){ return supabase.from('aero_size_forecasts').select('orchard_id,processed_date,forecast_date').in('orchard_id',so).in('processed_date',runs).order('orchard_id').order('forecast_date'); }) : Promise.resolve([]);
+      var winQ=so.length ? plPaged(function(){ return supabase.from('aero_size_forecasts').select('orchard_id,processed_date,forecast_date,avg_size_mm').in('orchard_id',so).in('processed_date',runs).order('orchard_id').order('forecast_date'); }) : Promise.resolve([]);
       return winQ.then(function(rows){
         var win={};
         rows.forEach(function(x){ var sp=split[x.orchard_id]; if(!sp||sp.processed_date!==x.processed_date) return;
-          var w=win[x.orchard_id]=win[x.orchard_id]||{s:x.forecast_date,e:x.forecast_date}; if(x.forecast_date<w.s) w.s=x.forecast_date; if(x.forecast_date>w.e) w.e=x.forecast_date; });
+          var w=win[x.orchard_id]=win[x.orchard_id]||{s:x.forecast_date,e:x.forecast_date,ms:x.avg_size_mm,me:x.avg_size_mm};
+          if(x.forecast_date<=w.s){ w.s=x.forecast_date; w.ms=x.avg_size_mm; } if(x.forecast_date>=w.e){ w.e=x.forecast_date; w.me=x.avg_size_mm; } });
         var out={};
         Object.keys(byBlock).forEach(function(b){ var o=byBlock[b].oid, m=meas[o], sp=split[o], pk=null;
           if(sp&&sp.size_ranges) sp.size_ranges.forEach(function(x){ var v=Number(x.percentage_of_total_count); if(!pk||v>pk.pct) pk={label:x.label,pct:v}; });
           if(!m&&!sp) return;
-          out[b]={oid:o, m:m&&m.avg_size_mm!=null?Number(m.avg_size_mm):null, md:m?m.measurement_date:null, peak:pk, ws:win[o]&&win[o].s, we:win[o]&&win[o].e};
+          var w=win[o]||null, plan=null;
+          // our Harvest Planner window for the season that overlaps Aerobotics' forecast weeks
+          (plans[b]||[]).forEach(function(pl){ if(!w||(pl.harvest_start<=w.e&&(pl.harvest_end||pl.harvest_start)>=w.s)) plan=pl; });
+          out[b]={oid:o, m:m&&m.avg_size_mm!=null?Number(m.avg_size_mm):null, md:m?m.measurement_date:null, peak:pk,
+            ws:w&&w.s, we:w&&w.e, fms:w&&w.ms!=null?Number(w.ms):(sp&&sp.avg_size_mm!=null?Number(sp.avg_size_mm):null), fme:w&&w.me!=null?Number(w.me):null, run:sp&&sp.processed_date,
+            ps:plan&&plan.harvest_start, pe:plan&&plan.harvest_end, pseason:plan&&plan.seasons&&plan.seasons.name};
         });
         return out;
       });
@@ -2806,7 +2814,13 @@ function aeroRegisterCells(a, product){
       a.m!=null ? [ce('span',{key:'v'},a.m.toFixed(1)+' mm'), ce('div',{key:'d',style:{fontSize:10.5,color:'var(--text3)'}},aeroD(a.md))] : dash('No measurement yet')),
     ce('td',{key:'ap',style:{whiteSpace:'nowrap'},title:a.peak?'Most common size class expected at harvest start':null},
       a.peak ? [ce('span',{key:'l',className:'lot',style:{color:'var(--accent)'}},a.peak.label), ce('span',{key:'p',style:{fontSize:11,color:'var(--text3)',marginLeft:5}},Math.round(a.peak.pct)+'%')] : dash('No forecast yet')),
-    ce('td',{key:'aw',style:{whiteSpace:'nowrap',fontSize:12}}, a.ws ? aeroD(a.ws)+' → '+aeroD(a.we) : dash('No forecast yet'))
+    ce('td',{key:'aw',style:{whiteSpace:'nowrap',fontSize:12,lineHeight:1.35},
+        title:a.ws?('Aerobotics TrueFruit size forecast (run of '+aeroD(a.run,true)+'): average fruit size predicted week by week from '+aeroD(a.ws,true)+' to '+aeroD(a.we,true)+'. Aerobotics picks these weeks from the variety’s usual harvest period — they are not our Harvest Planner dates.'+(a.ps?' Our plan ('+(a.pseason||'')+'): '+aeroD(a.ps,true)+' → '+aeroD(a.pe,true)+'.':'')):null},
+      a.ws ? [
+        ce('div',{key:'s',style:{color:'var(--text)'}}, ce('b',{style:{fontWeight:600}}, a.fms!=null?a.fms.toFixed(1)+' mm':'—'), ' at '+aeroD(a.ws)+(a.fme!=null&&Math.abs(a.fme-a.fms)>=0.1?' → '+a.fme.toFixed(1)+' mm':'')),
+        ce('div',{key:'w',style:{fontSize:10.5,color:'var(--text3)'}}, 'Aerobotics: '+aeroD(a.ws)+' → '+aeroD(a.we)),
+        a.ps ? ce('div',{key:'p',style:{fontSize:10.5,color:'var(--accent)'}}, 'Our plan: '+aeroD(a.ps)+' → '+aeroD(a.pe)) : null
+      ] : dash('No forecast yet'))
   ];
 }
 
@@ -2819,7 +2833,8 @@ function aeroMapCard(a, sum){
       kv('Visit', a&&a.md?aeroD(a.md,true):'—'),
       kv('Fruit · samples', a?((a.n||0)+' · '+((sum&&sum.nSamples)||'—')):'—'),
       kv('Peak at harvest', sum&&sum.peak?(sum.peak.label+' · '+Math.round(sum.peak.pct)+'%'):(sum?'—':'…')),
-      kv('Forecast window', sum&&sum.ws?(aeroD(sum.ws)+' → '+aeroD(sum.we)):(sum?'—':'…'))),
+      kv('Aerobotics forecast', sum&&sum.ws?((sum.fms!=null?sum.fms.toFixed(1)+' mm · ':'')+aeroD(sum.ws)+' → '+aeroD(sum.we)):(sum?'—':'…')),
+      kv('Our plan', sum&&sum.ps?(aeroD(sum.ps)+' → '+aeroD(sum.pe)):(sum?'—':'…'))),
     (sum&&sum.nSamples)?ce('div',{className:'hint',style:{marginTop:8}},'Purple dots on the map are the TrueFruit sample points. Hover one for its size.'):null,
     ce('div',{className:'hint',style:{marginTop:6}},'Full size split and forecast curve: Block Register → open this block.'));
 }
@@ -2888,7 +2903,7 @@ function AeroSection(p){
   if(st.run&&st.run.length){
     var cur=st.run.filter(function(f){return f.avg_size_mm!=null;}).map(function(f){return {d:f.forecast_date,v:Number(f.avg_size_mm)};});
     var prev=(st.prev||[]).filter(function(f){return f.avg_size_mm!=null;}).map(function(f){return {d:f.forecast_date,v:Number(f.avg_size_mm)};});
-    out.push(title('Size forecast to harvest',' — run of '+aeroD(st.latest,true)));
+    out.push(title('Aerobotics size forecast',' — run of '+aeroD(st.latest,true)+' · weeks chosen by Aerobotics, not our Harvest Planner dates'));
     out.push(ce('div',{key:'fc'}, aeroCurve(cur,prev)));
     out.push(ce('div',{key:'fl',style:{display:'flex',gap:12,fontSize:11,color:'var(--text2)',margin:'0 0 10px'}},
       ce('span',null, ce('span',{style:{display:'inline-block',width:10,height:3,background:'var(--accent)',verticalAlign:'middle',marginRight:5}}),'This season'),
