@@ -2707,7 +2707,7 @@ function DataHealthScreen(ctx){
 /* ── Aerobotics (sync-aerobotics → aero_* tables): drawer section + Data Health link panel ── */
 var AERO_PRODUCT={'Table Grapes':'grapes','Orange':'citrus','Soft Citrus':'citrus','Lemon':'citrus','Grapefruit':'citrus','Mango':'mango','Pomegranate':'pomegranate'};
 var AERO_BLEM=['#1e6b3a','#7fb08a','#e8c87a','#d9822b','#b03030'];
-var AERO_COL=['#e8851a','#f0a83a','#e7c95a','#c9cf5e','#9cbf5a','#6fa64f','#4b8a45','#2e6b3a'];
+var AERO_COL=['#3f7d3a','#6f9b3e','#a3b444','#d2c24a','#e8b23f','#ea9a34','#e5802a','#d9661f'];   // TrueFruit colour stage 1 = green … 8 = full colour (verified on the data: stage rises toward harvest)
 function aeroD(iso,yr){ if(!iso) return '—'; var d=new Date(String(iso).length===10?iso+'T00:00:00':iso); return d.toLocaleDateString('en-GB',yr?{day:'numeric',month:'short',year:'numeric'}:{day:'numeric',month:'short'}); }
 function aeroDT(iso){ if(!iso) return '—'; var d=new Date(iso); return d.toLocaleDateString('en-GB',{day:'numeric',month:'short'})+' '+d.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}); }
 function aeroNorm(s){ return String(s||'').toLowerCase().replace(/lemon|valencia|orange/g,'').replace(/[^a-z]/g,''); }
@@ -2896,8 +2896,8 @@ function AeroSection(p){
     if(sd.length) out.push(ce('div',{key:'mb'}, ce('div',{style:{fontSize:11,color:'var(--text3)',marginBottom:6}},'Size split (class · diameter mm)'+(m._detDate?' — from the '+aeroD(m._detDate)+' visit':'')),
       aeroBars(sd.map(function(r){return {label:r.label,pct:Number(r.percentage),sub:String(r.bin_range||'').replace(' - ','–')};}))));
     if((m.blemish_dist||[]).length||(m.colour_dist||[]).length) out.push(ce('div',{key:'bc',style:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:14,marginTop:10}},
-      ce('div',null, ce('div',{style:{fontSize:11,color:'var(--text3)',marginBottom:5}},'Blemish'), aeroSeg(m.blemish_dist||[],AERO_BLEM,function(r){return r.label;})),
-      ce('div',null, ce('div',{style:{fontSize:11,color:'var(--text3)',marginBottom:5}},'Colour stage (Aerobotics 1–8)'), aeroSeg(m.colour_dist||[],AERO_COL,function(r){return 'stage '+r.label;}))));
+      ce('div',null, ce('div',{style:{fontSize:11,color:'var(--text3)',marginBottom:5},title:'Aerobotics blemish severity of the rind, in 5 steps: Unblemished, Slight, Moderate, Significant, Severe.'},'Blemish (rind marks)'), aeroSeg(m.blemish_dist||[],AERO_BLEM,function(r){return r.label;})),
+      ce('div',null, ce('div',{style:{fontSize:11,color:'var(--text3)',marginBottom:5},title:'Aerobotics colour stage of the rind: 1 = fully green, 8 = fully coloured. Fruit moves up the scale as it ripens.'},'Colour stage (1 green → 8 full colour)'), aeroSeg(m.colour_dist||[],AERO_COL,function(r){return 'stage '+r.label;}))));
   }
 
   if(st.run&&st.run.length){
