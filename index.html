@@ -2871,10 +2871,12 @@ function AeroSection(p){
       tile('Peak size class', peak?peak.label:'—', peak?(Number(peak.percentage).toFixed(1)+'% of fruit'):''),
       unb?tile('Unblemished', Number(unb.percentage).toFixed(1)+'%', 'of measured fruit'):null));
     var vs=(st.visits||[]).filter(function(v){return v.avg_size_mm!=null;}).slice().reverse();
-    var cutoff=new Date(new Date(m.measurement_date+'T00:00:00').getTime()-300*864e5).toISOString().slice(0,10);
-    vs=vs.filter(function(v){return v.measurement_date>=cutoff;});     // this season's visits only
+    // this crop only: walk back from the latest visit; fruit only grows within a crop, so a visit
+    // more than 5 mm BIGGER than the one after it belongs to last season's (pre-harvest) crop
+    var cropStart=vs.length-1; while(cropStart>0 && Number(vs[cropStart-1].avg_size_mm)<=Number(vs[cropStart].avg_size_mm)+5) cropStart--;
+    vs=vs.slice(cropStart);
     if(vs.length>1) out.push(ce('div',{key:'tr',style:{marginBottom:10}},
-      ce('div',{style:{fontSize:11,color:'var(--text3)',marginBottom:2}},'Size by visit — '+vs.length+' visits, '+aeroD(vs[0].measurement_date)+' → '+aeroD(vs[vs.length-1].measurement_date)),
+      ce('div',{style:{fontSize:11,color:'var(--text3)',marginBottom:2}},'Size by visit, this crop — '+vs.length+' visits, '+aeroD(vs[0].measurement_date,true)+' → '+aeroD(vs[vs.length-1].measurement_date)),
       aeroCurve(vs.map(function(v){return {d:v.measurement_date,v:Number(v.avg_size_mm)};}),[])));
     if(sd.length) out.push(ce('div',{key:'mb'}, ce('div',{style:{fontSize:11,color:'var(--text3)',marginBottom:6}},'Size split (class · diameter mm)'+(m._detDate?' — from the '+aeroD(m._detDate)+' visit':'')),
       aeroBars(sd.map(function(r){return {label:r.label,pct:Number(r.percentage),sub:String(r.bin_range||'').replace(' - ','–')};}))));
