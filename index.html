@@ -1674,7 +1674,7 @@ function FarmMapScreen(ctx){
   var sry=useState(false); var seriesReady=sry[0],setSeriesReady=sry[1]; // per-block production series done paging in
   var bmp=useState({}); var brMap=bmp[0],setBrMap=bmp[1];   // variety name (lower) -> breeder name; v_farm_block_geom carries variety as text
   var szm=useState({}); var sizeMap=szm[0],setSizeMap=szm[1];   // block_id -> latest TrueFruit visit (Aerobotics)
-  var sizeRef=React.useRef({}), sampleRef=React.useRef(null);
+  var sizeRef=React.useRef({}), sampleRef=React.useRef(null), flyingRef=React.useRef(false);   // flying = map zoom/pan animation in progress
   var asu=useState(null); var aeroSel=asu[0],setAeroSel=asu[1];   // forecast summary for the selected block
   useEffect(function(){ aeroSizeMap().then(function(m){ sizeRef.current=m||{}; setSizeMap(m||{}); }); },[]);
   useEffect(function(){ supabase.from('varieties').select('name,breeders(name)').then(function(r){
@@ -1733,7 +1733,7 @@ function FarmMapScreen(ctx){
       onEachFeature:function(f,lyr){ var p=f.properties;
         lyr.on('mouseover',function(e){ lyr.setStyle({weight:2.4,fillOpacity:0.82}); lyr.bringToFront(); showHover(p,e.originalEvent); });
         lyr.on('mouseout',function(){ var dim=mode==='size'&&!(sizeRef.current[p.id]&&sizeRef.current[p.id].m!=null); lyr.setStyle({weight:1.2,fillOpacity:dim?0.04:0.62}); hideHover(); });
-        lyr.on('click',function(){ selectBlock(p); try{ map.flyToBounds(lyr.getBounds(),{maxZoom:17,padding:[40,40],duration:0.6}); }catch(e){} });
+        lyr.on('click',function(){ selectBlock(p); try{ flyingRef.current=true; map.once('moveend',function(){ flyingRef.current=false; }); map.flyToBounds(lyr.getBounds(),{maxZoom:17,padding:[40,40],duration:0.6}); }catch(e){ flyingRef.current=false; } });
         try{ labels.addLayer(L.marker(lyr.getBounds().getCenter(),{interactive:false,icon:L.divIcon({className:'',html:'<div class="lbl-div">'+(p.aydi_block_number||'')+'</div>',iconSize:[0,0]})})); }catch(e){}
       }});
     layer.addTo(map); layerRef.current=layer; labels.addTo(map); labelRef.current=labels;
@@ -1744,6 +1744,9 @@ function FarmMapScreen(ctx){
     if(!window.L){ set({loading:false,err:'Map library failed to load.',feats:[]}); return; }
     var map=L.map(boxRef.current,{preferCanvas:false,attributionControl:true}).setView([30.3,30.9],10);
     mapRef.current=map; setBase(map,'sat'); setSel(null); setPlot(null); setCov(null);
+    // Leaflet only re-measures on window resize; when the map box itself changes size (side panel filling,
+    // scrollbar, layout settling) tiles + plot fills stay sized to the old box → grey squares / fills cut off
+    var ro=null; try{ if(window.ResizeObserver){ ro=new ResizeObserver(function(){ if(mapRef.current) mapRef.current.invalidateSize({pan:false}); }); ro.observe(boxRef.current); } }catch(e){}
     // hand-drawn polygons (leaflet-draw): measure area, include in export
     try{ drawnRef.current=L.featureGroup().addTo(map);
       if(L.Draw){ map.on(L.Draw.Event.CREATED, function(e){
@@ -1793,10 +1796,10 @@ function FarmMapScreen(ctx){
       lr.data.forEach(function(e){ var pr=e.parent||{}; (mp[e.child_block_id]=mp[e.child_block_id]||[]).push({ pid:e.parent_block_id, event:e.event_type, variety:(pr.varieties&&pr.varieties.name)||'unknown', from:pr.planting_year, to:pr.last_producing_season }); });
       lineageRef.current=mp;
     });
-    return function(){ if(mapRef.current){ mapRef.current.remove(); mapRef.current=null; } };
+    return function(){ try{ if(ro) ro.disconnect(); }catch(e){} if(mapRef.current){ mapRef.current.remove(); mapRef.current=null; } };
   },[ctx.crop]);
 
-  useEffect(function(){ buildLayer(true); },[ctx.map.farm]);
+  useEffect(function(){ setSel(null); setPlot(null); buildLayer(true); },[ctx.map.farm]);   // new farm → clear the old selection
   useEffect(function(){ buildLayer(false); },[ctx.map.mode,ctx.map.off]);
   useEffect(function(){ if(ctx.map.mode==='size') buildLayer(false); },[sizeMap]);
   // TrueFruit: sample points + forecast summary for the selected block
@@ -1810,8 +1813,13 @@ function FarmMapScreen(ctx){
       sps.forEach(function(sp,i){ if(sp.latitude==null||sp.longitude==null) return;
         g.addLayer(L.circleMarker([sp.latitude,sp.longitude],{radius:6,color:'#fff',weight:2,fillColor:'#6d3fd4',fillOpacity:0.95})
           .bindTooltip('TrueFruit sample '+(i+1)+' · '+(sp.average_fruit_size_mm!=null?Number(sp.average_fruit_size_mm).toFixed(1)+' mm':'—')+' · '+(sp.count_fruit_measured||0)+' fruit')); });
-      if(sampleRef.current&&mapRef.current) mapRef.current.removeLayer(sampleRef.current);
-      g.addTo(mapRef.current); sampleRef.current=g; setAeroSel(function(cur){ return Object.assign({},cur||{},{nSamples:sps.length}); }); });
+      // add only once the map has stopped moving: adding SVG shapes mid-zoom leaves Leaflet's renderer sized to an
+      // in-between view, which clips every plot fill along a straight line until the next pan
+      function addSamples(){ var mp=mapRef.current; if(!alive||!mp) return;
+        if(sampleRef.current) mp.removeLayer(sampleRef.current);
+        g.addTo(mp); sampleRef.current=g; }
+      if(flyingRef.current&&mapRef.current) mapRef.current.once('moveend',function(){ setTimeout(addSamples,0); }); else addSamples();
+      setAeroSel(function(cur){ return Object.assign({},cur||{},{nSamples:sps.length}); }); });
     aeroBlockSummary([id]).then(function(m){ if(alive) setAeroSel(function(cur){ return Object.assign({},m[id]||{none:true},cur&&cur.nSamples?{nSamples:cur.nSamples}:{}); }); });
     return function(){ alive=false; };
   },[sel,sizeMap]);
