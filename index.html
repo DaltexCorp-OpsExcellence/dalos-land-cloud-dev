@@ -178,6 +178,10 @@ tr:last-child td{border-bottom:none}
 .chip.active .cnt{background:rgba(255,255,255,.2);color:#fff}
 .pager{display:flex;gap:8px;align-items:center;justify-content:flex-end;margin-top:10px;font-size:12px;color:var(--text3)}
 tr.rowlink{cursor:pointer}
+/* Block Register: the table scrolls inside its own box so the header row can stay pinned */
+.reg-scroll{max-height:calc(100vh - 250px);min-height:320px;overflow:auto}
+.reg-scroll thead th{position:sticky;top:0;z-index:2;background:var(--card);box-shadow:inset 0 -2px 0 var(--border2)}
+@media (max-width:767px){.reg-scroll{max-height:none;min-height:0}}
 tr.rowlink:hover td{background:var(--bg)}
 
 /* Slide-over / bottom sheet (§6.3) */
@@ -839,7 +843,7 @@ function RegisterScreen(ctx){
     st.loading ? ce(Loading,{rows:8}) :
     st.rows.length===0 ? ce('div',{className:'card'},ce(EmptyState,{title:'No blocks match',msg:(search||chip||farmF)?'Try clearing the search, chip, or farm filter.':'The register is empty for this crop.',action:(search||chip||farmF)?'Clear filters':null,onAction:function(){setSearch('');setChip(null);setFarmF('');}})) :
     ce('div',null,
-      ce('div',{className:'table-wrap'},
+      ce('div',{className:'table-wrap reg-scroll'},
         ce('table',null,
           ce('thead',null,ce('tr',null,['Aydi','Block ID','Crop','Farm','Variety','Breeder','Rootstock','Planting yr','Total fed','Planted fed','Last season','Aero ha','Cost ctr','Status'].concat(showAero?['Fruit size','Coloured','Clean','Peak count','Harvest size forecast']:[]).map(function(h){var numH={'Planting yr':1,'Total fed':1,'Planted fed':1,'Last season':1,'Aero ha':1,'Cost ctr':1,'Fruit size':1,'Coloured':1,'Clean':1};return ce('th',{key:h,style:numH[h]?{textAlign:'right'}:null},h);}))),
           ce('tbody',null, st.rows.map(function(b){
