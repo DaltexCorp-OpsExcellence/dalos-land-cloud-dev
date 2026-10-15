@@ -853,7 +853,7 @@ function renderLog(){
     }
     updateDirtyBadge(); return;
   }
-  const AC=AERO_ON()||(product==='citrus'&&aeroHP.state==='loading'); const NCOL=7+(AC?1:0)+cols.length+2;
+  const AC=(AERO_ON()&&Object.keys(aeroHP.by).length>=Math.max(3,plots.length*0.1))||(product==='citrus'&&aeroHP.state==='loading'); const NCOL=7+(AC?1:0)+cols.length+2;
   const wkLbl = (cols.length>7?'2-wk ':'')+(m==='plan'?'plan':(wk2act?'total':'harv'));
   const varLbl= m==='plan'?'':'vs plan';
   document.getElementById('cellLegend').innerHTML=
