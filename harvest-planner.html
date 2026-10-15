@@ -1508,7 +1508,17 @@ function aeroPackHTML(A){
       ${useT?`<td class="num">${Math.round(g.remCov).toLocaleString()}</td><td class="num">${a.rem?Math.round(g.remCov/a.rem*100):0}%</td>`:`<td class="num">${fmt1(sum(plots.filter(p=>p.v===a.v&&aeroHP.by[p.blockId]&&aeroHP.by[p.blockId].ranges).map(p=>p.area)))}</td><td class="num">${a.area?Math.round(sum(plots.filter(p=>p.v===a.v&&aeroHP.by[p.blockId]&&aeroHP.by[p.blockId].ranges).map(p=>p.area))/a.area*100):0}%</td>`}</tr>`;}).join('');
   const all=[];rows.forEach(({g})=>g.order.forEach(l=>{if(all.indexOf(l)<0)all.push(l);}));
   return `<div class="sec-title">Expected pack-out by count <span class="r">${useT?'tonnes (forecast)':'share of fruit weight — no plan tonnes yet'}</span></div>
-    <div class="hint">Aerobotics TrueFruit forecast for each plot’s first harvest week${useT?' × remaining plan tonnes':''}, split by fruit weight. Darker = bigger fruit (lower count); grey = over/undersize. ${useT?'':'Tonnes per count appear once plan tonnes are entered.'} Under each variety: how many of its plots have a forecast.</div>
+    <div class="hint">Aerobotics TrueFruit forecast for each plot’s first harvest week${useT?' × remaining plan tonnes':''}, split by fruit weight. Darker = bigger fruit (lower count); grey = over/undersize. ${useT?'':'Tonnes per count appear once plan tonnes are entered.'} Under each variety: how many of its plots have a forecast. The number on each band is its <b>count code</b> — fruit per standard carton, so a lower number = bigger fruit.</div>
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:4px 0 12px;font:500 11px var(--font-mono);color:var(--text2)">
+      <span style="color:var(--text3)">COLOUR =</span>
+      <span>bigger fruit</span>
+      <span style="color:var(--text3)">(low count)</span>
+      <span style="display:inline-block;width:150px;height:12px;border-radius:3px;border:1px solid var(--border);background:linear-gradient(90deg,#0d4f4c,#2f7d6b,#7fb08a,#cfd9a6,#f3ead2)"></span>
+      <span style="color:var(--text3)">(high count)</span>
+      <span>smaller fruit</span>
+      <span style="display:inline-block;width:16px;height:12px;border-radius:3px;border:1px solid var(--border);background:var(--border2);margin-left:10px"></span>
+      <span>over / undersize</span>
+    </div>
     <div class="table-wrap"><table><tr><th style="min-width:170px">Variety</th><th style="width:60%">${useT?'Split of remaining tonnes by count':'Split of fruit weight by count'}</th><th class="num">${useT?'Remaining t covered':'Area covered (fed)'}</th><th class="num">Coverage</th></tr>${body}</table></div>
     <details style="margin-top:8px"><summary style="cursor:pointer;font-size:12px;color:var(--accent)">${useT?'Tonnes per count, by variety':'% of fruit weight per count, by variety'}</summary>
       <div class="table-wrap" style="margin-top:6px"><table><tr><th class="frozen f0">Variety</th>${all.map(l=>`<th class="num">${esc(l)}</th>`).join('')}</tr>
