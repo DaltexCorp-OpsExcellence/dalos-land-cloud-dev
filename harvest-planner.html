@@ -99,6 +99,8 @@ tr.subtot .num{text-align:right}
 tr.subtot .stlab{position:sticky;left:0;background:#edeae4;text-transform:uppercase;letter-spacing:.04em;font-size:10px;color:#5a564a}
 tr.grandtot td{background:#38352f;font-weight:700;color:#fff;font-size:12px;padding:4px 10px}
 tr.grandtot .num{text-align:right;color:#fff}
+/* Season Overview: center every column under its header (heatmap .cal excluded) */
+#page-ov table:not(.cal) th,#page-ov table:not(.cal) td{text-align:center}
 tr.grandtot .stlab{position:sticky;left:0;background:#38352f;color:#fff;text-transform:uppercase;letter-spacing:.04em;font-size:10px}
 .tot td{background:var(--bg2);font-weight:600;color:var(--text)}
 .pill{display:inline-flex;align-items:center;border-radius:20px;padding:1px 7px;font-size:10px;font-weight:500;border:1px solid;white-space:nowrap}
@@ -577,7 +579,7 @@ body.present .diff-row{font-size:15px}
 const WD=["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
 const MON=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 let WK=[], WKDATE=[], CUR=0, CURDAY=3;
-let selWeek=0, page='log', editMode='plan';
+let selWeek=0, page='log', editMode='plan', dataLoading=false;
 let plots=[], farmsList=[], SEASON=null, SEASONS=[], canWrite=false, seasonHasPlan=true;
 let product='citrus';
 const PRODUCT_LABEL={citrus:'Citrus',grapes:'Grapes',mango:'Mango',pomegranate:'Pomegranate'};
@@ -1314,7 +1316,7 @@ function offPlanRender(){
     const btns = x.status==='unreviewed'
       ? `<button class="btn btn-sec btn-sm" onclick="reviewOffPlan(${x.i},${x.w},${x.d},'off_plan_confirmed')">✓ Genuine</button> <button class="btn btn-sec btn-sm" onclick="reviewOffPlan(${x.i},${x.w},${x.d},'data_error')">⚑ Error</button>`
       : `<button class="btn btn-sec btn-sm" onclick="reviewOffPlan(${x.i},${x.w},${x.d},'clear')">Undo</button>`;
-    return `<tr><td>${chip(x.status)}</td><td><span class="plot">${x.p}</span></td><td>${x.v}</td><td>${x.f}</td><td>${dowLabel(x.w,x.d)}</td><td class="num">${x.t} t</td><td style="text-align:right">${btns}</td></tr>`;
+    return `<tr><td>${chip(x.status)}</td><td><span class="plot">${x.p}</span></td><td>${x.v}</td><td>${x.f}</td><td>${dowLabel(x.w,x.d)}</td><td class="num">${x.t} t</td><td>${btns}</td></tr>`;
   }).join('');
   box.innerHTML=`<div class="table-wrap"><table>
     <tr><th>Status</th><th>Plot</th><th>Variety</th><th>Farm</th><th>Day</th><th class="num">Picked</th><th></th></tr>
@@ -1534,7 +1536,7 @@ function setPage(p){page=p;
   document.getElementById('page-ov').classList.toggle('active',p==='ov');
   document.getElementById('page-rev').classList.toggle('active',p==='rev');
   document.getElementById('page-trk').classList.toggle('active',p==='trk');
-  if(p==='ov')renderOv();
+  if(p==='ov'){ if(dataLoading||!plots.length)showOvSkeleton(); else renderOv(); }
   if(p==='rev')renderRevList();
   if(p==='trk')renderTrucks();
 }
@@ -1706,6 +1708,16 @@ function showGridSkeleton(){
   for(let i=0;i<11;i++){ const w=[92,86,78,90,72,88,94,80,84,76,90][i]; rows+=`<tr><td style="padding:6px"><span class="skel" style="display:block;height:22px;width:${w}%"></span></td></tr>`; }
   t.innerHTML='<tbody>'+rows+'</tbody>';
 }
+// shimmer rows for the Season Overview tables while live data is still loading
+function skelRows(cols,n){let r='';const ws=[60,50,44,52,46,56,48,54,42,50,46,52];
+  for(let i=0;i<n;i++){r+='<tr>'+Array.from({length:cols}).map((_,c)=>`<td style="padding:8px 12px"><span class="skel" style="height:13px;width:${ws[c%ws.length]}%"></span></td>`).join('')+'</tr>';}
+  return r;}
+function showOvSkeleton(){
+  const set=(id,cols,n)=>{const el=document.getElementById(id);if(el)el.innerHTML=skelRows(cols,n);};
+  set('ovWatch',7,4); set('ovVar',12,8); set('ovPlot',9,10);
+  const pk=document.getElementById('ovPack');
+  if(pk)pk.innerHTML='<div class="sec-title">Expected pack-out by count <span class="r">loading…</span></div><div class="table-wrap"><table>'+skelRows(4,6)+'</table></div>';
+}
 async function boot(){
   let session=null; try{session=(await SB.auth.getSession()).data.session;}catch(e){}
   if(!session){authGate();return;}
@@ -1774,6 +1786,7 @@ async function startSeason(){
 }
 async function loadSeason(season){
   SEASON=season;
+  dataLoading=true; if(page==='ov')showOvSkeleton();   // show skeletons while the season's live data loads
   clearSeasonStores();
   {
     const [bR,pR,pdR,adR,tkR,rvR]=await Promise.all([
@@ -1813,6 +1826,7 @@ async function loadSeason(season){
   buildSeasonPicker();
   syncChrome();
   renderLog();
+  dataLoading=false;
   if(page==='ov')renderOv(); else if(page==='trk')renderTrucks(); else if(page==='rev')renderRevList();
   updateDirtyBadge();
 }
