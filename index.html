@@ -3049,7 +3049,7 @@ function AeroHealth(p){
   return ce('div',{className:'card',style:{marginTop:10}},
     ce('div',{style:{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap',marginBottom:10}},
       ce('div',{className:'section-title',style:{margin:0}},ce('span',{className:'section-title-bar'}),'Aerobotics link'+(crop?' — '+crop:'')),
-      ce('span',{style:{fontSize:12,color:'var(--text3)'}}, last?('Last sync '+aeroDT(last.started_at)+' · '+(last.ok===true?'ok':(last.ok===false?'failed':'running'))+(stats.orchards!=null?' · '+stats.orchards+' orchards · '+(stats.measurements||0)+' fruit visits · '+(stats.forecasts||0)+' forecast weeks':'')):'Never synced'),
+      ce('span',{style:{fontSize:12,color:'var(--text3)'}}, last?('Last sync '+aeroDT(last.started_at)+' · '+(last.ok===true?'ok':(last.ok===false?'failed':'running'))+(stats.orchards!=null?' · '+stats.orchards+' orchards · '+(stats.measurements||0)+' visits checked · '+(stats.forecasts||0)+' forecast weeks':'')):'Never synced'),
       ctx.canWrite?ce('button',{className:'btn btn-secondary btn-sm',style:{marginLeft:'auto'},disabled:syncing==='Syncing… this takes up to a minute',onClick:syncNow},syncing==='Syncing… this takes up to a minute'?'Syncing…':'Sync now'):null),
     undo?ce('div',{className:'ok-band',style:{display:'flex',alignItems:'center',gap:10,marginTop:0}}, ce('span',null,undo.msg||'Saved.'),
       ce('button',{className:'btn btn-secondary btn-sm',style:{marginLeft:'auto'},onClick:function(){ var o=undo.oid; setUndo(null); saveLink(o,null,'auto'); }},'Undo'),
