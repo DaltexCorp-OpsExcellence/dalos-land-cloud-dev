@@ -181,6 +181,9 @@ tr.rowlink{cursor:pointer}
 /* Block Register: the table scrolls inside its own box so the header row can stay pinned */
 .reg-scroll{max-height:calc(100vh - 250px);min-height:320px;overflow:auto}
 .reg-scroll thead th{position:sticky;top:0;z-index:2;background:var(--card);box-shadow:inset 0 -2px 0 var(--border2)}
+.reg-scroll th:first-child,.reg-scroll td:first-child{position:sticky;left:0;z-index:1;background:var(--card);box-shadow:inset -1px 0 0 var(--border)}
+.reg-scroll thead th:first-child{z-index:3;box-shadow:inset -1px 0 0 var(--border),inset 0 -2px 0 var(--border2)}
+.reg-scroll tr.rowlink:hover td:first-child{background:var(--bg)}
 @media (max-width:767px){.reg-scroll{max-height:none;min-height:0}}
 tr.rowlink:hover td{background:var(--bg)}
 
@@ -845,11 +848,10 @@ function RegisterScreen(ctx){
     ce('div',null,
       ce('div',{className:'table-wrap reg-scroll'},
         ce('table',null,
-          ce('thead',null,ce('tr',null,['Aydi','Block ID','Crop','Farm','Variety','Breeder','Rootstock','Planting yr','Total fed','Planted fed','Last season','Aero ha','Cost ctr','Status'].concat(showAero?['Fruit size','Coloured','Clean','Peak count','Harvest size forecast']:[]).map(function(h){var numH={'Planting yr':1,'Total fed':1,'Planted fed':1,'Last season':1,'Aero ha':1,'Cost ctr':1,'Fruit size':1,'Coloured':1,'Clean':1};return ce('th',{key:h,style:numH[h]?{textAlign:'right'}:null},h);}))),
+          ce('thead',null,ce('tr',null,['Aydi','Crop','Farm','Variety','Breeder','Rootstock','Planting yr','Total fed','Planted fed','Last season','Aero ha','Cost ctr','Status'].concat(showAero?['Fruit size','Coloured','Clean','Peak count','Harvest size forecast']:[]).map(function(h){var numH={'Planting yr':1,'Total fed':1,'Planted fed':1,'Last season':1,'Aero ha':1,'Cost ctr':1,'Fruit size':1,'Coloured':1,'Clean':1};return ce('th',{key:h,style:numH[h]?{textAlign:'right'}:null},h);}))),
           ce('tbody',null, st.rows.map(function(b){
             return ce('tr',{key:b.id,className:'rowlink',onClick:function(){setSel(b);}},
-              ce('td',{style:{whiteSpace:'nowrap'}}, ce('span',{className:'lot',style:{fontWeight:600}}, b.aydi_block_number||'—')),
-              ce('td',{style:{whiteSpace:'nowrap'}}, ce('span',{className:'lot',style:{color:'var(--text3)'},title:'Operational block ID'}, b.operational_block_id)),
+              ce('td',{style:{whiteSpace:'nowrap'},title:'Block ID '+(b.operational_block_id||'—')}, ce('span',{className:'lot',style:{fontWeight:600}}, b.aydi_block_number||'—')),
               ce('td',null, ce('span',{style:{display:'inline-block',width:8,height:8,borderRadius:2,background:CROP_COLORS[b.product_id]||'#999',marginRight:6}}), b.product_id),
               ce('td',null, (b.farms&&b.farms.name)||b.farm_code),
               ce('td',{className:'ar',dir:'auto'}, (b.varieties&&b.varieties.name)||'—'),
