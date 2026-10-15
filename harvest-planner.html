@@ -421,6 +421,8 @@ body.present .diff-row{font-size:15px}
       <div class="sec-title">By variety <span class="r">mirrors the planning sheet — budget → estimates → latest → actuals</span></div>
       <div class="table-wrap"><table id="ovVar"></table></div>
 
+      <div id="ovPack"></div>
+
       <div class="sec-title">By plot <span class="r">the detail rows behind each variety</span></div>
       <div class="table-wrap logwrap"><table id="ovPlot"></table></div>
     </div>
@@ -1352,20 +1354,20 @@ function renderOv(){
   calBody+=`<tr>`+totW.map((v,i)=>{const h=heatRow(v,tmx);const past=i<=CUR;return `<td class="hcell" style="background:${h.bg};color:${h.c};font-weight:600">${past?`<b>${totA[i]||''}</b><small>/${v||0}</small>`:(v||'')}</td>`}).join('')+`</tr>`;
   document.getElementById('ovCal').innerHTML=calHead+calBody;
   // variety table — this-week columns first, estimates history at the end
-  let vh=`<tr><th class="frozen f0">Variety</th><th class="num">Plots</th><th class="num">Plan wk</th><th class="num">Actual wk</th><th class="num">Δ wk</th><th class="num">Next 2 wks</th><th class="num">Season plan</th><th class="num">Harvested</th><th class="num">% done</th><th class="num">Pace Δ</th><th class="num">Remaining</th><th class="num">Plan t/fed</th></tr>`;
+  let vh=`<tr><th class="frozen f0">Variety</th><th class="num">Plots</th><th class="num">Plan wk</th><th class="num">Actual wk</th><th class="num">Δ wk</th><th class="num">Next 2 wks</th><th class="num">Season plan</th><th class="num">Harvested</th><th class="num">% done</th><th class="num">Pace Δ</th><th class="num">Remaining</th><th class="num">Plan t/fed</th>${AERO_ON()?'<th class="num" title="Aerobotics TrueFruit — latest field visit, plan-weighted">Fruit size</th><th title="Most common size class expected at harvest start (TrueFruit forecast)">Peak count</th><th title="Weeks covered by the latest TrueFruit size forecast">Size forecast</th>':''}</tr>`;
   const dchip=(v,base)=>{const on=Math.abs(v)<Math.max(3,base*0.06);const cls=on?'v-on':(v>0?'v-over':'v-under');return `<span class="varcell ${cls}">${on?'on':(v>0?'+':'')+Math.round(v)}</span>`;};
   let vb=A.map(a=>`<tr>
     <td class="frozen f0"><span class="vname">${a.v}</span></td><td class="num">${a.n}</td>
     <td class="num">${a.planWkTD.toLocaleString()}</td><td class="num"><b style="color:var(--text)">${a.actWk.toLocaleString()}</b></td><td class="num">${dchip(a.actWk-a.planWkTD,a.planWkTD)}</td>
     <td class="num">${a.next2.toLocaleString()}</td>
     <td class="num">${a.latest.toLocaleString()}</td><td class="num">${a.harv.toLocaleString()}</td><td class="num">${a.latest?Math.round(a.harv/a.latest*100):0}%</td>
-    <td class="num">${dchip(a.actTD-a.planTD,a.planTD)}</td><td class="num">${a.rem.toLocaleString()}</td><td class="num">${a.rate}</td>
+    <td class="num">${dchip(a.actTD-a.planTD,a.planTD)}</td><td class="num">${a.rem.toLocaleString()}</td><td class="num">${a.rate}</td>${aeroVarCells(a.v)}
     </tr>`).join('');
   const T={planWkTD:sum(A.map(a=>a.planWkTD)),actWk:sum(A.map(a=>a.actWk)),next2,latest:tPlan,harv:tHarv,rem:tPlan-tHarv,budget:tBud,jul:sum(A.map(a=>a.jul)),nov:sum(A.map(a=>a.nov)),planTD,actTD};
-  vb+=`<tr class="tot"><td class="frozen f0">Total</td><td class="num">${plots.length}</td><td class="num">${T.planWkTD.toLocaleString()}</td><td class="num">${T.actWk.toLocaleString()}</td><td class="num">${dchip(T.actWk-T.planWkTD,T.planWkTD)}</td><td class="num">${T.next2.toLocaleString()}</td><td class="num">${T.latest.toLocaleString()}</td><td class="num">${T.harv.toLocaleString()}</td><td class="num">${T.latest?Math.round(T.harv/T.latest*100):0}%</td><td class="num">${dchip(T.actTD-T.planTD,T.planTD)}</td><td class="num">${T.rem.toLocaleString()}</td><td></td></tr>`;
+  vb+=`<tr class="tot"><td class="frozen f0">Total</td><td class="num">${plots.length}</td><td class="num">${T.planWkTD.toLocaleString()}</td><td class="num">${T.actWk.toLocaleString()}</td><td class="num">${dchip(T.actWk-T.planWkTD,T.planWkTD)}</td><td class="num">${T.next2.toLocaleString()}</td><td class="num">${T.latest.toLocaleString()}</td><td class="num">${T.harv.toLocaleString()}</td><td class="num">${T.latest?Math.round(T.harv/T.latest*100):0}%</td><td class="num">${dchip(T.actTD-T.planTD,T.planTD)}</td><td class="num">${T.rem.toLocaleString()}</td><td></td>${AERO_ON()?'<td></td><td></td><td></td>':''}</tr>`;
   document.getElementById('ovVar').innerHTML=vh+vb;
   // plot table — from the same model
-  let ph=`<tr><th class="frozen of0">Farm</th><th class="frozen of1">Plot</th><th class="frozen of2">Variety</th><th>Status</th><th class="num">Area</th><th class="num">Season plan</th><th class="num">Harvested</th><th class="num">% done</th><th class="num">Remaining</th></tr>`;
+  let ph=`<tr><th class="frozen of0">Farm</th><th class="frozen of1">Plot</th><th class="frozen of2">Variety</th><th>Status</th><th class="num">Area</th><th class="num">Season plan</th><th class="num">Harvested</th><th class="num">% done</th><th class="num">Remaining</th>${AERO_ON()?'<th class="num">Fruit size</th><th>Peak count</th>':''}</tr>`;
   const psorted=plots.map((p,i)=>({p,i})).sort((a,b)=>a.p.v.localeCompare(b.p.v)||a.p.f.localeCompare(b.p.f));
   let pb=psorted.map(({p,i})=>{const latest=sum(WK.map((_,w)=>sum(WD.map((__,d)=>dayPlan(i,w,d))))); const harv=sumTo(getActual,i,CUR,CURDAY);
     return `<tr>
@@ -1373,9 +1375,96 @@ function renderOv(){
     <td><span class="pill p-${p.pnp}">${p.pnp}</span></td>
     <td class="num">${p.area.toFixed(1)}</td>
     <td class="num"><b style="color:var(--text)">${latest.toLocaleString()}</b></td>
-    <td class="num">${harv.toLocaleString()}</td><td class="num">${latest?Math.round(harv/latest*100):0}%</td><td class="num">${(latest-harv).toLocaleString()}</td>
+    <td class="num">${harv.toLocaleString()}</td><td class="num">${latest?Math.round(harv/latest*100):0}%</td><td class="num">${(latest-harv).toLocaleString()}</td>${aeroPlotCells(p.blockId)}
     </tr>`;}).join('');
   document.getElementById('ovPlot').innerHTML='<thead>'+ph+'</thead><tbody>'+pb+'</tbody>';
+  document.getElementById('ovPack').innerHTML=aeroPackHTML(A);
+  aeroEnsure();
+}
+
+// ---------- AEROBOTICS TrueFruit (read-only, aero_* tables; filled by the sync-aerobotics edge fn) ----------
+const esc=v=>String(v==null?'':v).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+let aeroHP={key:null,state:'idle',by:{}};   // by: blockId -> {m, md, ranges:[{label,c,w}], ws, we}
+const AERO_ON=()=>product==='citrus'&&aeroHP.state==='ok'&&Object.keys(aeroHP.by).length>0;
+async function aeroPaged(mk){const out=[];for(let from=0;;from+=1000){const {data,error}=await mk().range(from,from+999);if(error)throw error;out.push(...(data||[]));if(!data||data.length<1000)break;}return out;}
+async function aeroEnsure(){
+  const key=product+'|'+(SEASON&&SEASON.id)+'|'+plots.length;
+  if(product!=='citrus'||aeroHP.key===key) return;
+  aeroHP={key,state:'loading',by:{}};
+  try{
+    const ids=plots.map(p=>p.blockId).filter(Boolean), links=[];
+    for(let i=0;i<ids.length;i+=150){const {data,error}=await SB.from('aero_block_links').select('block_id,orchard_id,aero_orchards(hectares)').eq('status','linked').in('block_id',ids.slice(i,i+150));if(error)throw error;links.push(...(data||[]));}
+    const byBlock={};links.forEach(l=>{const ha=Number(l.aero_orchards&&l.aero_orchards.hectares)||0,c=byBlock[l.block_id];if(!c||ha>c.ha)byBlock[l.block_id]={oid:l.orchard_id,ha};});
+    const oids=[...new Set(Object.values(byBlock).map(x=>x.oid))];
+    if(!oids.length){aeroHP.state='ok';return;}
+    const [ms,sp]=await Promise.all([
+      aeroPaged(()=>SB.from('aero_fruit_measurements').select('orchard_id,measurement_date,avg_size_mm').in('orchard_id',oids).order('orchard_id').order('measurement_date',{ascending:false})),
+      aeroPaged(()=>SB.from('aero_size_forecasts').select('orchard_id,processed_date,forecast_date,size_ranges').in('orchard_id',oids).not('size_ranges','is',null).order('orchard_id').order('processed_date',{ascending:false}))]);
+    const meas={},split={};ms.forEach(x=>{if(!meas[x.orchard_id])meas[x.orchard_id]=x;});sp.forEach(x=>{if(!split[x.orchard_id])split[x.orchard_id]=x;});
+    const so=Object.keys(split),runs=[...new Set(so.map(o=>split[o].processed_date))],win={};
+    if(so.length){const rows=await aeroPaged(()=>SB.from('aero_size_forecasts').select('orchard_id,processed_date,forecast_date').in('orchard_id',so).in('processed_date',runs).order('orchard_id').order('forecast_date'));
+      rows.forEach(x=>{const s0=split[x.orchard_id];if(!s0||s0.processed_date!==x.processed_date)return;const w=win[x.orchard_id]=win[x.orchard_id]||{s:x.forecast_date,e:x.forecast_date};if(x.forecast_date<w.s)w.s=x.forecast_date;if(x.forecast_date>w.e)w.e=x.forecast_date;});}
+    // only forecasts whose weeks overlap this planner season; visits from the 10 months before it ends
+    const iso=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+    const sS=WKDATE.length?iso(WKDATE[0]):'0000-01-01', eD=WKDATE.length?new Date(WKDATE[WKDATE.length-1]):new Date(); eD.setDate(eD.getDate()+6); const sE=iso(eD);
+    const mMin=iso(new Date(new Date(sE+'T00:00:00').getTime()-300*864e5));
+    let skipped=null;
+    const by={};Object.keys(byBlock).forEach(b=>{const o=byBlock[b].oid;let m=meas[o],s0=split[o];
+      if(s0&&win[o]&&(win[o].e<sS||win[o].s>sE)){ if(!skipped||win[o].s<skipped.s) skipped={s:win[o].s,e:win[o].e}; s0=null; }
+      if(m&&(m.measurement_date<mMin||m.measurement_date>sE)) m=null;
+      if(!m&&!s0)return;
+      by[b]={m:m&&m.avg_size_mm!=null?Number(m.avg_size_mm):null,md:m?m.measurement_date:null,fd:s0?s0.forecast_date:null,
+        ranges:s0?(s0.size_ranges||[]).map(r=>({label:r.label,c:Number(r.percentage_of_total_count)||0,w:Number(r.percentage_of_total_mass)||0})):null,ws:win[o]&&win[o].s,we:win[o]&&win[o].e};});
+    if(aeroHP.key!==key)return; aeroHP={key,state:'ok',by,skipped};
+  }catch(e){ if(aeroHP.key===key) aeroHP={key,state:'error',by:{},err:(e&&e.message)||String(e)}; console.warn('aerobotics',e); }
+  if(page==='ov') renderOv();
+}
+function aeroShort(iso){if(!iso)return '—';const d=new Date(iso+'T00:00:00');return d.getDate()+' '+MON[d.getMonth()];}
+function aeroPlotRem(i){const latest=sum(WK.map((_,w)=>sum(WD.map((__,d)=>dayPlan(i,w,d)))));return Math.max(0,latest-sumTo(getActual,i,CUR,CURDAY));}
+function aeroPlotPlan(i){return sum(WK.map((_,w)=>sum(WD.map((__,d)=>dayPlan(i,w,d)))));}
+// per-variety aggregate: size weighted by season plan (area if no plan); split by count weighted by remaining t (mass share)
+function aeroVarAgg(v){
+  const ps=plots.map((p,i)=>({p,i})).filter(x=>x.p.v===v&&aeroHP.by[x.p.blockId]);
+  if(!ps.length)return null;
+  let sw=0,sm=0,ws=null,we=null,order=[],tByLabel={},cW={},cWt=0,remCov=0;
+  ps.forEach(({p,i})=>{const a=aeroHP.by[p.blockId],wt=aeroPlotPlan(i)||p.area||1;
+    if(a.m!=null){sm+=a.m*wt;sw+=wt;}
+    if(a.ws&&(!ws||a.ws<ws))ws=a.ws; if(a.we&&(!we||a.we>we))we=a.we;
+    if(a.ranges){const rem=aeroPlotRem(i);remCov+=rem;cWt+=wt;
+      a.ranges.forEach(r=>{if(order.indexOf(r.label)<0)order.push(r.label);tByLabel[r.label]=(tByLabel[r.label]||0)+rem*r.w/100;cW[r.label]=(cW[r.label]||0)+r.c*wt;});}});
+  const cnt={};order.forEach(l=>cnt[l]=cWt?cW[l]/cWt:0);
+  const peak=order.length?order.reduce((a,l)=>cnt[l]>cnt[a]?l:a,order[0]):null;
+  return {n:ps.length,m:sw?sm/sw:null,ws,we,order,cnt,tByLabel,remCov,peak};
+}
+function aeroVarCells(v){if(!AERO_ON())return '';const a=aeroVarAgg(v);
+  if(!a)return '<td class="num" style="color:var(--text3)">—</td><td style="color:var(--text3)">—</td><td style="color:var(--text3)">—</td>';
+  return `<td class="num">${a.m!=null?a.m.toFixed(1)+' mm':'—'}</td><td>${a.peak?`<span class="plot" style="color:var(--accent)">${a.peak}</span> <span style="font-size:11px;color:var(--text3)">${Math.round(a.cnt[a.peak])}%</span>`:'—'}</td><td style="white-space:nowrap;font-size:12px">${a.ws?aeroShort(a.ws)+' → '+aeroShort(a.we):'—'}</td>`;}
+function aeroPlotCells(bid){if(!AERO_ON())return '';const a=aeroHP.by[bid];
+  if(!a)return '<td class="num" style="color:var(--text3)">—</td><td style="color:var(--text3)">—</td>';
+  const pk=a.ranges&&a.ranges.length?a.ranges.reduce((x,r)=>r.c>x.c?r:x,a.ranges[0]):null;
+  return `<td class="num" title="${a.md?'TrueFruit visit '+aeroShort(a.md):''}">${a.m!=null?a.m.toFixed(1)+' mm':'—'}</td><td>${pk?`<span class="plot" style="color:var(--accent)">${pk.label}</span> <span style="font-size:11px;color:var(--text3)">${Math.round(pk.c)}%</span>`:'—'}</td>`;}
+function aeroPackHTML(A){
+  if(product!=='citrus')return '';
+  if(aeroHP.state==='loading'||aeroHP.state==='idle')return `<div class="sec-title">Expected pack-out by count <span class="r">loading Aerobotics TrueFruit…</span></div>`;
+  if(aeroHP.state==='error')return `<div class="sec-title">Expected pack-out by count <span class="r">Aerobotics data could not load: ${esc(aeroHP.err||'')}</span></div>`;
+  const rows=A.map(a=>({a,g:aeroVarAgg(a.v)})).filter(x=>x.g&&x.g.order.length);
+  if(!rows.length)return `<div class="sec-title">Expected pack-out by count <span class="r">${aeroHP.skipped?'TrueFruit forecasts cover '+aeroShort(aeroHP.skipped.s)+' onwards, outside this season — open the season that includes them':'no TrueFruit size forecasts for this season\'s plots yet'}</span></div>`;
+  const ramp=['#0d4f4c','#2f7d6b','#7fb08a','#cfd9a6','#f3ead2'];
+  const col=(i,n)=>{const t=n>1?i/(n-1):0,x=t*(ramp.length-1),k=Math.min(ramp.length-2,Math.floor(x));return ramp[x-k<0.5?k:k+1];};
+  const body=rows.map(({a,g})=>{
+    const core=g.order.filter(l=>l!=='Oversize'&&l!=='Undersize'),totT=g.order.reduce((s0,l)=>s0+(g.tByLabel[l]||0),0)||1;
+    const seg=g.order.map(l=>{const t=g.tByLabel[l]||0,pct=t/totT*100;if(pct<=0)return '';const ci=core.indexOf(l),bg=ci<0?'var(--border2)':col(ci,core.length),dark=ci>=0&&ci/(Math.max(1,core.length-1))<0.5;
+      return `<i title="${esc(l)} · ${Math.round(t).toLocaleString()} t · ${pct.toFixed(1)}% of weight" style="display:block;height:100%;width:${pct}%;background:${bg};position:relative"><span style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font:500 9.5px var(--font-mono);color:${dark?'#fff':'#1d3433'};overflow:hidden;white-space:nowrap">${pct>=7?esc(l):''}</span></i>`;}).join('');
+    const top=g.order.slice().sort((x,y)=>(g.tByLabel[y]||0)-(g.tByLabel[x]||0)).slice(0,3).map(l=>`${esc(l)} ${Math.round(g.tByLabel[l]||0).toLocaleString()} t`).join(' · ');
+    return `<tr><td class="frozen f0"><span class="vname">${esc(a.v)}</span><div style="font-size:10.5px;color:var(--text3)">${g.n} of ${a.n} plots · from ${aeroShort(g.ws)}</div></td>
+      <td style="min-width:260px"><div style="display:flex;height:18px;border-radius:4px;overflow:hidden;background:var(--bg2)">${seg}</div><div style="font-size:11px;color:var(--text2);margin-top:3px">${top}</div></td>
+      <td class="num">${Math.round(g.remCov).toLocaleString()}</td><td class="num">${a.rem?Math.round(g.remCov/a.rem*100):0}%</td></tr>`;}).join('');
+  const all=[];rows.forEach(({g})=>g.order.forEach(l=>{if(all.indexOf(l)<0)all.push(l);}));
+  return `<div class="sec-title">Expected pack-out by count <span class="r">Aerobotics TrueFruit forecast for each plot's first harvest week × remaining plan tonnes, split by fruit weight · darker = bigger fruit (lower count) · grey = over/undersize</span></div>
+    <div class="table-wrap"><table><tr><th class="frozen f0">Variety</th><th>Split of remaining tonnes by count</th><th class="num">Remaining t covered</th><th class="num">Coverage</th></tr>${body}</table></div>
+    <details style="margin-top:8px"><summary style="cursor:pointer;font-size:12px;color:var(--accent)">Tonnes per count, by variety</summary>
+      <div class="table-wrap" style="margin-top:6px"><table><tr><th class="frozen f0">Variety</th>${all.map(l=>`<th class="num">${esc(l)}</th>`).join('')}</tr>
+      ${rows.map(({a,g})=>`<tr><td class="frozen f0"><span class="vname">${esc(a.v)}</span></td>${all.map(l=>{const t=g.tByLabel[l];return `<td class="num">${t>=0.5?Math.round(t).toLocaleString():'<span style="color:var(--text3)">·</span>'}</td>`;}).join('')}</tr>`).join('')}</table></div></details>`;
 }
 
 function setPage(p){page=p;

@@ -1636,7 +1636,7 @@ function MapNavSub(props){
     meta.mode==='age'
       ? ce('div',{className:'yrleg'}, ce('div',{className:'bar'}), ce('div',{className:'ends'}, ce('span',null,String(meta.yrMin)), ce('span',null,String(meta.yrMax))), ce('div',{style:{fontSize:9.5,color:'var(--sidebar-muted)',marginTop:4}},'older → younger · grey = no year'))
       : meta.mode==='size'
-      ? ce('div',{className:'yrleg'}, ce('div',{className:'bar'}), ce('div',{className:'ends'}, ce('span',null,meta.yrMin+(meta.yrMin!=='—'?' mm':'')), ce('span',null,meta.yrMax+(meta.yrMax!=='—'?' mm':''))), ce('div',{style:{fontSize:9.5,color:'var(--sidebar-muted)',marginTop:4}},'smaller → bigger fruit (latest visit) · grey = not measured · lemons and mandarins run smaller than oranges'))
+      ? ce('div',{className:'yrleg'}, ce('div',{className:'bar'}), ce('div',{className:'ends'}, ce('span',null,meta.yrMin+(meta.yrMin!=='—'?' mm':'')), ce('span',null,meta.yrMax+(meta.yrMax!=='—'?' mm':''))), ce('div',{style:{fontSize:9.5,color:'var(--sidebar-muted)',marginTop:4}},'smaller → bigger fruit (latest visit) · dashed outline = not measured · lemons and mandarins run smaller than oranges'))
       : meta.legend.map(function(l){ return ce('div',{key:l.key,className:'ni'+((meta.mode==='crop'&&m.off.indexOf(l.key)>=0)?' off':''),onClick:meta.mode==='crop'?function(){ var off=m.off.slice(); var i=off.indexOf(l.key); if(i>=0)off.splice(i,1); else off.push(l.key); m.setOff(off); }:null},
           ce('span',{className:'sw',style:{background:l.color}}), ce('span',null,l.label), ce('span',{className:'c'},l.n)); }),
     ce('div',{className:'navshow'}, meta.count)
@@ -1723,10 +1723,10 @@ function FarmMapScreen(ctx){
       return MAP_PALETTE[Math.max(0,secs.indexOf(secOf(p)))%MAP_PALETTE.length]; }
     var labels=L.layerGroup();
     var layer=L.geoJSON({type:'FeatureCollection',features:vis},{
-      style:function(f){ var dim=mode==='size'&&!(sizeRef.current[f.properties.id]&&sizeRef.current[f.properties.id].m!=null); return {color:'#fff',weight:1.2,fillColor:col(f.properties),fillOpacity:dim?0.25:0.62,opacity:0.9}; },
+      style:function(f){ var dim=mode==='size'&&!(sizeRef.current[f.properties.id]&&sizeRef.current[f.properties.id].m!=null); return {color:'#fff',weight:1.2,fillColor:col(f.properties),fillOpacity:dim?0.04:0.62,opacity:dim?0.7:0.9,dashArray:dim?'4 3':null}; },   // unmeasured = dashed outline only, so it never reads as a size
       onEachFeature:function(f,lyr){ var p=f.properties;
         lyr.on('mouseover',function(e){ lyr.setStyle({weight:2.4,fillOpacity:0.82}); lyr.bringToFront(); showHover(p,e.originalEvent); });
-        lyr.on('mouseout',function(){ var dim=mode==='size'&&!(sizeRef.current[p.id]&&sizeRef.current[p.id].m!=null); lyr.setStyle({weight:1.2,fillOpacity:dim?0.25:0.62}); hideHover(); });
+        lyr.on('mouseout',function(){ var dim=mode==='size'&&!(sizeRef.current[p.id]&&sizeRef.current[p.id].m!=null); lyr.setStyle({weight:1.2,fillOpacity:dim?0.04:0.62}); hideHover(); });
         lyr.on('click',function(){ selectBlock(p); try{ map.flyToBounds(lyr.getBounds(),{maxZoom:17,padding:[40,40],duration:0.6}); }catch(e){} });
         try{ labels.addLayer(L.marker(lyr.getBounds().getCenter(),{interactive:false,icon:L.divIcon({className:'',html:'<div class="lbl-div">'+(p.aydi_block_number||'')+'</div>',iconSize:[0,0]})})); }catch(e){}
       }});
