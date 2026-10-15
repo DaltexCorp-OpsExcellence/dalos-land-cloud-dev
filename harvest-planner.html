@@ -723,10 +723,8 @@ function colOf(w,di,wkStart){ const dl=dayLabels(w)[di]; return {w:w,di:di,wd:dl
 function viewCols(){
   const m=editMode;
   const present=document.body.classList.contains('present');
-  if(!present){ // present always shows the full 2 weeks (single-day Today/Day views are edit-only)
-    if(m==='harv'&&actView==='today') return [colOf(CUR,CURDAY)];
-    if(m==='harv'&&actView==='day'){ const s=daySel||{w:CUR,di:CURDAY}; return [colOf(s.w,s.di)]; }
-  }
+  if(m==='harv'&&actView==='today'&&!present) return [colOf(CUR,CURDAY)]; // Today = edit-only, not on the wall
+  if(m==='harv'&&actView==='day'){ const s=daySel||{w:CUR,di:CURDAY}; return [colOf(s.w,s.di)]; } // drill-into-a-day works in present too
   const cols=[]; for(let k=0;k<2;k++){ const w=selWeek+k; if(w>WK.length-1)break; for(let di=0;di<7;di++) cols.push(colOf(w,di,di===0&&k>0)); }
   return cols;
 }
@@ -743,6 +741,7 @@ function dayTotalT(i,w,d){const a=getActual(i,w,d),b=actBreak[i+'|'+w+'|'+d]||{}
   return parts.length?parts.reduce((s,x)=>s+x,0):null;}
 // 2-week overview → click a day to edit its four-way split in the Day view
 function drillDay(w,di){ daySel={w,di}; actView='day'; renderLog(); }
+function backTo2wk(){ actView='weeks'; renderLog(); } // return from a drilled day to the 2-week overview (used on the Present wall)
 function dayEdit(el,cat){
   const q=el.id.split('_'),i=+q[1],w=+q[2],di=+q[3],k=i+'|'+w+'|'+di;
   const raw=el.value===''?null:parseFloat(el.value); const val=(raw==null||isNaN(raw))?null:raw;
@@ -820,7 +819,7 @@ function renderLog(){
   const present=document.body.classList.contains('present');
   const single=(!present&&m==='harv'&&(actView==='today'||actView==='day')); // present ignores single-day views → always 2 weeks
   const isToday=(!present&&m==='harv'&&actView==='today');
-  const wk2act=(!present&&m==='harv'&&actView==='weeks'); // 2-week Actual = read-only day totals, click a day to edit the split
+  const wk2act=(m==='harv'&&actView!=='day'&&(present||actView==='weeks')); // 2-week Actual (incl. Present wall) = read-only day totals + PH; click a day to drill into its split
   if(isToday) selWeek=CUR; // "Today" always lives in the current week
   if(present) selWeek=Math.max(0,Math.min(selWeek,WK.length-2)); // keep both weeks on-calendar for the wall
   const cols=viewCols(); curCols=cols;
@@ -845,14 +844,15 @@ function renderLog(){
   : isToday ? '<b>Logging today.</b> Each plot\'s pick is split by destination — To Packhouse (vs plan), Field Sorting, Local Sales, Waste. <b>Blank = not logged yet</b>; type <b>0</b> for “no pick”. Rows = plots in window today or already logged today. Plan fields are read-only here.'
   : actView==='day' ? '<b>Logging a day.</b> Pick any date on the right; one column — type each plot\'s tonnes and press <b>Enter</b> (or ↓) for the next plot. Blank = not logged; 0 = no pick. Plan fields are read-only here.'
   :         '<b>Two-week overview.</b> Each cell is the day\'s <b>total pick</b> (all four destinations); the faint <b>PH</b> = the To-Packhouse portion. Tap any day to open its four-way split and log it. Row total = tonnes picked over the fortnight; <b>vs plan</b> tracks To Packhouse.';
-  if(m==='harv' && (actView==='day'||actView==='today') && !document.body.classList.contains('present')){
+  if(m==='harv' && (actView==='day' || (actView==='today'&&!present))){
     renderDaySplit(cols[0],{today:isToday});
     document.getElementById('cellLegend').innerHTML=`<span>Destinations:</span> <b style="color:var(--accent)">To Packhouse</b> = export-bound (vs plan) · Field Sorting = field grade-out · Local Sales = raw to traders · Waste = condemned · <b>Day total</b> = sum`;
     if(isToday){
       let rowsN=0,loggedN=0;plots.forEach((p,i)=>{if(document.getElementById('c_'+i+'_'+CUR+'_'+CURDAY)){rowsN++;if(getActual(i,CUR,CURDAY)!=null)loggedN++;}});
       document.getElementById('modeBanner').innerHTML=`<span class="tag">Actual Harvest</span><span>Today · ${cols[0].wd} ${cols[0].d} — <b><span id="todayCnt">${loggedN} of ${rowsN}</span></b> in-window plots logged · split each plot's pick by destination. <b>vs plan</b> on To Packhouse (وارد محطة). Blank = not logged.</span>`;
     } else {
-      document.getElementById('modeBanner').innerHTML=`<span class="tag">Actual Harvest</span><span>Logging <b>${cols[0].wd} ${cols[0].d} ${cols[0].mon}</b> — split each plot's pick by destination. <b>vs plan</b> is on To Packhouse (وارد محطة). Blank = not logged.</span>`;
+      const back = present ? ` · <a href="#" onclick="backTo2wk();return false" style="color:#fff;text-decoration:underline;font-weight:600">← back to 2 weeks</a>` : '';
+      document.getElementById('modeBanner').innerHTML=`<span class="tag">Actual Harvest</span><span>Logging <b>${cols[0].wd} ${cols[0].d} ${cols[0].mon}</b> — split each plot's pick by destination. <b>vs plan</b> is on To Packhouse (وارد محطة). Blank = not logged.${back}</span>`;
     }
     updateDirtyBadge(); return;
   }
@@ -1674,6 +1674,7 @@ function setPresent(on){
   if(on){ try{if(document.documentElement.requestFullscreen)document.documentElement.requestFullscreen();}catch(e){} }
   else { try{if(document.fullscreenElement&&document.exitFullscreen)document.exitFullscreen();}catch(e){} }
   // present forces the 2-week grid (viewCols reads the present class), so re-render the active page
+  if(on && (actView==='today'||actView==='day')) actView='weeks'; // start the wall on the 2-week overview, not a single edit-day
   if(page==='log')renderLog(); else if(page==='trk')renderTrucks();
 }
 function togglePresent(){ setPresent(!document.body.classList.contains('present')); }
