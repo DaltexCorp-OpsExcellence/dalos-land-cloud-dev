@@ -3,9 +3,11 @@
 // Auth: either the cron header x-sync-key (== Vault 'aero_sync_key') or a signed-in user for
 // whom farm_can_approve() is true ("Sync now" in Data Health). Deployed with verify_jwt=false
 // because the cron call carries no user JWT; both paths are checked here.
-// Incremental: every TrueFruit visit since 2024 is stored (size, count, date); the detail call
-// (size split, blemish, colour, sample GPS) runs once per orchard's latest visit; forecast size
-// splits only for the first week of runs not yet stored.
+// Incremental: daily runs fetch TrueFruit visits from 60 days before the newest stored visit (a full
+// history since 2024 on the first run or with ?full=1); size/count/date stored for every visit; the
+// detail call (size split, blemish, colour, sample GPS) runs for each orchard's latest visit when it is
+// missing or Aerobotics re-processed it; forecast size splits only for the first week of runs not yet
+// stored. One sync at a time (409 if another started < 15 min ago). Sync-run log kept 180 days.
 import { createClient } from "npm:@supabase/supabase-js@2.45.4";
 
 const API = "https://api.aerobotics.com/farming";
@@ -50,8 +52,14 @@ Deno.serve(async (req) => {
     trigger = "manual:" + (u?.user?.email || "user");
   }
 
-  const { data: run } = await svc.from("aero_sync_runs").insert({ trigger }).select("id").single();
-  const runId = run?.id;
+  // one sync at a time
+  const since15 = new Date(Date.now() - 15 * 60000).toISOString();
+  const { data: busy } = await svc.from("aero_sync_runs").select("id").is("finished_at", null).gt("started_at", since15).limit(1);
+  if (busy && busy.length) return json({ ok: false, error: "A sync is already running — try again in a few minutes." }, 409);
+  const full = new URL(req.url).searchParams.get("full") === "1";
+  const { data: run, error: runErr } = await svc.from("aero_sync_runs").insert({ trigger: trigger + (full ? " (full)" : "") }).select("id").single();
+  if (runErr || !run) return json({ ok: false, error: "could not start the sync log: " + (runErr?.message || "no row") }, 500);
+  const runId = run.id;
   const stats: Record<string, unknown> = {};
   let calls = 0;
 
@@ -73,7 +81,7 @@ Deno.serve(async (req) => {
     const all = async (path: string) => {
       const out: any[] = [];
       let next: string | null = API + path + (path.includes("?") ? "&" : "?") + "limit=1000";
-      while (next) { const p = await get(next); if (!p) break; out.push(...(p.results || [])); next = p.next; }
+      while (next) { const p = await get(next); if (!p) throw new Error("Aerobotics list page missing: " + next); out.push(...(p.results || [])); next = p.next; }
       return out;
     };
     const upsert = async (table: string, rows: any[], onConflict: string) => {
@@ -100,20 +108,29 @@ Deno.serve(async (req) => {
       id: f.id, name: f.name, total_hectares: f.total_hectares, orchard_count: f.orchard_count, synced_at: now,
     })), "id");
     const orchards = await all("/orchards/");
+    const { count: prevActive } = await svc.from("aero_orchards").select("id", { count: "exact", head: true }).eq("active", true);
+    if (prevActive && orchards.length < prevActive * 0.8)
+      throw new Error(`Aerobotics returned ${orchards.length} orchards vs ${prevActive} active before — stopping so nothing is wrongly deactivated`);
     await upsert("aero_orchards", orchards.map((o) => ({
       id: o.id, farm_id: o.farm_id, name: (o.name || "").trim(), crop_type: o.crop_type_name, cultivar: o.cultivar_name,
       cultivar_id: o.cultivar_id, hectares: o.hectares, polygon: o.polygon, external_id: o.external_id,
       active: true, synced_at: now,
     })), "id");
-    const ids = orchards.map((o) => o.id);
-    if (ids.length) await svc.from("aero_orchards").update({ active: false }).not("id", "in", `(${ids.join(",")})`);
+    // anything not seen in this sync is no longer in Aerobotics
+    { const { error } = await svc.from("aero_orchards").update({ active: false }).lt("synced_at", now).eq("active", true);
+      if (error) throw new Error("deactivate: " + error.message); }
     stats.farms = farms.length; stats.orchards = orchards.length;
 
     // 2. TrueFruit measurements. NOTE: without a date filter the API returns only the latest
     //    processing batch (82 rows) — always pass measurement_date__gte to get the full history.
     //    List-level fields (size, count, date) are stored for EVERY visit; the detail call
     //    (size split, blemish, colour, sample GPS) only for each orchard's latest visit.
-    const SINCE = "measurement_date__gte=2024-01-01";
+    const { data: newest } = await svc.from("aero_fruit_measurements").select("measurement_date").order("measurement_date", { ascending: false }).limit(1);
+    const fromDate = (!full && newest && newest[0])
+      ? new Date(new Date(newest[0].measurement_date + "T00:00:00Z").getTime() - 60 * 864e5).toISOString().slice(0, 10)
+      : "2024-01-01";
+    const SINCE = "measurement_date__gte=" + fromDate;
+    stats.measurements_from = fromDate;
     const sizeList = await all("/truefruit/size/measurements/?" + SINCE);
     const sizeBy = new Map(sizeList.map((m) => [m.orchard_id + "|" + m.measurement_date, m]));
     const gradeRaw = await all("/truefruit/grade/measurements/?" + SINCE);
@@ -129,16 +146,20 @@ Deno.serve(async (req) => {
         orchard_id: g.orchard_id, measurement_date: g.measurement_date, processed_date: g.processed_date,
         avg_size_mm: g.average_fruit_size_mm ?? s.average_fruit_size_mm ?? null, avg_length_mm: s.average_length_mm ?? null,
         avg_mass_g: s.average_mass_g ?? null, fruit_count: g.count_fruit_measured ?? s.count_fruit_measured ?? null,
-        fruit_unit: g.fruit_unit ?? null, synced_at: now,
+        fruit_unit: g.fruit_unit ?? null,
       };
     }), "orchard_id,measurement_date");
     // latest visit per orchard → fetch its detail once (size split, blemish, colour, sample GPS)
     const latestVisit = new Map<number, any>();
     for (const g of gradeList) { const c = latestVisit.get(g.orchard_id); if (!c || g.measurement_date > c.measurement_date) latestVisit.set(g.orchard_id, g); }
-    const have = await readAll(() => svc.from("aero_fruit_measurements").select("orchard_id,measurement_date")
+    // detail needed when missing, or when Aerobotics re-processed the visit after we fetched it
+    const have = await readAll(() => svc.from("aero_fruit_measurements").select("orchard_id,measurement_date,synced_at")
       .not("size_dist", "is", null).order("orchard_id").order("measurement_date"));
-    const haveDetail = new Set(have.map((h) => h.orchard_id + "|" + h.measurement_date));
-    const todo = [...latestVisit.values()].filter((g) => !haveDetail.has(g.orchard_id + "|" + g.measurement_date));
+    const detailAt = new Map(have.map((h) => [h.orchard_id + "|" + h.measurement_date, (h.synced_at || "").slice(0, 10)]));
+    const todo = [...latestVisit.values()].filter((g) => {
+      const k = g.orchard_id + "|" + g.measurement_date;
+      return !detailAt.has(k) || (g.processed_date && g.processed_date > (detailAt.get(k) || ""));
+    });
     const details = await pool(todo, 6, (g) => get(`/truefruit/grade/measurements/${g.orchard_id}/${g.measurement_date}/`));
     for (let i = 0; i < todo.length; i++) {
       const g = todo[i], d = details[i];
@@ -146,7 +167,7 @@ Deno.serve(async (req) => {
       const { error } = await svc.from("aero_fruit_measurements").update({
         avg_size_mm: d.average_fruit_size_mm ?? g.average_fruit_size_mm, fruit_count: d.count_fruit_measured ?? g.count_fruit_measured,
         size_dist: d.size_distribution ?? null, blemish_dist: d.blemish_distribution ?? null, colour_dist: d.color_distribution ?? null,
-        sample_positions: d.sample_positions ?? null,
+        sample_positions: d.sample_positions ?? null, synced_at: now,
       }).eq("orchard_id", g.orchard_id).eq("measurement_date", g.measurement_date);
       if (error) throw new Error("measurement detail: " + error.message);
     }
@@ -188,6 +209,7 @@ Deno.serve(async (req) => {
     const { data: m, error: me } = await svc.rpc("aero_rematch");
     if (me) throw new Error("rematch: " + me.message);
     stats.links = m; stats.api_calls = calls;
+    await svc.from("aero_sync_runs").delete().lt("started_at", new Date(Date.now() - 180 * 864e5).toISOString());
 
     await svc.from("aero_sync_runs").update({ finished_at: new Date().toISOString(), ok: true, stats }).eq("id", runId);
     return json({ ok: true, stats });
