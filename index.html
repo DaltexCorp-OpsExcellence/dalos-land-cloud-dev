@@ -189,7 +189,7 @@ tr.rowlink:hover td{background:var(--bg)}
 .rawover table{min-width:0}
 .rawover .rmet{font-size:13px;color:var(--text)}
 .rawover .rmet .lot{margin-left:6px;color:var(--text3)}
-.drawer-head{position:sticky;top:0;background:var(--bg2);border-bottom:1px solid var(--border);padding:14px 18px;display:flex;align-items:center;gap:10px}
+.drawer-head{position:sticky;top:0;z-index:2;background:var(--bg2);border-bottom:1px solid var(--border);padding:14px 18px;display:flex;align-items:center;gap:10px}
 .drawer-head h2{font-family:var(--font-display);font-size:19px;font-weight:400}
 .drawer-body{padding:16px 18px}
 .drawer-x{margin-left:auto;background:none;border:1px solid var(--border2);border-radius:6px;width:28px;height:28px;color:var(--text2);font-size:16px;line-height:1}
@@ -2715,8 +2715,8 @@ function aeroBars(rows){
   return ce('div',null, rows.map(function(r,i){ var pk=r.pct===mx;
     return ce('div',{key:i,style:{display:'flex',alignItems:'center',gap:8,fontSize:11.5,marginBottom:5}},
       ce('span',{style:{width:74,flex:'none',fontFamily:'var(--font-mono)',color:'var(--text2)'}}, r.label),
-      ce('span',{style:{flex:1,height:13,background:'var(--bg2)',borderRadius:3,overflow:'hidden'}}, ce('span',{style:{display:'block',height:'100%',width:(r.pct/mx*100)+'%',background:pk?'var(--accent)':'var(--accent2)',opacity:pk?1:0.6,borderRadius:3}})),
-      ce('span',{style:{width:110,flex:'none',textAlign:'right',fontFamily:'var(--font-mono)',color:'var(--text2)'}}, r.pct.toFixed(1)+'%', r.sub?ce('span',{style:{color:'var(--text3)'}},' '+r.sub):null)); }));
+      ce('span',{style:{flex:1,height:13,background:'var(--bg2)',borderRadius:3,overflow:'hidden'}}, ce('span',{style:{display:'block',height:'100%',width:(r.pct/mx*100)+'%',background:pk?'var(--accent)':'color-mix(in srgb,var(--accent2) 60%,var(--bg2))',borderRadius:3}})),
+      ce('span',{style:{width:138,flex:'none',textAlign:'right',fontFamily:'var(--font-mono)',fontSize:11,color:'var(--text2)',whiteSpace:'nowrap'}}, r.pct.toFixed(1)+'%', r.sub?ce('span',{style:{color:'var(--text3)'}},' '+r.sub):null)); }));
 }
 function aeroSeg(rows,cols,lbl){
   var nz=rows.filter(function(r){return Number(r.percentage)>0;});
@@ -2898,7 +2898,7 @@ function AeroHealth(p){
   var ctx=p.ctx||{};
   var s=useState({loading:true}); var st=s[0],set=s[1];
   var sy=useState(null); var syncing=sy[0],setSyncing=sy[1];
-  var op=useState('ambiguous'); var open=op[0],setOpen=op[1];
+  var op=useState(null); var openPick=op[0],setOpen=op[1];   // null = first tab that has items
   var pk=useState({}); var picks=pk[0],setPicks=pk[1];
   var bz=useState(null); var busy=bz[0],setBusy=bz[1];
   function pagedAll(mk){ var out=[]; return new Promise(function(res,rej){ (function pg(from){ mk().range(from,from+999).then(function(r){ if(r.error){rej(r.error);return;} out=out.concat(r.data||[]); if((r.data||[]).length===1000) pg(from+1000); else res(out); }); })(0); }); }
@@ -2943,7 +2943,7 @@ function AeroHealth(p){
   var pickCell=function(l,options){ var v=picks[l.orchard_id]||'';
     return ce('td',{style:{whiteSpace:'nowrap'}},
       ctx.canWrite ? [
-        ce('select',{key:'s',className:'tb-select',style:{maxWidth:280},value:v,onChange:function(e){ var n=Object.assign({},picks); n[l.orchard_id]=e.target.value; setPicks(n); }},
+        ce('select',{key:'s',className:'tb-select',style:{width:280},value:v,onChange:function(e){ var n=Object.assign({},picks); n[l.orchard_id]=e.target.value; setPicks(n); }},
           ce('option',{value:''},options.length?'Choose block…':'No candidate blocks'), options.map(function(x){ return ce('option',{key:x.id,value:x.id}, blabel(x)); })),
         ce('button',{key:'b',className:'btn btn-primary btn-sm',style:{marginLeft:6},disabled:!v||busy===l.orchard_id,onClick:function(){ saveLink(l.orchard_id,v); }},'Link'),
         ce('button',{key:'i',className:'btn btn-secondary btn-sm',style:{marginLeft:6},disabled:busy===l.orchard_id,onClick:function(){ saveLink(l.orchard_id,null,'ignored'); },title:'Not a Land Cloud block (e.g. a non-crop area)'},'Ignore')
@@ -2966,6 +2966,7 @@ function AeroHealth(p){
       manual.length?table(['Farm','Orchard','Cultivar','Aero ha','Linked to',''],manual.map(function(l){ var b=blk[l.block_id]; return ce('tr',{key:l.orchard_id}, oCell(l), ce('td',null, l.status==='ignored'?ce('span',{className:'badge badge-neutral'},'ignored'):(b?blabel(b):'—')),
         ce('td',null, ctx.canWrite?ce('button',{className:'btn btn-secondary btn-sm',disabled:busy===l.orchard_id,onClick:function(){ saveLink(l.orchard_id,null,'auto'); }},'Reset'):null)); })):empty('No manual links yet.')]
   };
+  var open=openPick||(['ambiguous','unmatched','area','variety','manual'].filter(function(k){ return {ambiguous:amb,unmatched:unm,area:areaDiff,variety:varDiff,manual:manual}[k].length; })[0]||'ambiguous');
   var tab=function(k,label,n,col){ return ce('button',{key:k,className:'chip'+(open===k?' active':''),onClick:function(){setOpen(k);}}, label, ce('span',{className:'cnt',style:(n&&col&&open!==k)?{color:col}:null}, n)); };
   var kpi=function(label,val,sub,color){ return ce('div',{className:'kpi'}, ce('div',{className:'kpi-label'},label), ce('div',{className:'kpi-val',style:color?{color:color}:null}, val), ce('div',{className:'kpi-sub'},sub)); };
   var total=linked.length+amb.length+unm.length+ign.length;
