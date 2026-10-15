@@ -1491,7 +1491,7 @@ function aeroPlotCells(bid){if(!AERO_ON())return '';const a=aeroHP.by[bid];
   return `<td class="num" title="${a.md?'TrueFruit visit '+aeroShort(a.md):''}">${a.m!=null?a.m.toFixed(1)+' mm':'—'}</td><td>${pk?`<span class="plot" style="color:var(--accent)">${pk.label}</span> <span style="font-size:11px;color:var(--text3)">${Math.round(pk.c)}%</span>`:'—'}</td>`;}
 function aeroPackHTML(A){
   if(product!=='citrus')return '';
-  if(aeroHP.state==='loading'||aeroHP.state==='idle')return `<div class="sec-title">Expected pack-out by count <span class="r">loading Aerobotics TrueFruit…</span></div>`;
+  if(aeroHP.state==='loading'||aeroHP.state==='idle')return `<div class="sec-title">Expected pack-out by count <span class="r">loading Aerobotics TrueFruit…</span></div><div class="table-wrap"><table>${skelRows(4,6)}</table></div>`;
   if(aeroHP.state==='error')return `<div class="sec-title">Expected pack-out by count <span class="r">Aerobotics data could not load: ${esc(aeroHP.err||'')}</span></div>`;
   const rows=A.map(a=>({a,g:aeroVarAgg(a.v)})).filter(x=>x.g&&x.g.order.length);
   if(!rows.length)return `<div class="sec-title">Expected pack-out by count <span class="r">${aeroHP.skipped?'TrueFruit forecasts cover '+aeroShort(aeroHP.skipped.s)+' onwards, outside this season — open the season that includes them':'no TrueFruit size forecasts for this season\'s plots yet'}</span></div>`;
