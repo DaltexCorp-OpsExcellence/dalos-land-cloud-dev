@@ -16,7 +16,7 @@
   --amber:#b87820;--amber-bg:#fdf3e0;--amber-border:#e8c87a;
   --red:#b03030;--red-bg:#faeaea;--red-border:#e8a0a0;
   --green:#1e6b3a;--green-bg:#e8f5ec;--green-border:#8ecba4;
-  --text:#111f1f;--text2:#3b4b4a;--text3:#5a6968;--skel-a:#e0e8e6;--skel-b:#cedad7;--past-mix:45%;--grp-bg:#cfe3e0;--grp-fg:#0e3a3d;--grp-line:#9fc4bf;
+  --text:#111f1f;--text2:#3b4b4a;--text3:#5a6968;--skel-a:#e0e8e6;--skel-b:#cedad7;--past-mix:45%;--grp-bg:#cfe3e0;--grp-fg:#0e3a3d;--grp-line:#9fc4bf;--act-c:#0b6b5f;--plan-c:#4a4fb5;
   --border:#c6d4d2;--border2:#aabdbb;--card:#ffffff;--subtot:#edeae4;--subtot-text:#4a4840;
   --shadow:0 10px 30px rgba(14,58,61,.18);
   --font-display:'DM Serif Display',Georgia,serif;
@@ -29,12 +29,12 @@
   --bg:#0f1b1c;--bg2:#172728;--bg3:#203436;--accent:#2a9a96;--accent2:#3bb3ae;--accent-bg:#173a3a;
   --amber:#e0a54a;--amber-bg:#33280f;--amber-border:#6b5320;--red:#e27a7a;--red-bg:#3a1c1c;--red-border:#743434;
   --green:#6cc58e;--green-bg:#15301f;--green-border:#2f6a44;--text:#e6efee;--text2:#bfcfcd;--text3:#8a9d9b;
-  --border:#2a3e3f;--border2:#3a5355;--card:#142223;--subtot:#232a26;--subtot-text:#cfc9bb;--shadow:0 10px 30px rgba(0,0,0,.5);--skel-a:#1f3436;--skel-b:#2d4749;--past-mix:75%;--grp-bg:#1d4446;--grp-fg:#e6f3f1;--grp-line:#2f6264;color-scheme:dark}}
+  --border:#2a3e3f;--border2:#3a5355;--card:#142223;--subtot:#232a26;--subtot-text:#cfc9bb;--shadow:0 10px 30px rgba(0,0,0,.5);--skel-a:#1f3436;--skel-b:#2d4749;--past-mix:75%;--grp-bg:#1d4446;--grp-fg:#e6f3f1;--grp-line:#2f6264;--act-c:#5fd3bf;--plan-c:#a7adf7;color-scheme:dark}}
 :root[data-theme="dark"]{
   --bg:#0f1b1c;--bg2:#172728;--bg3:#203436;--accent:#2a9a96;--accent2:#3bb3ae;--accent-bg:#173a3a;
   --amber:#e0a54a;--amber-bg:#33280f;--amber-border:#6b5320;--red:#e27a7a;--red-bg:#3a1c1c;--red-border:#743434;
   --green:#6cc58e;--green-bg:#15301f;--green-border:#2f6a44;--text:#e6efee;--text2:#bfcfcd;--text3:#8a9d9b;
-  --border:#2a3e3f;--border2:#3a5355;--card:#142223;--subtot:#232a26;--subtot-text:#cfc9bb;--shadow:0 10px 30px rgba(0,0,0,.5);--skel-a:#1f3436;--skel-b:#2d4749;--past-mix:75%;--grp-bg:#1d4446;--grp-fg:#e6f3f1;--grp-line:#2f6264;color-scheme:dark}
+  --border:#2a3e3f;--border2:#3a5355;--card:#142223;--subtot:#232a26;--subtot-text:#cfc9bb;--shadow:0 10px 30px rgba(0,0,0,.5);--skel-a:#1f3436;--skel-b:#2d4749;--past-mix:75%;--grp-bg:#1d4446;--grp-fg:#e6f3f1;--grp-line:#2f6264;--act-c:#5fd3bf;--plan-c:#a7adf7;color-scheme:dark}
 *{box-sizing:border-box}
 body{margin:0;font-family:var(--font-body);background:var(--bg);color:var(--text);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
 .app{display:flex;min-height:100vh}
@@ -158,7 +158,7 @@ th.today,td.today{background:var(--accent-bg)}
 .mg tr.grp td{position:sticky;top:var(--hh,60px);z-index:4;height:34px;box-sizing:border-box;white-space:nowrap;box-shadow:0 1px 0 var(--grp-line);background:var(--grp-bg)!important;color:var(--grp-fg);border-top:1px solid var(--grp-line);border-bottom:1px solid var(--grp-line);font-weight:700}
 .mg tr.grp td.stk,.mg tr.grp td.stk2{z-index:6}
 .mg tr.grp td.stk{overflow:hidden;text-overflow:ellipsis}.mg tr.grp td .winchip{margin:0 0 0 6px}
-.mg tr.grp td .calc,.mg tr.grp td .pln{color:var(--grp-fg);opacity:.75}
+.mg tr.grp td .calc{color:var(--grp-fg);opacity:.75}.mg tr.grp td .pln{opacity:1}
 .mg tr.tot td{background:var(--subtot)!important}
 .mg tr.tot .stk,.mg tr.tot .stk2{background:var(--subtot)}
 .mg .pl2{font-size:11px;color:var(--text3);line-height:1.3}
@@ -174,7 +174,12 @@ th.today,td.today{background:var(--accent-bg)}
 @media (max-width:700px){.mg .stk{min-width:130px;max-width:130px}.mg .stk2{left:130px;min-width:96px}.mg .pl2{display:none}}
 .mg td.past{background:color-mix(in srgb,var(--green-bg) 45%,transparent);text-align:right;line-height:1.15}
 .mg .act{color:var(--text);font-family:var(--font-num);font-size:12px}
-.pln{font-size:10.5px;color:var(--text3);font-family:var(--font-num)}
+.pln{font-size:10.5px;color:var(--plan-c);font-family:var(--font-num);opacity:.9}
+.sinceln{font-size:10.5px;font-family:var(--font-num)}
+.av,.mg .act.av{color:var(--act-c);font-weight:600}
+.pc,.mg td.pc,.dayin{color:var(--plan-c)}
+.dayin.z{color:var(--plan-c);opacity:.55}
+.vm{font-size:8px;margin-right:3px;vertical-align:1px}.vm.up{color:var(--green)}.vm.dn{color:var(--red)}
 .mg td.click{cursor:pointer}.mg td.click:hover{outline:1px solid var(--accent);outline-offset:-1px;background:var(--accent-bg)}
 .todayact{all:unset;cursor:pointer;display:block;font-size:10.5px;color:var(--accent);text-align:right;padding:0 4px;font-weight:600}
 .todayact:hover,.todayact:focus-visible{text-decoration:underline}
@@ -567,14 +572,14 @@ function viewEst(part){
   const wkCls=d=>{const w=new Date(d+'T00:00:00Z').getUTCDay();return (d===TODAY?'today ':'')+(w===5?'wk':'')};
   const sumDays=ps=>days.map(d=>ps.reduce((s,p)=>s+planVal(p,d),0));
   const actDay=dayTot;
-  const pastCell=(a,pl,i,bold,pid)=>{const v=a-pl;return `<td class="day dsum past ${pid?'click':''} ${i===0?'daystart':''} ${wkCls(days[i])}" ${pid?`data-act="${pid}|${days[i]}" title="Click to enter or correct the harvest for ${fmtD(days[i])}"`:''}><div class="act" style="${bold?'font-weight:700':''}">${a?n0(a):'<span class="calc">–</span>'}</div><div class="pln ${pl&&Math.abs(v)>0.5?(v>0?'pos':'neg'):''}">${pl?'plan '+n0(pl):''}</div></td>`};
-  const dayCells=(vals,bold,ps)=>vals.map((v,i)=>days[i]<TODAY?pastCell(ps.reduce((s,p)=>s+actDay(p,days[i]),0),v,i,bold):`<td class="day dsum ${i===0?'daystart':''} ${wkCls(days[i])}" style="${bold?'font-weight:700':''}">${v?n0(v):'<span class="calc">–</span>'}</td>`).join('');
+  const pastCell=(a,pl,i,bold,pid)=>{const v=a-pl;return `<td class="day dsum past ${pid?'click':''} ${i===0?'daystart':''} ${wkCls(days[i])}" ${pid?`data-act="${pid}|${days[i]}" title="Click to enter or correct the harvest for ${fmtD(days[i])}"`:''}><div class="act av" style="${bold?'font-weight:700':''}">${a?vmark(a,pl)+n0(a):'<span class="calc">–</span>'}</div><div class="pln">${pl?'plan '+n0(pl):''}</div></td>`};
+  const dayCells=(vals,bold,ps)=>vals.map((v,i)=>days[i]<TODAY?pastCell(ps.reduce((s,p)=>s+actDay(p,days[i]),0),v,i,bold):`<td class="day dsum pc ${i===0?'daystart':''} ${wkCls(days[i])}" style="${bold?'font-weight:700':''}">${v?n0(v):'<span class="calc">–</span>'}</td>`).join('');
   const fut=days.map(d=>d>=TODAY);
   // plan ahead = plan from today on, except today's plan for a plot that already has today's actual (it's in Harvested already)
   const planAhead=ps=>ps.reduce((s,p)=>s+days.reduce((t,d)=>t+(d>TODAY||(d===TODAY&&!p.daily[TODAY])?planVal(p,d):0),0),0);
   const tail=(rem,vals,ps)=>{const pf=planAhead(ps),pp=vals.reduce((s,v,i)=>s+(fut[i]?0:v),0);
     const ap=days.reduce((s,d,i)=>s+(d>TODAY?0:ps.reduce((t,p)=>t+actDay(p,d),0)),0);const after=rem-pf;
-    return `<td class="num daystart">${pp||ap?`${n0(ap)}<div class="pln ${ap-pp>0.5?'pos':ap-pp<-0.5?'neg':''}">plan ${n0(pp)}</div>`:'<span class="calc">–</span>'}</td><td class="num" style="color:var(--text)">${n0(pf)}</td><td class="num ${after<-0.5?'neg':''}">${n0(after)}</td>`};
+    return `<td class="num daystart">${pp||ap?`<span class="av">${vmark(ap,pp)}${n0(ap)}</span><div class="pln">plan ${n0(pp)}</div>`:'<span class="calc">–</span>'}</td><td class="num pc">${n0(pf)}</td><td class="num ${after<-0.5?'neg':''}">${n0(after)}</td>`};
   let rows='';
   for(const [g,ps] of Object.entries(groups)){
     GROUPS[g]=ps;const a=agg(ps,S.since);const dv=sumDays(ps);const per=dv.reduce((s,v)=>s+v,0);
@@ -604,10 +609,10 @@ function viewEst(part){
       const pp=pv.reduce((x,y,i)=>x+(days[i]<TODAY?y:0),0),ap=av.reduce((x,y)=>x+y,0),pf=planAhead(ps);
       const vc=(a,p)=>p&&Math.abs(a-p)>0.5?(a>p?'pos':'neg'):'';
       return `<tr class="${cls||''}"><td class="vname" style="text-align:left">${name}</td><td class="num">${n0(A)}</td><td class="num">${n0(PA)}</td><td class="num">${n0(PQ)}</td><td class="num calc">${n1(PA?PQ/PA:NaN)}</td><td class="num calc">${n1(L/A)}</td>
-        <td class="num calc">${n0(B)}</td><td class="num calc mcell" data-mk="${label}|${name}" data-mv="${N}"><span class="mval">${n0(N)}</span>${Math.abs(L-N)>0.5?`<div class="pln ${L>N?'pos':'neg'}">${sgn(L-N)} since</div>`:''}</td><td class="num" style="color:var(--text);font-weight:600">${n0(L)}</td><td class="num">${n0(H)}</td><td class="num">${n0(SL)}</td><td class="num">${n0(W)}</td><td class="num ${L-H<-0.5?'neg':''}">${n0(L-H)}</td>
-        <td class="num daystart">${pp||ap?`<span style="color:var(--text)">${n0(ap)}</span><div class="pln ${vc(ap,pp)}">plan ${n0(pp)}</div>`:'<span class="calc">–</span>'}</td><td class="num" style="color:var(--text)">${n0(pf)}</td>
-        ${pv.map((v,i)=>days[i]<TODAY?`<td class="num pastc ${i===0?'daystart':''} ${wkCls(days[i])}" style="line-height:1.15"><span style="color:var(--text)">${av[i]?n0(av[i]):'<span class="calc">–</span>'}</span><div class="pln ${vc(av[i],v)}">${v?'plan '+n0(v):''}</div></td>`
-          :`<td class="num ${i===0?'daystart':''} ${wkCls(days[i])}">${v?n0(v):'<span class="calc">–</span>'}<div class="pln">${days[i]===TODAY&&actDay?'':''}</div></td>`).join('')}</tr>`};
+        <td class="num calc">${n0(B)}</td><td class="num calc mcell" data-mk="${label}|${name}" data-mv="${N}"><span class="mval">${n0(N)}</span>${Math.abs(L-N)>0.5?`<div class="sinceln ${L>N?'pos':'neg'}">${sgn(L-N)} since</div>`:''}</td><td class="num" style="color:var(--text);font-weight:600">${n0(L)}</td><td class="num">${n0(H)}</td><td class="num">${n0(SL)}</td><td class="num">${n0(W)}</td><td class="num ${L-H<-0.5?'neg':''}">${n0(L-H)}</td>
+        <td class="num daystart">${pp||ap?`<span class="av">${vmark(ap,pp)}${n0(ap)}</span><div class="pln">plan ${n0(pp)}</div>`:'<span class="calc">–</span>'}</td><td class="num pc">${n0(pf)}</td>
+        ${pv.map((v,i)=>days[i]<TODAY?`<td class="num pastc ${i===0?'daystart':''} ${wkCls(days[i])}" style="line-height:1.15"><span class="av">${av[i]?vmark(av[i],v)+n0(av[i]):'<span class="calc">–</span>'}</span><div class="pln">${v?'plan '+n0(v):''}</div></td>`
+          :`<td class="num pc ${i===0?'daystart':''} ${wkCls(days[i])}">${v?n0(v):'<span class="calc">–</span>'}</td>`).join('')}</tr>`};
     const ent=Object.entries(g).sort((a,b)=>a[0].localeCompare(b[0]));
     return `<div class="card"><h2>Summary by ${label.toLowerCase()}</h2><div class="sub">Same columns as the old plan sheet. Past days (shaded) show the actual with the plan under it (green = above plan, red = below); today on shows the plan.</div>
      <div class="table-wrap"><table class="sg"><thead><tr><th>${label}</th><th>Total area</th><th>EXP area</th><th>EXP area qty<span class="f">latest, EXP plots</span></th><th>Yield/area EXP<span class="f">= qty ÷ EXP area</span></th><th>Yield/area<span class="f">= latest ÷ total area</span></th>
@@ -640,7 +645,7 @@ function viewEst(part){
     ${days.map((d,i)=>{const t=new Date(d+'T00:00:00Z');return `<th class="day ${i===0?'daystart':''} ${wkCls(d)}">${t.toLocaleDateString('en-GB',{weekday:'short',timeZone:'UTC'})}<span class="f">${fmtD(d)}</span></th>`}).join('')}
     <th class="daystart">Actual so far<span class="f">past days in view</span></th><th>Plan ahead<span class="f">today on, not yet harvested</span></th><th>Left after plan<span class="f">= remaining − plan ahead</span></th></tr></thead>
     <tbody>${rows}</tbody></table></div>
-  <div class="legendrow"><span><i class="lg past"></i>Past day: Raw PK actual, plan underneath</span><span><i class="lg today"></i>Today</span><span><i class="lg fri"></i>Friday (weekend)</span><span><i class="lg off"></i>Outside the variety's harvest window</span><span><i class="lg ok"></i>Plan saved</span></div>
+  <div class="legendrow"><span><b class="av">12</b> Actual (Raw PK)</span><span><b class="pc">10</b> Plan</span><span><span class="vm up">▲</span><span class="vm dn">▼</span> above / below plan</span><span><i class="lg past"></i>Past day</span><span><i class="lg today"></i>Today</span><span><i class="lg fri"></i>Friday (weekend)</span><span><i class="lg off"></i>Outside the variety's harvest window</span><span><i class="lg ok"></i>Plan saved</span></div>
   ${part==='grid'?'':sumGrid(p=>p.variety,'Variety')+sumGrid(p=>p.farm,'Farm')}`;
 }
 document.addEventListener('click',e=>{const w=e.target.closest('[data-wk]');if(w){const v=+w.dataset.wk;S.wk=v?(S.wk||0)+v:0;render()}
@@ -853,7 +858,7 @@ function openLog(){
   const body=()=>{const ps=PLOTS.filter(p=>p.farm===farm&&(!onlyOpen||!(p.ev.length&&est(p)-total(p)<=1)||planVal(p,date)>0||p.daily[date]));
     return `<table><thead><tr><th>Plot</th><th>Remaining</th><th>Planned</th>${ACOLS.map(c=>`<th class="lh" style="--c:${c[3]}">${colHead(c)}</th>`).join('')}<th>All picked<span class="f">= sum</span></th><th>Raw PK vs plan</th></tr></thead><tbody>
     ${ps.map(p=>{const a=actRow(p,date);return `<tr data-lrow="${p.id}"><td><span class="plot">${p.sector}-${p.plot}</span> <span class="vname" style="font-size:12px">${esc(p.variety)}</span></td><td class="num calc">${n0(est(p)-total(p))}</td>
-      <td class="num calc">${n0(planVal(p,date))}</td>${a.map((v,j)=>`<td style="padding:4px 5px"><input class="ain" style="--c:${ACOLS[j][3]}" data-ai="${j}" value="${v||''}" placeholder="—" inputmode="decimal" aria-label="${p.sector}-${p.plot} ${ACOLS[j][1]}"></td>`).join('')}<td class="num lt">${aDay(a)?n1(aDay(a)):'0'}</td><td class="lv" data-pl="${planVal(p,date)}">${vsPlan(a,planVal(p,date))}</td></tr>`}).join('')||`<tr><td colspan="9" class="calc" style="white-space:normal;padding:14px">${onlyOpen?'Every plot on this farm is fully harvested against its estimate. Untick \'Hide fully harvested plots\' to see them.':'No plots on this farm.'}</td></tr>`}</tbody></table>`};
+      <td class="num pc">${n0(planVal(p,date))}</td>${a.map((v,j)=>`<td style="padding:4px 5px"><input class="ain" style="--c:${ACOLS[j][3]}" data-ai="${j}" value="${v||''}" placeholder="—" inputmode="decimal" aria-label="${p.sector}-${p.plot} ${ACOLS[j][1]}"></td>`).join('')}<td class="num lt">${aDay(a)?n1(aDay(a)):'0'}</td><td class="lv" data-pl="${planVal(p,date)}">${vsPlan(a,planVal(p,date))}</td></tr>`}).join('')||`<tr><td colspan="9" class="calc" style="white-space:normal;padding:14px">${onlyOpen?'Every plot on this farm is fully harvested against its estimate. Untick \'Hide fully harvested plots\' to see them.':'No plots on this farm.'}</td></tr>`}</tbody></table>`};
   modal(`<div class="mh"><div><h3>Log harvest</h3><div class="meta">One row per plot. Leave a row empty if nothing was picked. Only To packhouse (Raw PK) counts against the estimate and the plan; the other three are recorded for reference.</div></div><button class="x" aria-label="Close">×</button></div>
    <div class="mb"><div style="display:flex;gap:10px;align-items:end;flex-wrap:wrap">
      <div class="field"><label class="lbl" for="ldate">Date</label><input type="date" id="ldate" data-nd max="${TODAY}" value="${date}" style="font-size:14px"></div>
@@ -946,8 +951,10 @@ const SLIDES=['Season position','What changed','Plan vs actual','Plots & daily p
 function bridgeRows(entries){const mx=Math.max(1,...entries.map(r=>Math.abs(r[1])));
   return entries.map(([k,v])=>`<div class="brow"><span>${esc(k)}</span><span class="track"><i style="left:${v<0?50-Math.abs(v)/mx*50:50}%;width:${Math.abs(v)/mx*50}%;background:${v<0?'var(--red)':'var(--green)'}"></i><i style="left:50%;width:1px;background:var(--border2)"></i></span><span class="num ${v<0?'neg':'pos'}">${sgn(v)} t</span></div>`).join('')}
 function dayTot(p,d){const a=p.daily[d];return a?a[0]:0}   /* Raw PK for a plot-day */
+/* actual vs plan: actual in --act-c, plan in --plan-c, ▲/▼ shows above/below plan */
+function vmark(a,pl){if(!pl||Math.abs(a-pl)<=0.5)return '';return a>pl?'<span class="vm up" title="above plan">▲</span>':'<span class="vm dn" title="below plan">▼</span>'}
 function last7(ps){const ds=[...Array(7)].map((_,i)=>addDays(TODAY,i-7));const a=ds.reduce((s,d)=>s+ps.reduce((t,p)=>t+dayTot(p,d),0),0),pl=ds.reduce((s,d)=>s+ps.reduce((t,p)=>t+planVal(p,d),0),0);
-  if(!a&&!pl)return '<span class="calc">–</span>';return `${n0(a)}<div class="pln ${a-pl>0.5?'pos':a-pl<-0.5?'neg':''}">plan ${n0(pl)}</div>`}
+  if(!a&&!pl)return '<span class="calc">–</span>';return `<span class="av">${vmark(a,pl)}${n0(a)}</span><div class="pln">plan ${n0(pl)}</div>`}
 function presentView(){
   const list=filtered();const A=agg(list,S.since);const sl=S.slide||0;
   const bar=`<div class="pbar"><span class="t">Citrus harvest · ${S.farm==='All'?'All farms':esc(S.farm)}</span><span class="m">Meeting ${fmtDY(TODAY)} · changes since ${fmtDY(S.since)}</span>
