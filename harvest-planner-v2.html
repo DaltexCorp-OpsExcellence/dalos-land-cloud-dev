@@ -1,4 +1,5 @@
 <title>Harvest Planner v2</title>
+<script>try{var t=localStorage.getItem('hp2-theme');if(t==='dark'||t==='light')document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.110.8/dist/umd/supabase.js"></script>
 <script src="shell.js?cb=5"></script>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Mono:wght@400;500&family=Instrument+Sans:wght@400;500;600&family=Space+Grotesk:wght@400;500;600;700&family=Noto+Sans+Arabic:wght@400;500;600&display=swap">
@@ -256,6 +257,7 @@ body.present .page{padding:0 0 32px;gap:0}
         <button data-t="sum">Summary</button>
         <button data-t="chg">Changes</button>
       </div>
+      <button class="menubtn" id="themeBtn" aria-label="Switch to dark mode" title="Dark / light mode"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path id="themeIco" d=""/></svg></button>
       <button class="btn sm pri" id="presentBtn">▶ Present</button>
       <select class="sel" id="season" aria-label="Season"></select>
     </div>
@@ -272,6 +274,15 @@ body.present .page{padding:0 0 32px;gap:0}
   </div>
 </div>
 <div id="tip" hidden></div>
+<script>
+(function(){var root=document.documentElement,btn=document.getElementById('themeBtn'),ico=document.getElementById('themeIco');
+  var MOON='M13 9.5A5.5 5.5 0 1 1 6.5 3a4.5 4.5 0 0 0 6.5 6.5z',SUN='M8 5a3 3 0 1 0 0 6 3 3 0 0 0 0-6zM8 1v1.5M8 13.5V15M1 8h1.5M13.5 8H15M3 3l1 1M12 12l1 1M3 13l1-1M12 4l1-1';
+  function isDark(){var t=root.getAttribute('data-theme');return t?t==='dark':matchMedia('(prefers-color-scheme: dark)').matches}
+  function sync(){var d=isDark();ico.setAttribute('d',d?SUN:MOON);btn.setAttribute('aria-label',d?'Switch to light mode':'Switch to dark mode')}
+  btn.onclick=function(){var t=isDark()?'light':'dark';root.setAttribute('data-theme',t);try{localStorage.setItem('hp2-theme',t)}catch(e){}sync()};
+  try{matchMedia('(prefers-color-scheme: dark)').addEventListener('change',sync)}catch(e){}
+  sync();})();
+</script>
 <div id="modalRoot"></div>
 
 <script>
