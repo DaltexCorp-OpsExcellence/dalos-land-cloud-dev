@@ -219,7 +219,7 @@ th.lh{border-bottom:3px solid var(--c)}
 .howto[open] .hint{margin-top:6px}
 body:not(.showf) .mg th .f,body:not(.showf) .sg th .f{display:none}
 .card.start{padding-bottom:6px}.card.start ol{margin:4px 0 12px;padding:0 14px 0 34px;display:grid;gap:8px;font-size:13px;color:var(--text2)}
-.qwrap{position:relative;display:inline-flex}.qclr{all:unset;cursor:pointer;position:absolute;right:6px;top:50%;transform:translateY(-50%);color:var(--text3);font-size:16px;padding:0 4px}
+.qwrap{position:relative;display:inline-flex}.qclr[hidden]{display:none}.qclr{all:unset;cursor:pointer;position:absolute;right:6px;top:50%;transform:translateY(-50%);color:var(--text3);font-size:16px;padding:0 4px}
 .hsplit summary{cursor:pointer;font-size:12px;color:var(--accent);font-weight:600}.tipgrid .row{display:grid;grid-template-columns:1fr auto;gap:10px;padding:3px 0;border-top:1px solid var(--border);font-size:12.5px}
 .pest .hint,.pest .howto,.pest th .f{display:none}.pest th{font-size:11.5px}
 .pbar{flex-wrap:nowrap;overflow-x:auto}.pbar .pf,.pbar .pslides{flex-wrap:nowrap}.pbar #exitPresent{margin-left:auto;flex-shrink:0}
@@ -320,7 +320,7 @@ const SBC=window.supabase.createClient(SB_URL,SB_ANON);
 const LC_HOME='/dalos-land-cloud-dev/';
 const cairoDate=d=>new Date(d).toLocaleDateString('en-CA',{timeZone:'Africa/Cairo'});
 async function paged(mk){const out=[];for(let from=0;;from+=1000){const {data,error}=await mk().range(from,from+999);if(error)throw error;out.push(...(data||[]));if(!data||data.length<1000)break;}return out;}
-function gate(title,msg,link){document.getElementById('page').innerHTML=`<div style="max-width:460px;margin:12vh auto;text-align:center;color:var(--text2)"><h2 style="font-family:var(--font-display);font-weight:400;font-size:24px;margin:0 0 8px;color:var(--text)">${title}</h2><p style="color:var(--text3);margin:0 0 18px">${msg}</p>${link?`<a href="${LC_HOME}" class="btn pri" style="text-decoration:none">Open Land Cloud →</a>`:''}</div>`;}
+function gate(title,msg,link){const fc=document.getElementById('farmChips');if(fc)fc.innerHTML='';document.getElementById('page').innerHTML=`<div style="max-width:460px;margin:12vh auto;text-align:center;color:var(--text2)"><h2 style="font-family:var(--font-display);font-weight:400;font-size:24px;margin:0 0 8px;color:var(--text)">${title}</h2><p style="color:var(--text3);margin:0 0 18px">${msg}</p>${link?`<a href="${LC_HOME}" class="btn pri" style="text-decoration:none">Open Land Cloud →</a>`:''}</div>`;}
 // skeleton shaped like the Estimates page (cards, controls, table) shown until live data arrives
 function loading(){
   const sk=(w,h,r)=>`<span class="skel" style="width:${w};height:${h}px;${r?'border-radius:'+r+'px':''}"></span>`;
