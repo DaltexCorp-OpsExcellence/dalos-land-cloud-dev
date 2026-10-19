@@ -653,13 +653,13 @@ function rollTable(keyFn,label,list,extraCol){
   const g={};list.forEach(p=>(g[keyFn(p)]=g[keyFn(p)]||[]).push(p));
   const ent=Object.entries(g).sort((a,b)=>agg(b[1],S.since).est-agg(a[1],S.since).est);
   const body=ent.map(([k,ps])=>{GROUPS[k]=ps;const a=agg(ps,S.since);const d=a.est-a.budget;
-    return `<tr><td class="vname">${esc(k)}${extraCol?` <span class="calc" style="font-weight:400">${esc(extraCol(ps))}</span><br>${winChip(k)}`:''}</td><td class="num">${n0(a.budget)}</td><td class="num calc">${n0(a.jul)}</td><td class="num calc mcell" data-mk="rt|${label}|${esc(k)}" data-mv="${ps.reduce((t,p)=>t+estAt(p,monthEnd(S.month)),0)}"><span class="mval">${n0(ps.reduce((t,p)=>t+estAt(p,monthEnd(S.month)),0))}</span></td>
-      <td class="num" style="color:var(--text);font-weight:700">${n0(a.est)}${gbadge(k,ps)}</td><td class="num ${d>=0?'pos':'neg'}">${sgn(d)}</td>
-      <td><span class="pill ${d>0.5?'p':'np'}" style="${d<-0.5?'background:var(--red-bg);color:var(--red)':''}">${d>0.5?'Surplus':d<-0.5?'Deficit':'On budget'}</span></td>
+    return `<tr><td class="vname">${esc(k)}${extraCol?` <span class="calc" style="font-weight:400">${esc(extraCol(ps))}</span><br>${winChip(k)}`:''}</td><td class="num">${n0(a.budget)}</td><td class="num calc mcell" data-mk="rt|${label}|${esc(k)}" data-mv="${ps.reduce((t,p)=>t+estAt(p,monthEnd(S.month)),0)}"><span class="mval">${n0(ps.reduce((t,p)=>t+estAt(p,monthEnd(S.month)),0))}</span></td>
+      <td class="num"><div class="estcell"><span class="bslot">${gbadge(k,ps)}</span><b style="color:var(--text)">${n0(a.est)}</b></div></td>${a.budget&&a.est?`<td class="num ${d>0.5?'pos':d<-0.5?'neg':''}">${sgn(d)}</td>
+      <td><span class="pill ${d>0.5?'p':'np'}" style="${d<-0.5?'background:var(--red-bg);color:var(--red)':''}">${d>0.5?'Surplus':d<-0.5?'Deficit':'On budget'}</span></td>`:'<td class="num calc">–</td><td></td>'}
       <td class="num">${n0(a.tot)}</td><td class="num">${n0(a.tot/a.est*100)}%</td></tr>`}).join('');
   const A=agg(list,S.since);
-  return `<div class="table-wrap"><table><thead><tr><th style="text-align:left">${label}</th><th>Budget</th><th>July est.</th><th>${monthSel()}</th><th>Latest</th><th>vs budget</th><th></th><th>Raw PK actual</th><th>% of est.</th></tr></thead>
-   <tbody>${body}<tr class="tot"><td>Total</td><td class="num">${n0(A.budget)}</td><td class="num">${n0(A.jul)}</td><td class="num mcell" data-mk="rt|${label}|Total" data-mv="${list.reduce((t,p)=>t+estAt(p,monthEnd(S.month)),0)}"><span class="mval">${n0(list.reduce((t,p)=>t+estAt(p,monthEnd(S.month)),0))}</span></td><td class="num">${n0(A.est)}</td><td class="num">${sgn(A.est-A.budget)}</td><td></td><td class="num">${n0(A.tot)}</td><td class="num">${n0(A.tot/A.est*100)}%</td></tr></tbody></table></div>`;
+  return `<div class="table-wrap"><table><thead><tr><th style="text-align:left">${label}</th><th>Budget</th><th>${monthSel()}</th><th>Latest</th><th>vs budget</th><th></th><th>Raw PK actual</th><th>% of est.</th></tr></thead>
+   <tbody>${body}<tr class="tot"><td>Total</td><td class="num">${n0(A.budget)}</td><td class="num mcell" data-mk="rt|${label}|Total" data-mv="${list.reduce((t,p)=>t+estAt(p,monthEnd(S.month)),0)}"><span class="mval">${n0(list.reduce((t,p)=>t+estAt(p,monthEnd(S.month)),0))}</span></td><td class="num">${n0(A.est)}</td><td class="num">${sgn(A.est-A.budget)}</td><td></td><td class="num">${n0(A.tot)}</td><td class="num">${n0(A.tot/A.est*100)}%</td></tr></tbody></table></div>`;
 }
 
 function viewSum(){
@@ -673,7 +673,7 @@ function viewSum(){
       return `<td class="num" style="${ch?'background:var(--amber-bg);color:var(--text)':''}">${n0(v)}</td>`}).join('')}</tr>`}).join('');
   const typeOf=ps=>ps[0].type;
   return kpis(list)+`<div class="grid2">
-   <div class="card"><h2>By variety</h2><div class="sub">Budget → July → November → latest, summed from plots. Hover a <b style="color:var(--amber)">● updates</b> badge to see what moved.</div>${rollTable(p=>p.variety,'Variety',list,typeOf)}</div>
+   <div class="card"><h2>By variety</h2><div class="sub">Budget, the estimate as of the month you pick, and the latest, summed from plots. Hover an <b style="color:var(--amber)">● updates</b> badge to see what moved.</div>${rollTable(p=>p.variety,'Variety',list,typeOf)}</div>
    <div class="card"><h2>By farm</h2><div class="sub">Same totals, rolled up by farm.</div>${rollTable(p=>p.farm,'Farm',list)}</div>
   </div>
   <div class="card"><h2>Estimate snapshots</h2><div class="sub">Estimate per variety as it stood each week, taken from the change history. This replaces copying the totals into dated columns by hand. Shaded cells changed that week.</div>
