@@ -1,3 +1,7 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Harvest Planner v2</title>
 <script>try{var t=localStorage.getItem('hp2-theme');if(t==='dark'||t==='light')document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.110.8/dist/umd/supabase.js"></script>
@@ -12,7 +16,7 @@
   --amber:#b87820;--amber-bg:#fdf3e0;--amber-border:#e8c87a;
   --red:#b03030;--red-bg:#faeaea;--red-border:#e8a0a0;
   --green:#1e6b3a;--green-bg:#e8f5ec;--green-border:#8ecba4;
-  --text:#111f1f;--text2:#3b4b4a;--text3:#6a7a79;
+  --text:#111f1f;--text2:#3b4b4a;--text3:#5a6968;--skel-a:#e0e8e6;--skel-b:#cedad7;--past-mix:45%;
   --border:#c6d4d2;--border2:#aabdbb;--card:#ffffff;--subtot:#edeae4;--subtot-text:#4a4840;
   --shadow:0 10px 30px rgba(14,58,61,.18);
   --font-display:'DM Serif Display',Georgia,serif;
@@ -25,12 +29,12 @@
   --bg:#0f1b1c;--bg2:#172728;--bg3:#203436;--accent:#2a9a96;--accent2:#3bb3ae;--accent-bg:#173a3a;
   --amber:#e0a54a;--amber-bg:#33280f;--amber-border:#6b5320;--red:#e27a7a;--red-bg:#3a1c1c;--red-border:#743434;
   --green:#6cc58e;--green-bg:#15301f;--green-border:#2f6a44;--text:#e6efee;--text2:#bfcfcd;--text3:#8a9d9b;
-  --border:#2a3e3f;--border2:#3a5355;--card:#142223;--subtot:#232a26;--subtot-text:#cfc9bb;--shadow:0 10px 30px rgba(0,0,0,.5);color-scheme:dark}}
+  --border:#2a3e3f;--border2:#3a5355;--card:#142223;--subtot:#232a26;--subtot-text:#cfc9bb;--shadow:0 10px 30px rgba(0,0,0,.5);--skel-a:#1f3436;--skel-b:#2d4749;--past-mix:75%;color-scheme:dark}}
 :root[data-theme="dark"]{
   --bg:#0f1b1c;--bg2:#172728;--bg3:#203436;--accent:#2a9a96;--accent2:#3bb3ae;--accent-bg:#173a3a;
   --amber:#e0a54a;--amber-bg:#33280f;--amber-border:#6b5320;--red:#e27a7a;--red-bg:#3a1c1c;--red-border:#743434;
   --green:#6cc58e;--green-bg:#15301f;--green-border:#2f6a44;--text:#e6efee;--text2:#bfcfcd;--text3:#8a9d9b;
-  --border:#2a3e3f;--border2:#3a5355;--card:#142223;--subtot:#232a26;--subtot-text:#cfc9bb;--shadow:0 10px 30px rgba(0,0,0,.5);color-scheme:dark}
+  --border:#2a3e3f;--border2:#3a5355;--card:#142223;--subtot:#232a26;--subtot-text:#cfc9bb;--shadow:0 10px 30px rgba(0,0,0,.5);--skel-a:#1f3436;--skel-b:#2d4749;--past-mix:75%;color-scheme:dark}
 *{box-sizing:border-box}
 body{margin:0;font-family:var(--font-body);background:var(--bg);color:var(--text);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
 .app{display:flex;min-height:100vh}
@@ -79,7 +83,7 @@ body{margin:0;font-family:var(--font-body);background:var(--bg);color:var(--text
 .card .table-wrap{border:none;border-top:1px solid var(--border);border-radius:0 0 var(--r2) var(--r2);max-height:none}
 table{border-collapse:collapse;width:100%}
 th{font-size:10px;text-transform:uppercase;letter-spacing:.04em;color:var(--text3);text-align:center;padding:8px 9px;border-bottom:2px solid var(--border2);white-space:nowrap;font-weight:600;background:var(--card);position:sticky;top:0;z-index:2}
-th .f{display:block;font-size:9px;letter-spacing:.02em;text-transform:none;color:var(--accent);font-weight:500}
+th .f{display:block;font-size:10px;letter-spacing:.02em;text-transform:none;color:var(--accent);font-weight:500}
 th.grpcol{border-bottom:1px solid var(--border);font-size:9.5px;color:var(--text2);background:var(--bg2)}
 td{font-size:13px;color:var(--text2);padding:5px 9px;border-bottom:1px solid var(--border);white-space:nowrap}
 .num{font-family:var(--font-num);font-size:12px;text-align:right;font-variant-numeric:tabular-nums;font-weight:500}
@@ -103,7 +107,7 @@ tr.tot td{background:var(--subtot);color:var(--subtot-text);font-weight:700;bord
 .bar i{display:block;height:100%;background:var(--accent2)}
 .rchip{display:inline-block;font-size:10.5px;padding:1px 8px;border-radius:10px;background:var(--accent-bg);color:var(--accent);font-weight:600}
 .rchip.none{background:var(--bg2);color:var(--text3);font-weight:500}
-.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,460px),1fr));gap:14px}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,600px),1fr));gap:14px}
 #tip{position:fixed;z-index:60;background:var(--card);border:1px solid var(--border2);border-radius:var(--r2);box-shadow:var(--shadow);padding:10px 12px;font-size:12px;max-width:340px;pointer-events:none}
 #tip .h{font-weight:600;color:var(--text);margin-bottom:6px}
 #tip .row{display:grid;grid-template-columns:auto 1fr;gap:2px 10px;padding:4px 0;border-top:1px solid var(--border)}
@@ -163,9 +167,9 @@ th.today,td.today{background:var(--accent-bg)}
 @media (max-width:700px){.mg .stk{min-width:130px;max-width:130px}.mg .stk2{left:130px;min-width:96px}.mg .pl2{display:none}}
 .mg td.past{background:color-mix(in srgb,var(--green-bg) 45%,transparent);text-align:right;line-height:1.15}
 .mg .act{color:var(--text);font-family:var(--font-num);font-size:12px}
-.pln{font-size:9.5px;color:var(--text3);font-family:var(--font-num)}
+.pln{font-size:10.5px;color:var(--text3);font-family:var(--font-num)}
 .mg td.click{cursor:pointer}.mg td.click:hover{outline:1px solid var(--accent);outline-offset:-1px;background:var(--accent-bg)}
-.todayact{all:unset;cursor:pointer;display:block;font-size:9.5px;color:var(--accent);text-align:right;padding:0 4px;font-weight:600}
+.todayact{all:unset;cursor:pointer;display:block;font-size:10.5px;color:var(--accent);text-align:right;padding:0 4px;font-weight:600}
 .todayact:hover,.todayact:focus-visible{text-decoration:underline}
 .agrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px}
 .ch{display:flex;flex-direction:column;align-items:center;gap:1px;line-height:1.2}
@@ -203,7 +207,28 @@ th.lh{border-bottom:3px solid var(--c)}
 .skel{display:inline-block;vertical-align:middle;background:linear-gradient(90deg,var(--bg2) 25%,var(--bg3) 37%,var(--bg2) 63%);background-size:400% 100%;border-radius:5px;animation:skelsh 1.4s ease infinite}
 @keyframes skelsh{0%{background-position:100% 0}100%{background-position:-100% 0}}
 @media (prefers-reduced-motion:reduce){.skel{animation:none}}
-.harv{display:flex;flex-direction:column;align-items:flex-end;gap:2px}
+.harv{display:flex;flex-direction:row;align-items:center;justify-content:flex-end;gap:6px}
+/* review fixes */
+.mg thead tr:first-child th{height:28px;padding-top:0;padding-bottom:0;box-sizing:border-box}
+.mg thead tr:nth-child(2) th{top:28px}
+.bad,.ain.bad,.dayin.bad,input.bad{outline:2px solid var(--red)!important;outline-offset:-1px;background:var(--red-bg)!important}
+.dayin.ok{background:var(--green-bg)!important;transition:background .4s}
+.btn:disabled{opacity:.45;pointer-events:none}
+.btnpair{display:inline-flex;gap:6px;flex-wrap:nowrap}
+.howto{flex-basis:100%;font-size:12px;color:var(--text3)}.howto summary{cursor:pointer;color:var(--accent);font-weight:600;font-size:12px;width:max-content}
+.howto[open] .hint{margin-top:6px}
+body:not(.showf) .mg th .f,body:not(.showf) .sg th .f{display:none}
+.card.start{padding-bottom:6px}.card.start ol{margin:4px 0 12px;padding:0 14px 0 34px;display:grid;gap:8px;font-size:13px;color:var(--text2)}
+.qwrap{position:relative;display:inline-flex}.qclr{all:unset;cursor:pointer;position:absolute;right:6px;top:50%;transform:translateY(-50%);color:var(--text3);font-size:16px;padding:0 4px}
+.hsplit summary{cursor:pointer;font-size:12px;color:var(--accent);font-weight:600}.tipgrid .row{display:grid;grid-template-columns:1fr auto;gap:10px;padding:3px 0;border-top:1px solid var(--border);font-size:12.5px}
+.pest .hint,.pest .howto,.pest th .f{display:none}.pest th{font-size:11.5px}
+.pbar{flex-wrap:nowrap;overflow-x:auto}.pbar .pf,.pbar .pslides{flex-wrap:nowrap}.pbar #exitPresent{margin-left:auto;flex-shrink:0}
+.skel{background:linear-gradient(90deg,var(--skel-a) 25%,var(--skel-b) 37%,var(--skel-a) 63%);background-size:400% 100%}
+.mg td.past{background:color-mix(in srgb,var(--green-bg) var(--past-mix),transparent)}
+.ain{background:var(--card)}.ain:not(:placeholder-shown){background:var(--amber-bg)}
+.x{width:32px;height:32px;display:grid;place-items:center;padding:0}
+@media (max-width:900px){.topbar .mock{display:none}.topbar h1{font-size:16px}.topbar{gap:8px}#season{max-width:150px}}
+@media (max-width:600px){.btnpair{width:100%}.btnpair .btn{flex:1;justify-content:center}}
 .harv .bar{margin:0;width:56px}
 .legendrow{display:flex;gap:16px;flex-wrap:wrap;font-size:11.5px;color:var(--text3);align-items:center}
 /* sidebar = drawer, hidden by default */
@@ -268,7 +293,7 @@ body.present .page{padding:0 0 32px;gap:0}
       <span class="lbl">Farm</span><span id="farmChips" style="display:contents"></span>
       <span class="lbl" style="margin-left:8px">Type</span>
       <select class="sel" id="typeSel" aria-label="Type"></select>
-      <input class="search" id="q" placeholder="Search plot or variety" aria-label="Search">
+      <span class="qwrap"><input class="search" id="q" placeholder="Search plot or variety" aria-label="Search"><button class="qclr" id="qClr" aria-label="Clear search" hidden>×</button></span><span class="calc" id="qCount" style="font-size:12px"></span>
       <div class="spacer"></div>
       <span class="lbl">Changes since</span>
       <select class="sel" id="since" aria-label="Changes since meeting"></select>
@@ -386,6 +411,8 @@ const fmtDY=d=>{const t=new Date(d+'T00:00:00Z');return t.toLocaleDateString('en
 const n0=x=>x==null||isNaN(x)?'–':(Math.abs(x-Math.round(x))<0.05?Math.round(x).toLocaleString('en-US'):x.toLocaleString('en-US',{minimumFractionDigits:1,maximumFractionDigits:1}));
 const n1=x=>x==null||isNaN(x)||!isFinite(x)?'–':x.toLocaleString('en-US',{minimumFractionDigits:1,maximumFractionDigits:1});
 const sgn=(x,f=n0)=>x>0.5?'+'+f(x):x<-0.5?'−'+f(-x):'0';
+// tonnes typed by people: Arabic digits and comma decimals accepted; '' = 0; anything else (text, negatives) = NaN
+const parseT=v=>{let t=String(v??'').trim().replace(/[\u0660-\u0669]/g,c=>c.charCodeAt(0)-0x660).replace(/[\u066B,]/g,'.');if(t==='')return 0;return /^(\d+\.?\d*|\.\d+)$/.test(t)?+t:NaN};
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 
 // ---------- plots (from farm_blocks + hp2_* tables, built by the loader) ----------
@@ -409,10 +436,12 @@ function agg(list,since){
 
 // ---------- state ----------
 const S={tab:'est',farm:'All',type:'All',q:'',since:MEETINGS[0],group:'farm',reason:'All'};
-try{const u=JSON.parse(localStorage.getItem('hp2-ui')||'{}');S.tab=u.tab||S.tab;S.group=u.group||S.group;if(MEETINGS.includes(u.since))S.since=u.since}catch(e){}
-const saveUI=()=>{try{localStorage.setItem('hp2-ui',JSON.stringify({tab:S.tab,group:S.group,since:S.since}))}catch(e){}};
+try{const u=JSON.parse(localStorage.getItem('hp2-ui')||'{}');S.tab=u.tab||S.tab;S.group=u.group||S.group;if(MEETINGS.includes(u.since))S.since=u.since;
+  S.farm=u.farm||'All';S.type=u.type||'All';S.days=u.days||7;S.wk=u.wk||0;S.howto=!!u.howto}catch(e){}
+const saveUI=()=>{try{localStorage.setItem('hp2-ui',JSON.stringify({tab:S.tab,group:S.group,since:S.since,farm:S.farm,type:S.type,days:S.days,wk:S.wk,howto:S.howto}))}catch(e){}};
 const FARMS=['All',...new Set(PLOTS.map(p=>p.farm))];
 const TYPES=['All',...new Set(PLOTS.map(p=>p.type))];
+if(!FARMS.includes(S.farm))S.farm='All';if(!TYPES.includes(S.type))S.type='All';
 const filtered=()=>PLOTS.filter(p=>(S.farm==='All'||p.farm===S.farm)&&(S.type==='All'||p.type===S.type)&&
   (!S.q||(p.plot+' '+p.variety+' '+p.farm+' '+p.sector).toLowerCase().includes(S.q.toLowerCase())));
 
@@ -423,7 +452,11 @@ function chrome(){
   $('#typeSel').innerHTML=TYPES.map(t=>`<option ${S.type===t?'selected':''}>${t}</option>`).join('');
   $('#since').innerHTML=MEETINGS.map(m=>`<option value="${m}" ${S.since===m?'selected':''}>Meeting ${fmtDY(m)}</option>`).join('');
   document.querySelectorAll('#tabs button').forEach(b=>b.classList.toggle('on',b.dataset.t===S.tab));
+  const n=filtered().length;$('#qCount').textContent=n===PLOTS.length?`${n} plots`:`${n} of ${PLOTS.length} plots`;$('#qClr').hidden=!S.q;
+  document.body.classList.toggle('showf',!!S.howto);saveUI();
 }
+document.addEventListener('toggle',e=>{if(e.target.classList&&e.target.classList.contains('howto')){S.howto=e.target.open;document.body.classList.toggle('showf',S.howto);saveUI()}},true);
+document.addEventListener('click',e=>{if(e.target.closest('[data-clearf]')){S.farm='All';S.type='All';S.q='';$('#q').value='';render()}});
 document.addEventListener('click',e=>{
   const f=e.target.closest('[data-farm]');if(f){S.farm=f.dataset.farm;render()}
   const t=e.target.closest('#tabs button');if(t){S.tab=t.dataset.t;saveUI();render()}
@@ -436,9 +469,13 @@ document.addEventListener('click',e=>{
 });
 $('#typeSel').onchange=e=>{S.type=e.target.value;render()};
 $('#since').onchange=e=>{S.since=e.target.value;saveUI();render()};
-$('#q').oninput=e=>{S.q=e.target.value;render()};
+let qT;$('#q').oninput=e=>{clearTimeout(qT);qT=setTimeout(()=>{S.q=e.target.value;render()},160)};
+$('#qClr').onclick=()=>{$('#q').value='';S.q='';render()};
 
 // ---------- change badge + hover ----------
+// harvested split: the 4 categories that make up Harvested (all counted against the estimate)
+function harvSplit(p){let a=[0,0,0,0];for(const [d,x] of Object.entries(p.daily))if(d<=TODAY)for(let j=0;j<4;j++)a[j]+=x[j];
+  return ['To packhouse','Field sorting','Local sales','Waste'].map((l,j)=>`<div class="row"><span class="calc">${l}</span><span class="num" style="text-align:right">${n0(a[j])} t</span></div>`).join('')}
 function badge(p){
   const all=inSeason(p);if(!all.length)return '';
   const nw=changes(p,S.since).length;
@@ -456,6 +493,8 @@ document.addEventListener('mouseover',e=>{
   const b=e.target.closest('[data-tip]');if(!b){hideTip();return}
   const [k,id]=[b.dataset.tip.slice(0,1),b.dataset.tip.slice(2)];
   let html='';
+  if(k==='h'){const p=PLOTS.find(x=>x.id===id);tip.innerHTML=`<div class="h">${esc(p.farm)} · <span class="plot">${p.sector}-${p.plot}</span> harvested ${n0(total(p))} t</div>${harvSplit(p)}`;tip.hidden=false;
+    const r=b.getBoundingClientRect();tip.style.left=Math.max(12,Math.min(r.left,innerWidth-352))+'px';tip.style.top=(r.bottom+8+tip.offsetHeight>innerHeight?r.top-tip.offsetHeight-8:r.bottom+8)+'px';return}
   if(k==='p'){
     const p=PLOTS.find(x=>x.id===id);const evs=p.ev.slice(-4).reverse();
     html=`<div class="h">${esc(p.farm)} · <span class="plot">${p.sector}-${p.plot}</span> ${esc(p.variety)}</div>`+
@@ -482,11 +521,11 @@ function kpis(list){
   const a=agg(list,S.since);const d=a.est-a.budget;
   return `<div class="kpis">
    <div class="kpi"><div class="k">Area · productive</div><div class="v">${n0(a.area)} <span style="font-size:13px;color:var(--text3)">fed</span></div><div class="s">${n0(a.parea)} fed productive · ${a.plots} plots</div></div>
-   <div class="kpi"><div class="k">Budget</div><div class="v">${n0(a.budget)} t</div><div class="s">${n1(a.budget/a.area)} t/fed</div></div>
-   <div class="kpi hl"><div class="k">Latest estimate</div><div class="v">${n0(a.est)} t</div><div class="s"><span class="${d>=0?'pos':'neg'}">${sgn(d)} t vs budget (${sgn(d/a.budget*100,n1)}%)</span></div></div>
+   <div class="kpi"><div class="k">Budget</div><div class="v">${a.budget?n0(a.budget)+' t':'–'}</div><div class="s">${a.budget?n1(a.budget/a.area)+' t/fed':'not set yet'}</div></div>
+   <div class="kpi hl"><div class="k">Latest estimate</div><div class="v">${a.est?n0(a.est)+' t':'–'}</div><div class="s">${a.est&&a.budget?`<span class="${d>=0?'pos':'neg'}">${sgn(d)} t vs budget (${sgn(d/a.budget*100,n1)}%)</span>`:a.est?'no budget yet':'no estimates yet'}</div></div>
    <div class="kpi"><div class="k">Moved since ${fmtD(S.since)}</div><div class="v ${a.est-a.prev>=0?'pos':'neg'}">${sgn(a.est-a.prev)} t</div><div class="s">${a.nNew} plot changes</div></div>
-   <div class="kpi"><div class="k">Harvested total</div><div class="v">${n0(a.tot)} t</div><div class="s">${n0(a.act)} t packhouse · ${n0(a.tot-a.act)} t sorting, local &amp; waste</div></div>
-   <div class="kpi"><div class="k">Remaining</div><div class="v">${n0(a.rem)} t</div><div class="s">${n0(a.tot/a.est*100)}% of estimate harvested</div></div>
+   <div class="kpi"><div class="k">Harvested total</div><div class="v">${n0(a.tot)} t</div><div class="s">${n0(a.act)} packhouse · ${n0(a.local)} sorting &amp; local · ${n0(a.tot-a.act-a.local)} waste</div></div>
+   <div class="kpi"><div class="k">Remaining</div><div class="v">${n0(a.rem)} t</div><div class="s">${a.est?n0(a.tot/a.est*100)+'% of estimate harvested':'needs an estimate'}</div></div>
   </div>`;
 }
 
@@ -496,7 +535,9 @@ function planVal(p,d){return PLAN[p.id+'|'+d]||0}
 async function savePlan(k,v,old){const i=k.lastIndexOf('|'),bid=k.slice(0,i),day=k.slice(i+1);
   const r=v>0?await SB.from('hp2_plan_days').upsert({season_id:DB.seasonId,block_id:bid,day,planned_t:v,updated_by:DB.me.id},{onConflict:'season_id,block_id,day'})
              :await SB.from('hp2_plan_days').delete().eq('season_id',DB.seasonId).eq('block_id',bid).eq('day',day);
-  if(r.error){PLAN[k]=old;keepScroll(render);toast('Plan not saved: '+r.error.message)}}
+  const cell=()=>document.querySelector(`[data-plan="${k}"]`);
+  if(r.error){PLAN[k]=old;keepScroll(render);toast('Plan not saved: '+r.error.message);cell()?.classList.add('bad');return}
+  const c=cell();if(c){c.classList.add('ok');setTimeout(()=>c.classList.remove('ok'),1400)}}
 const planDays=()=>{const n=S.days||7;const s=addDays(TODAY,(S.wk||0)*7-3);return [...Array(n)].map((_,i)=>addDays(s,i))};
 function viewEst(part){
   const list=filtered();const days=planDays();
@@ -526,7 +567,7 @@ function viewEst(part){
           <div class="pl2">${esc(p.root)} · ${p.planted} · ${n1(p.area)} fed ${S.group==='farm'?winChip(p.variety):''}</div></td>
         <td class="stk2" style="text-align:right"><button class="estbtn" data-edit="${p.id}" aria-label="Update estimate">${p.ev.length?n0(e):'<span class="calc">+ add</span>'} <span class="pen">✎</span></button>${badge(p)}</td>
         <td class="num calc">${p.ev.length?n1(e/p.area):'–'}</td><td class="num calc"><button class="budbtn" data-budget="${p.id}" aria-label="Set budget">${p.budget?n0(p.budget):'+ budget'}</button></td><td class="num ${d>=0?'pos':'neg'}">${p.budget&&p.ev.length?sgn(d):'<span class="calc">–</span>'}</td><td class="num">${tfCell(p)}</td>
-        <td class="num" title="To packhouse ${n0(p.act)} t · field sorting + local sales ${n0(p.local)} t · waste ${n0(p.culls)} t"><div class="harv">${n0(t)}<span class="bar"><i style="width:${Math.min(100,pct)}%"></i></span></div></td>
+        <td class="num" data-tip="h:${p.id}"><div class="harv">${n0(t)}<span class="bar"><i style="width:${Math.min(100,pct)}%"></i></span></div></td>
         <td class="num ${rem<-0.5?'neg':''}">${n0(rem)}</td>
         ${dvals.map((v,i)=>days[i]<TODAY?pastCell(actDay(p,days[i]),v,i,false,p.id):`<td class="day ${i===0?'daystart':''} ${wkCls(days[i])} ${inWin(p.variety,days[i])?'':'offwin'}" ${inWin(p.variety,days[i])?'':'title="Outside the '+esc(p.variety)+' harvest window"'}><input class="dayin ${v?'':'z'}" data-plan="${p.id}|${days[i]}" value="${v||''}" placeholder="·" inputmode="decimal" aria-label="Plan ${p.sector}-${p.plot} ${days[i]}">${days[i]===TODAY?`<button class="todayact" data-act="${p.id}|${TODAY}">${actDay(p,TODAY)?'act '+n0(actDay(p,TODAY)):'+ actual'}</button>`:''}</td>`).join('')}
         ${tail(rem,dvals,[p])}</tr>`;
@@ -542,27 +583,34 @@ function viewEst(part){
       const pp=pv.reduce((x,y,i)=>x+(days[i]<TODAY?y:0),0),ap=av.reduce((x,y)=>x+y,0),pf=planAhead(ps);
       const vc=(a,p)=>p&&Math.abs(a-p)>0.5?(a>p?'pos':'neg'):'';
       return `<tr class="${cls||''}"><td class="vname" style="text-align:left">${name}</td><td class="num">${n0(A)}</td><td class="num">${n0(PA)}</td><td class="num">${n0(PQ)}</td><td class="num calc">${n1(PA?PQ/PA:NaN)}</td><td class="num calc">${n1(L/A)}</td>
-        <td class="num calc">${n0(B)}</td><td class="num calc mcell" data-mk="${label}|${name}" data-mv="${N}"><span class="mval">${n0(N)}</span>${Math.abs(L-N)>0.5?`<div class="pln ${L>N?'pos':'neg'}">${sgn(L-N)} since</div>`:''}</td><td class="num" style="color:var(--text);font-weight:600">${n0(L)}</td><td class="num">${n0(H)}</td><td class="num">${n0(SL)}</td><td class="num ${L-H-SL-W<-0.5?'neg':''}">${n0(L-H-SL-W)}</td>
+        <td class="num calc">${n0(B)}</td><td class="num calc mcell" data-mk="${label}|${name}" data-mv="${N}"><span class="mval">${n0(N)}</span>${Math.abs(L-N)>0.5?`<div class="pln ${L>N?'pos':'neg'}">${sgn(L-N)} since</div>`:''}</td><td class="num" style="color:var(--text);font-weight:600">${n0(L)}</td><td class="num">${n0(H)}</td><td class="num">${n0(SL)}</td><td class="num">${n0(W)}</td><td class="num ${L-H-SL-W<-0.5?'neg':''}">${n0(L-H-SL-W)}</td>
         <td class="num daystart">${pp||ap?`<span style="color:var(--text)">${n0(ap)}</span><div class="pln ${vc(ap,pp)}">plan ${n0(pp)}</div>`:'<span class="calc">–</span>'}</td><td class="num" style="color:var(--text)">${n0(pf)}</td>
         ${pv.map((v,i)=>days[i]<TODAY?`<td class="num pastc ${i===0?'daystart':''} ${wkCls(days[i])}" style="line-height:1.15"><span style="color:var(--text)">${av[i]?n0(av[i]):'<span class="calc">·</span>'}</span><div class="pln ${vc(av[i],v)}">${v?'plan '+n0(v):''}</div></td>`
           :`<td class="num ${i===0?'daystart':''} ${wkCls(days[i])}">${v?n0(v):'<span class="calc">·</span>'}<div class="pln">${days[i]===TODAY&&actDay?'':''}</div></td>`).join('')}</tr>`};
     const ent=Object.entries(g).sort((a,b)=>a[0].localeCompare(b[0]));
     return `<div class="card"><h2>Summary by ${label.toLowerCase()}</h2><div class="sub">Same columns as the old plan sheet. Past days (shaded) show the actual with the plan under it (green = above plan, red = below); today on shows the plan.</div>
      <div class="table-wrap"><table class="sg"><thead><tr><th style="text-align:left">${label}</th><th>Total area</th><th>Prod. area</th><th>Prod. area qty<span class="f">latest, productive</span></th><th>Yield/area P<span class="f">= qty ÷ prod. area</span></th><th>Yield/area<span class="f">= latest ÷ total area</span></th>
-      <th>Budget qty</th><th>${monthSel()}</th><th>Latest update</th><th>To packhouse</th><th>Sales<span class="f">sorting + local</span></th><th>Remaining<span class="f">= latest − all harvested (incl. waste)</span></th><th class="daystart">Actual so far<span class="f">past days · vs plan</span></th><th>Plan ahead<span class="f">today on</span></th>
+      <th>Budget qty</th><th>${monthSel()}</th><th>Latest update</th><th>To packhouse</th><th>Sales<span class="f">sorting + local</span></th><th>Waste</th><th>Remaining<span class="f">= latest − all harvested (incl. waste)</span></th><th class="daystart">Actual so far<span class="f">past days · vs plan</span></th><th>Plan ahead<span class="f">today on</span></th>
       ${days.map((d,i)=>{const t=new Date(d+'T00:00:00Z');return `<th class="${i===0?'daystart':''} ${wkCls(d)}">${t.toLocaleDateString('en-GB',{weekday:'short',timeZone:'UTC'})}<span class="f">${fmtD(d)}</span></th>`}).join('')}</tr></thead>
       <tbody>${ent.map(([k,ps])=>row(esc(k),ps)).join('')}${row('Total',list,'tot')}</tbody></table></div></div>`};
   const dayNav=`<span class="lbl">Days</span><div class="seg"><button data-wk="-1" aria-label="Earlier">‹</button><button data-wk="0">${fmtD(s0)} – ${fmtD(s1)}</button><button data-wk="1" aria-label="Later">›</button></div>
     <div class="seg"><button data-days="7" class="${(S.days||7)===7?'on':''}">7 d</button><button data-days="14" class="${S.days===14?'on':''}">14 d</button></div>`;
   if(part==='sum')return `<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">${dayNav}<span class="spacer"></span><button class="btn sm" data-windows>Harvest windows</button><button class="btn sm pri" data-logharvest>+ Log harvest</button></div>${sumGrid(p=>p.variety,'Variety')}${sumGrid(p=>p.farm,'Farm')}`;
-  return kpis(list)+`
+  const fresh=PLOTS.every(p=>!p.ev.length)&&!Object.keys(PLAN).length&&!Object.values(WIN).some(w=>w.start);
+  const start=fresh?`<div class="card start"><h2>Start the ${esc(DB.season.name)} plan</h2><ol>
+      <li><b>Budgets.</b> Click <i>+ budget</i> on a plot, or send the budget sheet for a bulk upload.</li>
+      <li><b>Harvest windows.</b> Set a start and end date per variety with <button class="btn sm" data-windows>Harvest windows</button></li>
+      <li><b>Estimates.</b> Click <i>+ add</i> under Latest t whenever the agronomy team updates a plot.</li>
+      <li><b>Daily plan and actuals.</b> Type planned tonnes in the day cells; log what was picked with <button class="btn sm" data-logharvest>+ Log harvest</button></li></ol></div>`:'';
+  if(!list.length)return `<div class="card start"><h2>No plots match</h2><div class="sub">Nothing fits the farm, type or search filter.</div><div style="padding:0 14px 14px"><button class="btn sm" data-clearf>Clear filters</button></div></div>`;
+  return start+kpis(list)+`
   <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
     <span class="lbl">Group by</span><div class="seg"><button data-group="farm" class="${S.group==='farm'?'on':''}">Farm</button><button data-group="variety" class="${S.group==='variety'?'on':''}">Variety</button></div>
     <span class="lbl" style="margin-left:6px">Plan days</span>
     <div class="seg"><button data-wk="-1" aria-label="Earlier">‹</button><button data-wk="0">${fmtD(s0)} – ${fmtD(s1)}</button><button data-wk="1" aria-label="Later">›</button></div>
     <div class="seg"><button data-days="7" class="${(S.days||7)===7?'on':''}">7 d</button><button data-days="14" class="${S.days===14?'on':''}">14 d</button></div>
-    <span class="spacer"></span><button class="btn sm" data-windows>Harvest windows</button><button class="btn sm pri" data-logharvest>+ Log harvest</button>
-    <p class="hint" style="flex-basis:100%">Left: the estimate per plot. Click it to update by tonnes or t/fed; every change is saved with who, when and why (<b style="color:var(--amber)">● new</b> = since the selected meeting). Right: harvest raw tonnes per day. Past days show the <b>actual</b> from the harvest log with the plan under it (green = above plan, red = below). Click a past day to enter or correct a plot's harvest, use <b>+ actual</b> under today, or <b>Log harvest</b> to enter a whole farm's day at once. Today and later are plan inputs. <b>Left after plan</b> = remaining − plan ahead; red means the plan is more than the estimate. Hover Harvested for the packhouse / local split.</p>
+    <span class="spacer"></span><span class="btnpair"><button class="btn sm" data-windows>Harvest windows</button><button class="btn sm pri" data-logharvest>+ Log harvest</button></span>
+    <details class="howto" ${S.howto?'open':''}><summary>How this works</summary><p class="hint">Left: the estimate per plot. Click it to update by tonnes or t/fed; every change is saved with who, when and why (<b style="color:var(--amber)">● new</b> = since the selected meeting). Right: harvest raw tonnes per day. Past days show the <b>actual</b> from the harvest log with the plan under it (green = above plan, red = below). Click a past day to enter or correct a plot's harvest, use <b>+ actual</b> under today, or <b>Log harvest</b> to enter a whole farm's day at once. Today and later are plan inputs. <b>Left after plan</b> = remaining − plan ahead; red means the plan is more than the estimate. Hover Harvested for the packhouse / local split.</p></details>
   </div>
   <div class="table-wrap mg"><table>
     <thead><tr><th class="grpcol stk">Plot</th><th class="grpcol stk2">Estimate</th><th class="grpcol" colspan="4">Yield, budget &amp; size</th><th class="grpcol" colspan="2">Actual (harvest log)</th><th class="grpcol daystart" colspan="${days.length}">Harvest raw t per day · actual (past) · plan (today on)</th><th class="grpcol daystart" colspan="3">Plan check</th></tr>
@@ -575,7 +623,7 @@ function viewEst(part){
 }
 document.addEventListener('click',e=>{const w=e.target.closest('[data-wk]');if(w){const v=+w.dataset.wk;S.wk=v?(S.wk||0)+v:0;render()}
   const d=e.target.closest('[data-days]');if(d){S.days=+d.dataset.days;render()}});
-document.addEventListener('change',e=>{const i=e.target.closest('[data-plan]');if(!i)return;const k=i.dataset.plan,x=parseFloat(i.value),v=isNaN(x)||x<0?0:r2(x),old=PLAN[k]||0;if(v===old)return;PLAN[k]=v;savePlan(k,v,old);
+document.addEventListener('change',e=>{const i=e.target.closest('[data-plan]');if(!i)return;const k=i.dataset.plan,x=parseT(i.value);if(isNaN(x)){i.classList.add('bad');toast('Plan not saved: type a number, 0 or more');return}const v=r2(x),old=PLAN[k]||0;if(v===old){i.classList.remove('bad');return}PLAN[k]=v;savePlan(k,v,old);
   const nxt=i.closest('td')?.nextElementSibling?.querySelector('input')?.dataset.plan;keepScroll(render);
   if(nxt)document.querySelector(`[data-plan="${nxt}"]`)?.focus();});
 function keepScroll(fn){const w=document.querySelector('.mg,#pgrid');const y=scrollY,sx=w?.scrollLeft,sy=w?.scrollTop;fn();scrollTo(0,y);
@@ -652,7 +700,9 @@ function viewChg(){
 
 // ---------- modals ----------
 const root=$('#modalRoot');
-function closeModal(){root.innerHTML=''}
+// closing a modal with typed-but-unsaved entries asks first; saves call closeModal(true)
+const modalDirty=()=>[...root.querySelectorAll('input:not([data-nd]),textarea')].some(i=>i.type!=='checkbox'&&i.value!==i.defaultValue);
+function closeModal(force){if(!force&&root.innerHTML&&modalDirty()&&!confirm('Discard the entries you typed? They are not saved.'))return false;root.innerHTML='';return true}
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&root.innerHTML){closeModal();e.preventDefault()}});
 function modal(html,sm){root.innerHTML=`<div class="ovl" id="ovl"><div class="modal ${sm?'sm':''}" role="dialog" aria-modal="true">${html}</div></div>`;
   $('#ovl').addEventListener('click',e=>{if(e.target.id==='ovl'||e.target.closest('.x,[data-close]'))closeModal()});}
@@ -660,10 +710,10 @@ function modal(html,sm){root.innerHTML=`<div class="ovl" id="ovl"><div class="mo
 function chart(p){
   const W=700,H=170,L=46,R=12,T=12,B=26;
   const pts=p.ev.map(e=>({t:+new Date(e.d),v:e.v}));const t1=+new Date(TODAY);
-  const t0=Math.min(pts[0].t,t1-30*864e5); /* at least a 30-day window so same-day changes still draw */const vs=[...pts.map(x=>x.v),total(p)];const vmax=Math.max(...vs)*1.12||1;
-  const X=t=>L+(t-t0)/(t1-t0)*(W-L-R),Y=v=>T+(1-v/vmax)*(H-T-B);
+  const t0=Math.min(pts[0].t,t1-30*864e5); /* at least a 30-day window so same-day changes still draw */const vs=[...pts.map(x=>x.v),total(p)];const vs2=[...vs,p.budget].filter(v=>v>0),hi=Math.max(...vs2,1),lo0=Math.min(...vs2,hi);const vmin=lo0>hi*0.5?Math.floor(lo0*0.85):0;const vmax=hi*1.12;
+  const X=t=>L+(t-t0)/(t1-t0)*(W-L-R),Y=v=>T+(1-(Math.max(v,vmin)-vmin)/(vmax-vmin))*(H-T-B);
   let d=`M${X(pts[0].t)},${Y(pts[0].v)}`;pts.forEach((q,i)=>{if(i)d+=`H${X(q.t)}V${Y(q.v)}`});d+=`H${X(t1)}`;
-  const ticks=[0,.5,1].map(f=>Math.round(vmax*f/1.12));
+  const ticks=[vmin,(vmin+hi)/2,hi].map(Math.round);
   const months=[];for(let m=new Date(new Date(t0).toISOString().slice(0,8)+'01');+m<=t1;m.setMonth(m.getMonth()+1))months.push(+m);
   return `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Estimate over time">
    ${ticks.map(v=>`<line x1="${L}" x2="${W-R}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--border)" /><text x="${L-6}" y="${Y(v)+3}" text-anchor="end">${n0(v)}</text>`).join('')}
@@ -681,6 +731,7 @@ function openHistory(id){
      <div class="meta">${esc(p.root)} · planted ${p.planted} · ${n1(p.area)} fed (register) · ${productive(p)?'Productive':'Not productive'}</div></div><button class="x" aria-label="Close">×</button></div>
    <div class="mb">
     <div class="cmp"><div><span>Budget</span><b>${n0(p.budget)} t</b><span>${n1(p.budget/p.area)} t/fed</span></div><div><span>Latest estimate</span><b>${n0(e)} t</b><span>${n1(e/p.area)} t/fed</span></div><div><span>Harvested</span><b>${n0(total(p))} t</b><span>${n0(e-total(p))} t remaining</span></div></div>
+    <details class="hsplit"><summary>Harvested by category</summary><div class="tipgrid">${harvSplit(p)}</div></details>
     ${chart(p)}
     <ul class="tl">${items.map(({ev,prev})=>{const d=prev==null?null:ev.v-prev;
       return `<li class="${ev.round?'round':''}"><div class="when">${fmtDY(ev.d)}</div><div>
@@ -697,40 +748,39 @@ function openGroupHistory(key){
    </tbody></table></div></div><div class="mf"><button class="btn" data-close>Close</button></div>`);
 }
 function openEdit(id,kindIn){
-  const p=PLOTS.find(x=>x.id===id);let kind=kindIn||'update';let mode='volume',reason=null;
-  const curOf=()=>kind==='budget'?p.budget:est(p);let cur=curOf();
+  const p=PLOTS.find(x=>x.id===id);const kind=kindIn||'update';let mode='volume',reason=null;
+  const cur=kind==='budget'?p.budget:est(p);const hasPrev=kind==='budget'?p.ev.some(e=>e.kind==='budget'):p.ev.length>0;
+  let tv=hasPrev?cur:null;   /* value in tonnes, kept at full precision while switching units */
   modal(`<div class="mh"><div><h3 id="edT">${kind==='budget'?'Set budget':'Update estimate'}</h3><div class="meta">${esc(p.farm)} · <span class="plot">${p.sector}-${p.plot}</span> ${esc(p.variety)} · ${n1(p.area)} fed from the register</div></div><button class="x" aria-label="Close">×</button></div>
    <div class="mb">
-    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><span class="lbl">This is the</span><div class="seg" id="kindSeg"><button data-k="update" class="${kind==='update'?'on':''}">Latest estimate</button><button data-k="budget" class="${kind==='budget'?'on':''}">Budget</button></div>
-      <span class="lbl" style="margin-left:8px">Enter as</span><div class="seg" id="modeSeg"><button data-m="volume" class="on">Tonnes</button><button data-m="yield">t / feddan</button></div></div>
-    <div class="field"><label class="lbl" for="newv" id="newvl">New value (tonnes)</label><input id="newv" inputmode="decimal" value="${cur?Math.round(cur):''}"></div>
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><span class="lbl">Enter as</span><div class="seg" id="modeSeg"><button data-m="volume" class="on">Tonnes</button><button data-m="yield">t / feddan</button></div></div>
+    <div class="field"><label class="lbl" for="newv" id="newvl">New value (tonnes)</label><input id="newv" inputmode="decimal" value="${hasPrev?r2(cur):''}"></div>
     <div class="cmp" id="cmp"></div>
     <div class="field" id="rsWrap"><span class="lbl">Where is the change coming from? <span style="text-transform:none;letter-spacing:0;font-weight:400">(optional)</span></span><div class="reasons" id="rs">${REASONS.map(r=>`<button class="chip" data-r="${esc(r)}">${esc(r)}</button>`).join('')}</div></div>
     <div class="field"><label class="lbl" for="note">Note <span style="text-transform:none;letter-spacing:0;font-weight:400">(optional)</span></label><textarea id="note" placeholder="e.g. counted 20 trees per row, fruit set lower on the north side"></textarea></div>
    </div>
-   <div class="mf"><button class="btn" data-close>Cancel</button><button class="btn pri" id="saveEst">Save</button></div>`,true);
+   <div class="mf"><button class="btn" data-close>Cancel</button><button class="btn pri" id="saveEst" disabled>${kind==='budget'?'Save budget':'Save estimate'}</button></div>`,true);
   const inp=$('#newv');
-  const val=()=>{const x=parseFloat(inp.value);if(isNaN(x))return null;return mode==='yield'?x*p.area:x};
-  const upd=()=>{const v=val();const d=v==null?0:v-cur;$('#rsWrap').hidden=kind==='budget';
+  const val=()=>tv;
+  const ok=()=>tv!=null&&!isNaN(tv)&&(!hasPrev||Math.abs(r2(tv)-r2(cur))>=0.01);
+  inp.addEventListener('input',()=>{const x=parseT(inp.value);tv=inp.value.trim()===''?null:isNaN(x)?NaN:(mode==='yield'?x*p.area:x);inp.classList.toggle('bad',isNaN(tv)&&tv!==null)});
+  const upd=()=>{$('#saveEst').disabled=!ok();const v=tv==null||isNaN(tv)?null:tv;const d=v==null?0:v-cur;$('#rsWrap').hidden=kind==='budget';
     $('#cmp').innerHTML=`<div><span>Current ${kind==='budget'?'budget':'estimate'}</span><b>${cur?n0(cur)+' t':'–'}</b><span>${cur?n1(cur/p.area)+' t/fed':'not set'}</span></div><div><span>New</span><b>${v==null?'–':n0(v)+' t'}</b><span>${v==null?'':n1(v/p.area)+' t/fed'}</span></div><div><span>Change</span><b class="${d>0?'pos':d<0?'neg':''}">${sgn(d)} t</b><span>${cur?sgn(d/cur*100,n1)+'%':''}</span></div>`};
   inp.oninput=upd;upd();inp.focus();inp.select();
-  $('#kindSeg').onclick=e=>{const b=e.target.closest('[data-k]');if(!b)return;kind=b.dataset.k;cur=curOf();
-    document.querySelectorAll('#kindSeg button').forEach(x=>x.classList.toggle('on',x===b));$('#edT').textContent=kind==='budget'?'Set budget':'Update estimate';upd()};
-  $('#modeSeg').onclick=e=>{const b=e.target.closest('[data-m]');if(!b)return;const v=val();mode=b.dataset.m;
+  $('#modeSeg').onclick=e=>{const b=e.target.closest('[data-m]');if(!b)return;const v=tv==null||isNaN(tv)?null:tv;mode=b.dataset.m;
     document.querySelectorAll('#modeSeg button').forEach(x=>x.classList.toggle('on',x===b));
     $('#newvl').textContent=mode==='yield'?'New value (t / feddan)':'New value (tonnes)';
-    if(v!=null)inp.value=mode==='yield'?(v/p.area).toFixed(1):Math.round(v);upd()};
+    if(v!=null){inp.value=mode==='yield'?+(v/p.area).toFixed(3):r2(v);inp.defaultValue=inp.value}upd()};
   $('#rs').onclick=e=>{const b=e.target.closest('[data-r]');if(!b)return;reason=reason===b.dataset.r?null:b.dataset.r;
     document.querySelectorAll('#rs .chip').forEach(x=>x.classList.toggle('on',x.dataset.r===reason))};
-  $('#saveEst').onclick=async()=>{const v=val();if(v==null||v<0){inp.focus();inp.style.borderColor='var(--red)';return}
-    if(p.ev.length&&Math.abs(v-cur)<0.005&&kind==='update'){closeModal();return}
+  $('#saveEst').onclick=async()=>{if(!ok()){inp.focus();inp.classList.add('bad');return}const v=tv;
     const btn=$('#saveEst');btn.textContent='Saving…';btn.style.pointerEvents='none';
     const row={season_id:DB.seasonId,block_id:p.id,kind,value_t:r2(v),entered_as:mode==='yield'?'t_fed':'t',reason_code:kind==='budget'?null:(REASON_CODE[reason]||null),note:$('#note').value.trim()||null,created_by:DB.me.id};
     const {data,error}=await SB.from('hp2_estimate_events').insert(row).select('created_at').single();
-    if(error){btn.textContent='Save';btn.style.pointerEvents='';toast('Not saved: '+error.message);return}
+    if(error){btn.textContent=kind==='budget'?'Save budget':'Save estimate';btn.style.pointerEvents='';toast('Not saved: '+error.message);return}
     p.ev.push({d:cairoDate0(data.created_at),at:data.created_at,v:r2(v),by:DB.me.name,mode,reason:kind==='budget'?'Budget':reason,note:row.note||'',round:kind==='budget',kind});
     if(kind==='budget')p.budget=r2(v);
-    closeModal();keepScroll(render);toast(`Saved · ${p.sector}-${p.plot} ${kind==='budget'?'budget':'estimate'} ${cur?n0(cur)+' → ':''}${n0(v)} t`)};
+    closeModal(true);keepScroll(render);toast(`Saved · ${p.sector}-${p.plot} ${kind==='budget'?'budget':'estimate'} ${cur?n0(cur)+' → ':''}${n0(v)} t`)};
 }
 function toast(m){const t=document.createElement('div');t.className='toast';t.textContent=m;document.body.appendChild(t);setTimeout(()=>t.remove(),2600)}
 
@@ -741,9 +791,12 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')setSide(false)});
 // ---------- actuals entry (agronomists; same columns as the old Entry tab) ----------
 const ACOLS=[['pack','To packhouse','وارد محطة','var(--accent)'],['sort','Field sorting','فرزة أرض','#55707a'],['local','Local sales','خام تجار','var(--amber)'],['waste','Waste','إعدامات','var(--red)']];
 const aHarv=a=>a[0]+a[1]+a[2], aDay=a=>aHarv(a)+a[3];   // harvested (counts against the estimate) · day total = all four
-const vsPlan=(a,pl)=>{const t=aDay(a);if(!t&&!pl)return '<span class="vp">—</span>';if(!pl)return '<span class="vp up">unplanned</span>';const r=t/pl;
+const vsPlan=(a,pl)=>{const t=aDay(a);if(!t)return '<span class="vp">—</span>';if(!pl)return '<span class="vp up">unplanned</span>';const r=t/pl;
   return r>1.1?'<span class="vp up">above +'+n0(t-pl)+'</span>':r<0.9?'<span class="vp dn">below −'+n0(pl-t)+'</span>':'<span class="vp">on plan</span>'};
-function applyAct(p,d,arr,meta){if(arr.every(v=>!v))delete p.daily[d];else p.daily[d]=arr;(p.ameta=p.ameta||{})[d]=meta;recalc(p)}
+function applyAct(p,d,arr,meta){p.ameta=p.ameta||{};if(arr.every(v=>!v)){delete p.daily[d];delete p.ameta[d]}else{p.daily[d]=arr;p.ameta[d]=meta}recalc(p)}
+// read the 4 boxes of one entry: marks bad boxes red, returns null if any box is invalid
+function readAin(box){let bad=false;const a=[...box.querySelectorAll('[data-ai]')].map(i=>{const x=parseT(i.value);i.classList.toggle('bad',isNaN(x));if(isNaN(x)){bad=true;return 0}return x});return bad?null:a}
+const softAin=box=>[...box.querySelectorAll('[data-ai]')].map(i=>{const x=parseT(i.value);return isNaN(x)?0:x});
 // rows = [{p, a:[pack,sort,local,waste]}] for ONE day → one atomic RPC
 async function saveActs(d,rows){
   if(!rows.length)return true;
@@ -759,40 +812,43 @@ function openActual(id,d){
   const p=PLOTS.find(x=>x.id===id);let date=d||TODAY;
   const meta=()=>p.ameta?.[date]?`Last entered by ${esc(p.ameta[date].by)} · ${esc(p.ameta[date].at)}`:(p.daily[date]?'From the harvest log':'No entry yet for this day');
   modal(`<div class="mh"><div><h3>Harvest entry</h3><div class="meta">${esc(p.farm)} · <span class="plot">${p.sector}-${p.plot}</span> ${esc(p.variety)} · tonnes</div></div><button class="x" aria-label="Close">×</button></div>
-   <div class="mb"><div style="display:flex;gap:10px;align-items:end;flex-wrap:wrap"><div class="field"><label class="lbl" for="adate">Date</label><input type="date" id="adate" max="${TODAY}" value="${date}" style="font-size:14px"></div><span class="calc" id="ameta" style="font-size:12px;padding-bottom:9px">${meta()}</span></div>
+   <div class="mb"><div style="display:flex;gap:10px;align-items:end;flex-wrap:wrap"><div class="field"><label class="lbl" for="adate">Date</label><input type="date" id="adate" data-nd max="${TODAY}" value="${date}" style="font-size:14px"></div><span class="calc" id="ameta" style="font-size:12px;padding-bottom:9px">${meta()}</span></div>
    <div class="agrid" id="aflds">${actFields(actRow(p,date),'af')}</div><div class="cmp" id="acmp"></div></div>
-   <div class="mf"><button class="btn" data-close>Cancel</button><button class="btn pri" id="saveAct">Save entry</button></div>`,true);
-  const read=()=>[...document.querySelectorAll('#aflds [data-ai]')].map(i=>Math.max(0,parseFloat(i.value)||0));
+   <div class="mf"><button class="btn" id="clrAct" style="margin-right:auto" ${p.daily[date]?'':'hidden'}>Clear this day</button><button class="btn" data-close>Cancel</button><button class="btn pri" id="saveAct">Save entry</button></div>`,true);
+  const read=()=>softAin($('#aflds'));
   const upd=()=>{const a=read(),pl=planVal(p,date);$('#acmp').innerHTML=`<div><span>Day total</span><b>${n1(aDay(a))}</b><span>= sum of the four</span></div><div><span>Planned</span><b>${n0(pl)}</b><span>${fmtD(date)}</span></div><div><span>Vs plan</span><b style="font-size:13px;padding-top:4px">${vsPlan(a,pl)}</b><span>±10% = on plan</span></div>`};
   $('#aflds').oninput=upd;upd();document.querySelector('#af0').focus();
-  $('#adate').onchange=e=>{date=e.target.value||TODAY;$('#aflds').innerHTML=actFields(actRow(p,date),'af');$('#ameta').textContent=meta().replace(/&amp;/g,'&');upd()};
-  $('#saveAct').onclick=async()=>{const a=read();if(!await saveActs(date,[{p,a}]))return;closeModal();keepScroll(render);toast(`Saved · ${p.sector}-${p.plot} ${fmtD(date)} · ${n1(aDay(a))} t`)};
+  $('#adate').onchange=e=>{if(modalDirty()&&!confirm('Discard the entries you typed for '+fmtD(date)+'?')){e.target.value=date;return}date=e.target.value||TODAY;$('#aflds').innerHTML=actFields(actRow(p,date),'af');$('#ameta').textContent=meta().replace(/&amp;/g,'&');$('#clrAct').hidden=!p.daily[date];upd()};
+  $('#clrAct').onclick=async()=>{if(!confirm('Delete the harvest entry for '+fmtD(date)+'?'))return;if(!await saveActs(date,[{p,a:[0,0,0,0]}]))return;closeModal(true);keepScroll(render);toast(`Cleared · ${p.sector}-${p.plot} ${fmtD(date)}`)};
+  $('#saveAct').onclick=async()=>{const a=readAin($('#aflds'));if(!a){toast('Fix the boxes in red: numbers only, 0 or more');return}if(!await saveActs(date,[{p,a}]))return;closeModal(true);keepScroll(render);toast(`Saved · ${p.sector}-${p.plot} ${fmtD(date)} · ${n1(aDay(a))} t`)};
 }
 function openLog(){
   let date=TODAY,farm=S.farm==='All'?FARMS[1]:S.farm,onlyOpen=true;
-  const body=()=>{const ps=PLOTS.filter(p=>p.farm===farm&&(!onlyOpen||est(p)-total(p)>1||p.daily[date]));
+  const body=()=>{const ps=PLOTS.filter(p=>p.farm===farm&&(!onlyOpen||!(p.ev.length&&est(p)-total(p)<=1)||planVal(p,date)>0||p.daily[date]));
     return `<table><thead><tr><th style="text-align:left">Plot</th><th>Remaining</th><th>Planned</th>${ACOLS.map(c=>`<th class="lh" style="--c:${c[3]}">${colHead(c)}</th>`).join('')}<th>Day total<span class="f">= sum</span></th><th>Vs plan</th></tr></thead><tbody>
     ${ps.map(p=>{const a=actRow(p,date);return `<tr data-lrow="${p.id}"><td><span class="plot">${p.sector}-${p.plot}</span> <span class="vname" style="font-size:12px">${esc(p.variety)}</span></td><td class="num calc">${n0(est(p)-total(p))}</td>
-      <td class="num calc">${n0(planVal(p,date))}</td>${a.map((v,j)=>`<td style="padding:4px 5px"><input class="ain" style="--c:${ACOLS[j][3]}" data-ai="${j}" value="${v||''}" placeholder="—" inputmode="decimal" aria-label="${p.sector}-${p.plot} ${ACOLS[j][1]}"></td>`).join('')}<td class="num lt">${aDay(a)?n1(aDay(a)):'0'}</td><td class="lv" data-pl="${planVal(p,date)}">${vsPlan(a,planVal(p,date))}</td></tr>`}).join('')||'<tr><td colspan="9" class="calc">No plots.</td></tr>'}</tbody></table>`};
+      <td class="num calc">${n0(planVal(p,date))}</td>${a.map((v,j)=>`<td style="padding:4px 5px"><input class="ain" style="--c:${ACOLS[j][3]}" data-ai="${j}" value="${v||''}" placeholder="—" inputmode="decimal" aria-label="${p.sector}-${p.plot} ${ACOLS[j][1]}"></td>`).join('')}<td class="num lt">${aDay(a)?n1(aDay(a)):'0'}</td><td class="lv" data-pl="${planVal(p,date)}">${vsPlan(a,planVal(p,date))}</td></tr>`}).join('')||`<tr><td colspan="9" class="calc" style="white-space:normal;padding:14px">${onlyOpen?'Every plot on this farm is fully harvested against its estimate. Untick \'Hide fully harvested plots\' to see them.':'No plots on this farm.'}</td></tr>`}</tbody></table>`};
   modal(`<div class="mh"><div><h3>Log harvest</h3><div class="meta">One row per plot. Leave a row empty if nothing was picked. Harvested (counted against the estimate) = all four, waste included.</div></div><button class="x" aria-label="Close">×</button></div>
    <div class="mb"><div style="display:flex;gap:10px;align-items:end;flex-wrap:wrap">
-     <div class="field"><label class="lbl" for="ldate">Date</label><input type="date" id="ldate" max="${TODAY}" value="${date}" style="font-size:14px"></div>
+     <div class="field"><label class="lbl" for="ldate">Date</label><input type="date" id="ldate" data-nd max="${TODAY}" value="${date}" style="font-size:14px"></div>
      <div class="field"><label class="lbl" for="lfarm">Farm</label><select class="sel" id="lfarm" style="font-size:14px;padding:7px 10px">${FARMS.slice(1).map(f=>`<option ${f===farm?'selected':''}>${f}</option>`).join('')}</select></div>
-     <label style="font-size:12.5px;color:var(--text2);display:flex;gap:6px;align-items:center;padding-bottom:8px"><input type="checkbox" id="lopen" checked> Only plots with fruit left</label></div>
+     <label style="font-size:12.5px;color:var(--text2);display:flex;gap:6px;align-items:center;padding-bottom:8px"><input type="checkbox" id="lopen" checked> Hide fully harvested plots</label></div>
    <div class="table-wrap" id="lgrid" style="max-height:55vh">${body()}</div><div class="calc" id="lsum" style="font-size:12.5px"></div></div>
    <div class="mf"><button class="btn" data-close>Cancel</button><button class="btn pri" id="saveLog">Save day</button></div>`);
   document.querySelector('.modal').style.width='min(1000px,100%)';
-  const sum=()=>{let t=0,n=0;document.querySelectorAll('#lgrid [data-lrow]').forEach(r=>{const a=[...r.querySelectorAll('[data-ai]')].map(i=>parseFloat(i.value)||0);const v=aDay(a);r.querySelector('.lt').textContent=v?n1(v):'0';r.querySelector('.lv').innerHTML=vsPlan(a,+r.querySelector('.lv').dataset.pl);if(v){t+=v;n++}});$('#lsum').textContent=`${n} plots · ${n1(t)} t total on ${fmtDY(date)}`};
+  const sum=()=>{let t=0,n=0;document.querySelectorAll('#lgrid [data-lrow]').forEach(r=>{const a=softAin(r);r.querySelectorAll('[data-ai]').forEach(i=>i.classList.toggle('bad',isNaN(parseT(i.value))));const v=aDay(a);r.querySelector('.lt').textContent=v?n1(v):'0';r.querySelector('.lv').innerHTML=vsPlan(a,+r.querySelector('.lv').dataset.pl);if(v){t+=v;n++}});$('#lsum').textContent=`${n} plots · ${n1(t)} t total on ${fmtDY(date)}`};
   const redraw=()=>{$('#lgrid').innerHTML=body();sum()};
   $('#lgrid').oninput=sum;sum();
-  $('#ldate').onchange=e=>{date=e.target.value||TODAY;redraw()};$('#lfarm').onchange=e=>{farm=e.target.value;redraw()};$('#lopen').onchange=e=>{onlyOpen=e.target.checked;redraw()};
-  $('#saveLog').onclick=async()=>{const rows=[];document.querySelectorAll('#lgrid [data-lrow]').forEach(r=>{const p=PLOTS.find(x=>x.id===r.dataset.lrow);
-      const a=[...r.querySelectorAll('[data-ai]')].map(i=>Math.max(0,parseFloat(i.value)||0));const old=actRow(p,date);
+  const keep=()=>!modalDirty()||confirm('Discard the entries you typed?');
+  $('#ldate').onchange=e=>{if(!keep()){e.target.value=date;return}date=e.target.value||TODAY;redraw()};$('#lfarm').onchange=e=>{if(!keep()){e.target.value=farm;return}farm=e.target.value;redraw()};$('#lopen').onchange=e=>{if(!keep()){e.target.checked=onlyOpen;return}onlyOpen=e.target.checked;redraw()};
+  $('#saveLog').onclick=async()=>{const rows=[];let bad=0;document.querySelectorAll('#lgrid [data-lrow]').forEach(r=>{const p=PLOTS.find(x=>x.id===r.dataset.lrow);
+      const a=readAin(r);if(!a){bad++;return}const old=actRow(p,date);
       if(a.some((v,j)=>Math.abs(v-old[j])>0.0001))rows.push({p,a})});
-    if(!rows.length){closeModal();toast('No changes to save');return}
+    if(bad){toast(`Fix the boxes in red on ${bad} plot${bad>1?'s':''}: numbers only, 0 or more`);return}
+    if(!rows.length){closeModal(true);toast('No changes to save');return}
     const b=$('#saveLog');b.textContent='Saving…';b.style.pointerEvents='none';
     if(!await saveActs(date,rows)){b.textContent='Save day';b.style.pointerEvents='';return}
-    closeModal();keepScroll(render);toast(`Saved ${rows.length} plot entries for ${fmtD(date)}`)};
+    closeModal(true);keepScroll(render);toast(`Saved ${rows.length} plot entries for ${fmtD(date)}`)};
 }
 document.addEventListener('click',e=>{const c=e.target.closest('[data-act]');if(c){const [i,d]=[c.dataset.act.slice(0,c.dataset.act.lastIndexOf('|')),c.dataset.act.slice(c.dataset.act.lastIndexOf('|')+1)];openActual(i,d)}
   if(e.target.closest('[data-logharvest]'))openLog()});
@@ -804,27 +860,31 @@ const winChip=v=>WIN[v]&&WIN[v].start?`<button class="winchip" data-win="${esc(v
   :(WIN[v]?`<button class="winchip" data-win="${esc(v)}" style="opacity:.7">+ window</button>`:'');
 function openWindows(focus){
   const vs=Object.keys(WIN).sort();
-  modal(`<div class="mh"><div><h3>Harvest windows</h3><div class="meta">One window per variety. Days outside it are shaded in the daily plan. Every change is kept with who, when and why.</div></div><button class="x" aria-label="Close">×</button></div>
+  modal(`<div class="mh"><div><h3>Harvest windows</h3><div class="meta">One window per variety. Days outside it are shaded in the daily plan. Every change is kept with who, when and why. Empty both dates to clear a window.</div></div><button class="x" aria-label="Close">×</button></div>
    <div class="mb"><div class="table-wrap" style="max-height:58vh"><table><thead><tr><th style="text-align:left">Variety</th><th>Start</th><th>End</th><th>Days</th><th style="text-align:left">Why (optional)</th><th style="text-align:left">Last change</th></tr></thead><tbody>
    ${vs.map(v=>{const w=WIN[v],l=w.log[w.log.length-1];return `<tr data-wrow="${esc(v)}" ${v===focus?'class="grp"':''}><td class="vname">${esc(v)}</td>
      <td><input type="date" class="wdate" data-w="start" value="${w.start||''}" aria-label="${esc(v)} start"></td><td><input type="date" class="wdate" data-w="end" value="${w.end||''}" aria-label="${esc(v)} end"></td>
      <td class="num calc wdays">${w.start&&w.end?Math.round((new Date(w.end)-new Date(w.start))/864e5)+1:'–'}</td>
      <td><input class="wnote" placeholder="e.g. colour break late" aria-label="${esc(v)} reason"></td>
-     <td class="calc" style="font-size:12px" title="${esc(w.log.map(x=>fmtDY(x.d)+': '+fmtD(x.start)+'→'+fmtD(x.end)+' · '+x.by+(x.note?' · '+x.note:'')).join('\n'))}">${l?`${fmtDY(l.d)} · ${esc(l.by)}${w.log.length>1?` <span class="chg" style="margin-left:4px">${w.log.length-1} chg</span>`:''}`:'Not set'}</td></tr>`}).join('')}
+     <td class="calc" style="font-size:12px;white-space:normal">${l?`<details><summary>${fmtDY(l.d)} · ${esc(l.by)}${w.log.length>1?` · ${w.log.length} changes`:''}</summary>${w.log.slice().reverse().map(x=>`<div>${fmtDY(x.d)}: ${fmtD(x.start)} → ${fmtD(x.end)} · ${esc(x.by)}${x.note?' · '+esc(x.note):''}</div>`).join('')}</details>`:'Not set'}</td></tr>`}).join('')}
    </tbody></table></div></div>
    <div class="mf"><button class="btn" data-close>Cancel</button><button class="btn pri" id="saveWin">Save windows</button></div>`);
   document.querySelector('.modal').style.width='min(900px,100%)';
   const f=document.querySelector('tr.grp .wdate');if(f){f.focus();f.closest('tr').scrollIntoView({block:'center'})}
   document.querySelectorAll('[data-wrow]').forEach(r=>r.oninput=()=>{const a=r.querySelector('[data-w=start]').value,b=r.querySelector('[data-w=end]').value;r.querySelector('.wdays').textContent=a&&b?Math.round((new Date(b)-new Date(a))/864e5)+1:'–'});
-  $('#saveWin').onclick=async()=>{const rows=[];let bad=0;document.querySelectorAll('[data-wrow]').forEach(r=>{const v=r.dataset.wrow,w=WIN[v];const a=r.querySelector('[data-w=start]').value,b=r.querySelector('[data-w=end]').value;
-      if(a&&b&&a>b){bad++;return}
+  $('#saveWin').onclick=async()=>{const rows=[],clears=[];let bad=0;document.querySelectorAll('[data-wrow]').forEach(r=>{const v=r.dataset.wrow,w=WIN[v];const sa=r.querySelector('[data-w=start]'),sb=r.querySelector('[data-w=end]'),a=sa.value,b=sb.value;
+      const wrong=(!!a!==!!b)||(a&&b&&a>b);sa.classList.toggle('bad',!!wrong);sb.classList.toggle('bad',!!wrong);if(wrong){bad++;return}
+      if(!a&&!b&&w.start){clears.push(v);return}
       if(a&&b&&(a!==w.start||b!==w.end))rows.push({v,a,b,note:r.querySelector('.wnote').value.trim()})});
-    if(bad){toast('End date must be after start date');return}
-    if(!rows.length){closeModal();toast('No changes to save');return}
+    if(bad){toast('Each window needs both dates, and the end on or after the start');return}
+    if(!rows.length&&!clears.length){closeModal(true);toast('No changes to save');return}
+    for(const v of clears){const {error}=await SB.from('hp2_windows').delete().eq('season_id',DB.seasonId).eq('variety_id',WIN[v].varietyId);if(error){toast('Not cleared: '+error.message);return}
+      WIN[v].start=null;WIN[v].end=null;WIN[v].log.push({d:TODAY,start:null,end:null,by:DB.me.name,note:'Cleared'})}
+    if(!rows.length){closeModal(true);keepScroll(render);toast(`Cleared ${clears.length} window${clears.length>1?'s':''}`);return}
     const {error}=await SB.rpc('hp2_save_windows',{p_season:DB.seasonId,p_rows:rows.map(x=>({variety_id:WIN[x.v].varietyId,start_date:x.a,end_date:x.b,note:x.note}))});
     if(error){toast('Not saved: '+error.message);return}
     rows.forEach(x=>{const w=WIN[x.v];w.start=x.a;w.end=x.b;w.log.push({d:TODAY,start:x.a,end:x.b,by:DB.me.name,note:x.note})});
-    closeModal();keepScroll(render);toast(`Saved ${rows.length} window${rows.length>1?'s':''}`)};
+    closeModal(true);keepScroll(render);toast(`Saved ${rows.length} window${rows.length>1?'s':''}`)};
 }
 // ---------- TrueFruit (Aerobotics) latest scan per plot ----------
 const TF=DB.tf;
@@ -881,7 +941,7 @@ function presentView(){
       <div class="kpi"><div class="k">Budget</div><div class="v">${n0(A.budget)} t</div><div class="s">${n1(A.budget/A.area)} t/fed</div></div>
       <div class="kpi hl"><div class="k">Latest estimate</div><div class="v">${n0(A.est)} t</div><div class="s">${n1(A.est/A.area)} t/fed</div></div>
       <div class="kpi"><div class="k">Moved since ${fmtD(S.since)}</div><div class="v ${A.est-A.prev>=0?'pos':'neg'}">${sgn(A.est-A.prev)} t</div><div class="s">${A.nNew} plot changes</div></div>
-      <div class="kpi"><div class="k">Harvested</div><div class="v">${n0(A.tot)} t</div><div class="s">${n0(A.act)} packhouse · ${n0(A.local)} local</div></div>
+      <div class="kpi"><div class="k">Harvested</div><div class="v">${n0(A.tot)} t</div><div class="s">${n0(A.act)} packhouse · ${n0(A.local)} sorting &amp; local · ${n0(A.tot-A.act-A.local)} waste</div></div>
       <div class="kpi"><div class="k">Remaining</div><div class="v">${n0(A.rem)} t</div><div class="s">estimate − harvested</div></div>
     </div>
     <div class="table-wrap pt" style="max-height:none"><table><thead><tr><th style="text-align:left">Variety</th><th>Harvest window</th><th>TrueFruit</th><th>Budget</th><th>${monthSel()}</th><th>Latest</th><th>vs budget</th><th>Moved since ${fmtD(S.since)}</th><th>Harvested</th><th>Remaining</th><th>Last 7 d<span class="f">actual · vs plan</span></th><th>Planned next 7 d</th></tr></thead><tbody>
@@ -903,7 +963,7 @@ function presentView(){
   } else if(sl===2){
     const pastD=[...Array(7)].map((_,i)=>addDays(TODAY,i-7));
     const ap=pastD.reduce((s,d)=>s+list.reduce((t,p)=>t+dayTot(p,d),0),0),pp=pastD.reduce((s,d)=>s+list.reduce((t,p)=>t+planVal(p,d),0),0);
-    body=`<h2 class="ph">Last 7 days: ${n0(ap)} t harvested against a plan of ${n0(pp)} t</h2><div class="psub">${sgn(ap-pp)} t (${pp?sgn((ap-pp)/pp*100,n1):'–'}%) · daily actual vs plan by variety and farm, with the plan ahead</div>
+    body=`<h2 class="ph">Last 7 days: ${n0(ap)} t harvested${pp?` against a plan of ${n0(pp)} t`:', no plan entered for these days'}</h2><div class="psub">${pp?`${sgn(ap-pp)} t (${sgn((ap-pp)/pp*100,n1)}%)`:'–'} · daily actual vs plan by variety and farm, with the plan ahead</div>
     <div class="pest">${viewEst('sum')}</div>`;
   } else {
     body=`<div class="pest">${viewEst('grid')}</div>`;
@@ -918,11 +978,11 @@ document.addEventListener('click',e=>{const x=e.target.closest('[data-pexp]');if
   if(e.target.closest('#pexpAll')){const vs=[...document.querySelectorAll('[data-pexp]')].map(b=>b.dataset.pexp);const open=!vs.every(k=>S.pexp[k]);vs.forEach(k=>S.pexp[k]=open);keepScroll(render)}
   const s=e.target.closest('[data-slide]');if(s){S.slide=+s.dataset.slide;render()}
   if(e.target.closest('#exitPresent'))setPresent(false)});
-document.addEventListener('keydown',e=>{if(!S.present||root.innerHTML||e.defaultPrevented)return;
+document.addEventListener('keydown',e=>{if(!S.present||root.innerHTML||e.defaultPrevented||/^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName))return;
   if(e.key==='ArrowRight'){S.slide=Math.min(SLIDES.length-1,(S.slide||0)+1);render()}
   else if(e.key==='ArrowLeft'){S.slide=Math.max(0,(S.slide||0)-1);render()}
   else if(e.key==='Escape')setPresent(false)});
-document.addEventListener('fullscreenchange',()=>{if(!document.fullscreenElement&&S.present)setPresent(false)});
+/* leaving fullscreen keeps Present mode; Exit or Esc leaves it */
 function render(){if(S.present){$('#page').innerHTML=presentView();return}chrome();const pg=$('#page');
   if(S.tab==='plan')S.tab='est';
   pg.innerHTML=S.tab==='est'?viewEst():S.tab==='sum'?viewSum():viewChg();}
