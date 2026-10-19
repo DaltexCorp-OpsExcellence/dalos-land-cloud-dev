@@ -16,7 +16,7 @@
   --amber:#b87820;--amber-bg:#fdf3e0;--amber-border:#e8c87a;
   --red:#b03030;--red-bg:#faeaea;--red-border:#e8a0a0;
   --green:#1e6b3a;--green-bg:#e8f5ec;--green-border:#8ecba4;
-  --text:#111f1f;--text2:#3b4b4a;--text3:#5a6968;--skel-a:#e0e8e6;--skel-b:#cedad7;--past-mix:45%;
+  --text:#111f1f;--text2:#3b4b4a;--text3:#5a6968;--skel-a:#e0e8e6;--skel-b:#cedad7;--past-mix:45%;--grp-bg:#cfe3e0;--grp-fg:#0e3a3d;--grp-line:#9fc4bf;
   --border:#c6d4d2;--border2:#aabdbb;--card:#ffffff;--subtot:#edeae4;--subtot-text:#4a4840;
   --shadow:0 10px 30px rgba(14,58,61,.18);
   --font-display:'DM Serif Display',Georgia,serif;
@@ -29,12 +29,12 @@
   --bg:#0f1b1c;--bg2:#172728;--bg3:#203436;--accent:#2a9a96;--accent2:#3bb3ae;--accent-bg:#173a3a;
   --amber:#e0a54a;--amber-bg:#33280f;--amber-border:#6b5320;--red:#e27a7a;--red-bg:#3a1c1c;--red-border:#743434;
   --green:#6cc58e;--green-bg:#15301f;--green-border:#2f6a44;--text:#e6efee;--text2:#bfcfcd;--text3:#8a9d9b;
-  --border:#2a3e3f;--border2:#3a5355;--card:#142223;--subtot:#232a26;--subtot-text:#cfc9bb;--shadow:0 10px 30px rgba(0,0,0,.5);--skel-a:#1f3436;--skel-b:#2d4749;--past-mix:75%;color-scheme:dark}}
+  --border:#2a3e3f;--border2:#3a5355;--card:#142223;--subtot:#232a26;--subtot-text:#cfc9bb;--shadow:0 10px 30px rgba(0,0,0,.5);--skel-a:#1f3436;--skel-b:#2d4749;--past-mix:75%;--grp-bg:#1d4446;--grp-fg:#e6f3f1;--grp-line:#2f6264;color-scheme:dark}}
 :root[data-theme="dark"]{
   --bg:#0f1b1c;--bg2:#172728;--bg3:#203436;--accent:#2a9a96;--accent2:#3bb3ae;--accent-bg:#173a3a;
   --amber:#e0a54a;--amber-bg:#33280f;--amber-border:#6b5320;--red:#e27a7a;--red-bg:#3a1c1c;--red-border:#743434;
   --green:#6cc58e;--green-bg:#15301f;--green-border:#2f6a44;--text:#e6efee;--text2:#bfcfcd;--text3:#8a9d9b;
-  --border:#2a3e3f;--border2:#3a5355;--card:#142223;--subtot:#232a26;--subtot-text:#cfc9bb;--shadow:0 10px 30px rgba(0,0,0,.5);--skel-a:#1f3436;--skel-b:#2d4749;--past-mix:75%;color-scheme:dark}
+  --border:#2a3e3f;--border2:#3a5355;--card:#142223;--subtot:#232a26;--subtot-text:#cfc9bb;--shadow:0 10px 30px rgba(0,0,0,.5);--skel-a:#1f3436;--skel-b:#2d4749;--past-mix:75%;--grp-bg:#1d4446;--grp-fg:#e6f3f1;--grp-line:#2f6264;color-scheme:dark}
 *{box-sizing:border-box}
 body{margin:0;font-family:var(--font-body);background:var(--bg);color:var(--text);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
 .app{display:flex;min-height:100vh}
@@ -153,7 +153,12 @@ th.today,td.today{background:var(--accent-bg)}
 .mg .stk{position:sticky;left:0;z-index:3;background:var(--card);min-width:200px;max-width:200px;white-space:normal}
 .mg .stk2{position:sticky;left:200px;z-index:3;background:var(--card);border-right:2px solid var(--border2);min-width:132px}
 .mg th.stk,.mg th.stk2{z-index:5}
-.mg tr.grp .stk,.mg tr.grp .stk2{background:var(--bg2)}
+.mg thead th{z-index:8}.mg thead th.stk,.mg thead th.stk2{z-index:9}
+/* sum rows: one solid colour across every cell, sticky below the header */
+.mg tr.grp td{position:sticky;top:var(--hh,60px);z-index:4;background:var(--grp-bg)!important;color:var(--grp-fg);border-top:1px solid var(--grp-line);border-bottom:1px solid var(--grp-line);font-weight:700}
+.mg tr.grp td.stk,.mg tr.grp td.stk2{z-index:6}
+.mg tr.grp td .calc,.mg tr.grp td .pln{color:var(--grp-fg);opacity:.75}
+.mg tr.tot td{background:var(--subtot)!important}
 .mg tr.tot .stk,.mg tr.tot .stk2{background:var(--subtot)}
 .mg .pl2{font-size:11px;color:var(--text3);line-height:1.3}
 .mg th.day{min-width:52px}
@@ -996,9 +1001,12 @@ document.addEventListener('keydown',e=>{if(!S.present||root.innerHTML||e.default
   else if(e.key==='ArrowLeft'){S.slide=Math.max(0,(S.slide||0)-1);render()}
   else if(e.key==='Escape')setPresent(false)});
 /* leaving fullscreen keeps Present mode; Exit or Esc leaves it */
-function render(){if(S.present){$('#page').innerHTML=presentView();return}chrome();const pg=$('#page');
+/* sum rows stick under the grid header until the next sum row scrolls up: needs the header's real height */
+function setHH(){document.querySelectorAll('.mg').forEach(m=>{const h=m.querySelector('thead')?.offsetHeight||0;m.style.setProperty('--hh',h+'px')})}
+addEventListener('resize',setHH);document.addEventListener('toggle',()=>setTimeout(setHH,0),true);
+function render(){if(S.present){$('#page').innerHTML=presentView();setHH();return}chrome();const pg=$('#page');
   if(S.tab==='plan')S.tab='est';
-  pg.innerHTML=S.tab==='est'?viewEst():S.tab==='sum'?viewSum():viewChg();}
+  pg.innerHTML=S.tab==='est'?viewEst():S.tab==='sum'?viewSum():viewChg();setHH();}
 render();
 }
 boot();
