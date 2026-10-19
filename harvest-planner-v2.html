@@ -166,6 +166,7 @@ th.today,td.today{background:var(--accent-bg)}
 .mg th.daystart,.mg td.daystart{border-left:2px solid var(--border2)}
 .mg td.day{padding:1px 2px;text-align:right}
 .mg th.wk,.mg td.wk{background:color-mix(in srgb,var(--bg2) 55%,transparent)}
+.mg thead th.wk{background:color-mix(in srgb,var(--bg2) 55%,var(--card))}   /* header cells must be opaque: rows scroll under them */
 .mg .dsum{font-family:var(--font-num);font-size:11.5px;font-variant-numeric:tabular-nums;padding-right:6px}
 .mg .dayin{width:48px}
 .kpis{grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px}
@@ -182,7 +183,7 @@ th.today,td.today{background:var(--accent-bg)}
 .av,.mg .act.av{font-style:normal;font-weight:700}
 .pc,.mg td.pc,.pln{font-style:italic;font-weight:500}
 .pc{text-decoration:underline dashed;text-decoration-thickness:1px;text-underline-offset:3px;text-decoration-color:color-mix(in srgb,var(--plan-c) 60%,transparent)}
-.pln::before{content:'';display:inline-block;width:10px;border-top:1px dashed var(--plan-c);vertical-align:3px;margin-right:3px}
+.pln:empty{display:none}.pln::before{content:'';display:inline-block;width:10px;border-top:1px dashed var(--plan-c);vertical-align:3px;margin-right:3px}
 .dayin{font-style:italic;font-weight:500;border-bottom:1px dashed color-mix(in srgb,var(--plan-c) 55%,transparent)!important}
 /* Log harvest on phones: one card per plot, the 4 categories in 2×2 */
 @media (max-width:700px){
