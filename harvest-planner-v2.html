@@ -321,7 +321,7 @@ body.present .page{padding:0 0 32px;gap:0}
       <span class="qwrap"><input class="search" id="q" placeholder="Search plot or variety" aria-label="Search"><button class="qclr" id="qClr" aria-label="Clear search" hidden>×</button></span><span class="calc" id="qCount" style="font-size:12px"></span>
       <div class="spacer"></div>
       <span class="lbl">Changes since</span>
-      <select class="sel" id="since" aria-label="Changes since meeting"></select>
+      <select class="sel" id="since" aria-label="Changes since week"></select>
     </div>
     <div class="page" id="page"></div>
   </div>
@@ -413,7 +413,8 @@ async function boot(){
         tf[bid]=[Number(r.avg_size_mm),pk||'',r.measurement_date]});
     }catch(e){console.warn('TrueFruit not loaded',e)}
     const today=cairoDate(Date.now());
-    const meetings=[];{const t=new Date(today+'T00:00:00Z');const back=((t.getUTCDay()+6)%7)||7;t.setUTCDate(t.getUTCDate()-back);for(let k=0;k<8;k++){meetings.push(t.toISOString().slice(0,10));t.setUTCDate(t.getUTCDate()-7)}}
+    /* "changes since week N": options are ISO weeks (Mon–Sun); each value is the day before that week's Monday */
+    const meetings=[];{const t=new Date(today+'T00:00:00Z');t.setUTCDate(t.getUTCDate()-((t.getUTCDay()+6)%7)-1);for(let k=0;k<10;k++){meetings.push(t.toISOString().slice(0,10));t.setUTCDate(t.getUTCDate()-7)}}
     startApp({sb:SBC,season,seasonId:S_ID,y1,today,plots,plan:PLAN,windows,tf,reasons,meetings,me:{id:session.user.id,name:acct.name||'Me'}});
   }catch(err){gate('Could not load','Live-data load error: '+esc0((err&&err.message)||String(err))+'. Refresh if you just signed in.',false);console.error(err)}
 }
@@ -425,6 +426,9 @@ const TODAY=DB.today, BEARING_AGE=7, SB=DB.sb;
 const cairoDate0=d=>new Date(d).toLocaleDateString('en-CA',{timeZone:'Africa/Cairo'});
 const REASONS=DB.reasons.map(r=>r.label), REASON_CODE=Object.fromEntries(DB.reasons.map(r=>[r.label,r.code]));
 const MEETINGS=DB.meetings;
+const isoWeek=d=>{const t=new Date(d+'T00:00:00Z');const day=(t.getUTCDay()+6)%7;t.setUTCDate(t.getUTCDate()-day+3);const y0=new Date(Date.UTC(t.getUTCFullYear(),0,4));return 1+Math.round(((t-y0)/864e5-3+((y0.getUTCDay()+6)%7))/7)};
+const wkOf=since=>isoWeek(addDays(since,1));            /* week whose Monday follows the cut-off */
+const sinceLbl=()=>'week '+wkOf(S.since);
 const JUL_END=DB.y1+'-07-31';
 
 let seed=7;const rnd=()=>{seed=(seed*16807)%2147483647;return (seed-1)/2147483646};
@@ -461,7 +465,7 @@ function agg(list,since){
 }
 
 // ---------- state ----------
-const S={tab:'est',farm:'All',type:'All',q:'',since:MEETINGS[0],group:'farm',reason:'All'};
+const S={tab:'est',farm:'All',type:'All',q:'',since:(addDays(MEETINGS[0],1)===TODAY?MEETINGS[1]:MEETINGS[0]),group:'farm',reason:'All'};
 try{const u=JSON.parse(localStorage.getItem('hp2-ui')||'{}');S.tab=u.tab||S.tab;S.group=u.group||S.group;if(MEETINGS.includes(u.since))S.since=u.since;
   S.farm=u.farm||'All';S.type=u.type||'All';S.days=u.days||7;S.wk=u.wk||0;S.howto=!!u.howto}catch(e){}
 const saveUI=()=>{try{localStorage.setItem('hp2-ui',JSON.stringify({tab:S.tab,group:S.group,since:S.since,farm:S.farm,type:S.type,days:S.days,wk:S.wk,howto:S.howto}))}catch(e){}};
@@ -476,7 +480,7 @@ const $=s=>document.querySelector(s);
 function chrome(){
   $('#farmChips').innerHTML=FARMS.map(f=>`<button class="chip ${S.farm===f?'on':''}" data-farm="${f}">${f}</button>`).join('');
   $('#typeSel').innerHTML=TYPES.map(t=>`<option ${S.type===t?'selected':''}>${t}</option>`).join('');
-  $('#since').innerHTML=MEETINGS.map(m=>`<option value="${m}" ${S.since===m?'selected':''}>Meeting ${fmtDY(m)}</option>`).join('');
+  $('#since').innerHTML=MEETINGS.map(m=>`<option value="${m}" ${S.since===m?'selected':''}>Week ${wkOf(m)} · from ${fmtD(addDays(m,1))}</option>`).join('');
   document.querySelectorAll('#tabs button').forEach(b=>b.classList.toggle('on',b.dataset.t===S.tab));
   const n=filtered().length;$('#qCount').textContent=n===PLOTS.length?`${n} plots`:`${n} of ${PLOTS.length} plots`;$('#qClr').hidden=!S.q;
   document.body.classList.toggle('showf',!!S.howto);saveUI();
@@ -505,7 +509,7 @@ function harvSplit(p){let a=[0,0,0,0];for(const [d,x] of Object.entries(p.daily)
 function badge(p){
   const all=inSeason(p);if(!all.length)return '';
   const nw=changes(p,S.since).length;
-  return `<button class="chg ${nw?'new':''}" data-hist="${p.id}" data-tip="p:${p.id}" title="${nw?`${nw} update${nw>1?'s':''} since the ${fmtD(S.since)} meeting · `:''}${all.length} change${all.length>1?'s':''} this season" aria-label="${all.length} changes, view history">${nw?'<span class="d"></span>'+nw+(nw>1?' updates':' update'):all.length+(all.length>1?' changes':' change')}</button>`;
+  return `<button class="chg ${nw?'new':''}" data-hist="${p.id}" data-tip="p:${p.id}" title="${nw?`${nw} update${nw>1?'s':''} since ${sinceLbl()} · `:''}${all.length} change${all.length>1?'s':''} this season" aria-label="${all.length} changes, view history">${nw?'<span class="d"></span>'+nw+(nw>1?' updates':' update'):all.length+(all.length>1?' changes':' change')}</button>`;
 }
 function gbadge(key,list){
   const nNew=list.reduce((s,p)=>s+changes(p,S.since).length,0);
@@ -532,7 +536,7 @@ document.addEventListener('mouseover',e=>{
     list.forEach(p=>changes(p,S.since).forEach(e=>{const i=p.ev.indexOf(e);evs.push({p,e,d:e.v-(i?p.ev[i-1].v:0)})}));
     evs.sort((a,b)=>Math.abs(b.d)-Math.abs(a.d));
     const net=evs.reduce((s,x)=>s+x.d,0);
-    html=`<div class="h">${esc(id)} · ${evs.length} changes since ${fmtD(S.since)} · net <span class="${net>0?'pos':'neg'}">${sgn(net)} t</span></div>`+
+    html=`<div class="h">${esc(id)} · ${evs.length} changes since ${sinceLbl()} · net <span class="${net>0?'pos':'neg'}">${sgn(net)} t</span></div>`+
       evs.slice(0,5).map(x=>`<div class="row"><span class="plot">${x.p.sector}-${x.p.plot}</span><span><span class="${x.d>0?'pos':'neg'}">${sgn(x.d)} t</span> · ${x.e.reason?esc(x.e.reason):'<i>no reason</i>'} <span class="calc">${esc(x.p.farm)}</span></span></div>`).join('')+
       (evs.length>5?`<div class="calc" style="margin-top:4px">+${evs.length-5} more</div>`:'')+`<div class="foot">Click for details</div>`;
   }
@@ -549,7 +553,7 @@ function kpis(list){
    <div class="kpi"><div class="k">Area · EXP</div><div class="v">${n0(a.area)} <span style="font-size:13px;color:var(--text3)">fed</span></div><div class="s">${n0(a.parea)} fed EXP · ${n0(a.area-a.parea)} fed WIP · ${a.plots} plots</div></div>
    <div class="kpi"><div class="k">Budget</div><div class="v">${a.budget?n0(a.budget)+' t':'–'}</div><div class="s">${a.budget?n1(a.budget/a.area)+' t/fed':'not set yet'}</div></div>
    <div class="kpi hl"><div class="k">Latest estimate</div><div class="v">${a.est?n0(a.est)+' t':'–'}</div><div class="s">${a.est&&a.budget?`<span class="${d>=0?'pos':'neg'}">${sgn(d)} t vs budget (${sgn(d/a.budget*100,n1)}%)</span>`:a.est?'no budget yet':'no estimates yet'}</div></div>
-   <div class="kpi"><div class="k">Moved since ${fmtD(S.since)}</div><div class="v ${a.est-a.prev>=0?'pos':'neg'}">${sgn(a.est-a.prev)} t</div><div class="s">${a.nNew} plot changes</div></div>
+   <div class="kpi"><div class="k">Moved since ${sinceLbl()}</div><div class="v ${a.est-a.prev>=0?'pos':'neg'}">${sgn(a.est-a.prev)} t</div><div class="s">${a.nNew} plot changes</div></div>
    <div class="kpi"><div class="k">Raw PK harvested</div><div class="v">${n0(a.tot)} t</div><div class="s">+ ${n0(a.local)} sorting &amp; local, ${n0(a.culls)} waste (not counted)</div></div>
    <div class="kpi"><div class="k">Remaining</div><div class="v">${n0(a.rem)} t</div><div class="s">${a.est?n0(a.tot/a.est*100)+'% of estimate harvested':'needs an estimate'}</div></div>
   </div>`;
@@ -619,7 +623,7 @@ function viewEst(part){
       <th>Budget qty</th><th>${monthSel()}</th><th>Latest update</th><th>Raw PK actual</th><th>Sales<span class="f">sorting + local, not counted</span></th><th>Waste<span class="f">not counted</span></th><th>Remaining<span class="f">= latest − Raw PK actual</span></th><th class="daystart">Actual so far<span class="f">past days · vs plan</span></th><th>Plan ahead<span class="f">today on</span></th>
       ${days.map((d,i)=>{const t=new Date(d+'T00:00:00Z');return `<th class="${i===0?'daystart':''} ${wkCls(d)}">${t.toLocaleDateString('en-GB',{weekday:'short',timeZone:'UTC'})}<span class="f">${fmtD(d)}</span></th>`}).join('')}</tr></thead>
       <tbody>${ent.map(([k,ps])=>row(esc(k),ps)).join('')}${row('Total',list,'tot')}</tbody></table></div></div>`};
-  const dayNav=`<span class="lbl">Days</span><div class="seg"><button data-wk="-1" aria-label="Previous week" title="Previous week">‹ Week</button><span class="segtxt">${fmtD(s0)} – ${fmtD(s1)}</span><button data-wk="1" aria-label="Next week" title="Next week">Week ›</button></div><button class="btn sm" data-wk="0" ${(S.wk||0)===0?'disabled':''}>Today</button>
+  const dayNav=`<span class="lbl">Days</span><div class="seg"><button data-wk="-1" aria-label="Previous week" title="Previous week">‹ Week</button><span class="segtxt">Wk ${isoWeek(s0)}${isoWeek(s1)!==isoWeek(s0)?'–'+isoWeek(s1):''} · ${fmtD(s0)} – ${fmtD(s1)}</span><button data-wk="1" aria-label="Next week" title="Next week">Week ›</button></div><button class="btn sm" data-wk="0" ${(S.wk||0)===0?'disabled':''}>Today</button>
     <div class="seg"><button data-days="7" class="${(S.days||7)===7?'on':''}">7 d</button><button data-days="14" class="${S.days===14?'on':''}">14 d</button></div>`;
   if(part==='sum')return `<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">${dayNav}<span class="spacer"></span><button class="btn sm" data-windows>Harvest windows</button><button class="btn sm pri" data-logharvest>+ Log harvest</button></div>${sumGrid(p=>p.variety,'Variety')}${sumGrid(p=>p.farm,'Farm')}`;
   const fresh=PLOTS.every(p=>!p.ev.length)&&!Object.keys(PLAN).length&&!Object.values(WIN).some(w=>w.start);
@@ -633,10 +637,10 @@ function viewEst(part){
   <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
     <span class="lbl">Group by</span><div class="seg"><button data-group="farm" class="${S.group==='farm'?'on':''}">Farm</button><button data-group="variety" class="${S.group==='variety'?'on':''}">Variety</button></div>
     <span class="lbl" style="margin-left:6px">Plan days</span>
-    <div class="seg"><button data-wk="-1" aria-label="Previous week" title="Previous week">‹ Week</button><span class="segtxt">${fmtD(s0)} – ${fmtD(s1)}</span><button data-wk="1" aria-label="Next week" title="Next week">Week ›</button></div><button class="btn sm" data-wk="0" ${(S.wk||0)===0?'disabled':''}>Today</button>
+    <div class="seg"><button data-wk="-1" aria-label="Previous week" title="Previous week">‹ Week</button><span class="segtxt">Wk ${isoWeek(s0)}${isoWeek(s1)!==isoWeek(s0)?'–'+isoWeek(s1):''} · ${fmtD(s0)} – ${fmtD(s1)}</span><button data-wk="1" aria-label="Next week" title="Next week">Week ›</button></div><button class="btn sm" data-wk="0" ${(S.wk||0)===0?'disabled':''}>Today</button>
     <div class="seg"><button data-days="7" class="${(S.days||7)===7?'on':''}">7 d</button><button data-days="14" class="${S.days===14?'on':''}">14 d</button></div>
     <span class="spacer"></span><span class="btnpair"><button class="btn sm" data-windows>Harvest windows</button><button class="btn sm pri" data-logharvest>+ Log harvest</button></span>
-    <details class="howto" ${S.howto?'open':''}><summary>How this works</summary><p class="hint">Left: the estimate per plot. Click it to update by tonnes or t/fed; every change is saved with who, when and why (<b style="color:var(--amber)">● updates</b> = since the selected meeting). Right: Raw PK tonnes per day. Past days show the <b>actual</b> from the harvest log with the plan under it (green = above plan, red = below). Click a past day to enter or correct a plot's harvest, use <b>+ actual</b> under today, or <b>Log harvest</b> to enter a whole farm's day at once. Today and later are plan inputs. <b>Left after plan</b> = remaining − plan ahead; red means the plan is more than the estimate. Hover Raw PK actual for everything picked by category.</p></details>
+    <details class="howto" ${S.howto?'open':''}><summary>How this works</summary><p class="hint">Left: the estimate per plot. Click it to update by tonnes or t/fed; every change is saved with who, when and why (<b style="color:var(--amber)">● updates</b> = since the selected week). Right: Raw PK tonnes per day. Past days show the <b>actual</b> from the harvest log with the plan under it (green = above plan, red = below). Click a past day to enter or correct a plot's harvest, use <b>+ actual</b> under today, or <b>Log harvest</b> to enter a whole farm's day at once. Today and later are plan inputs. <b>Left after plan</b> = remaining − plan ahead; red means the plan is more than the estimate. Hover Raw PK actual for everything picked by category.</p></details>
   </div>
   <div class="table-wrap mg"><table>
     <thead><tr><th class="grpcol stk">Plot</th><th class="grpcol stk2">Estimate</th><th class="grpcol" colspan="4">Yield, budget &amp; size</th><th class="grpcol" colspan="2">Actual (harvest log)</th><th class="grpcol daystart" colspan="${days.length}">Raw PK t per day · actual (past) · plan (today on)</th><th class="grpcol daystart" colspan="3">Plan check</th></tr>
@@ -714,13 +718,13 @@ function viewChg(){
      <td class="num calc">${n0(c.prev)}</td><td class="num" style="color:var(--text)">${n0(c.e.v)}</td><td class="num ${c.d>0?'pos':'neg'}">${sgn(c.d)}</td><td class="num calc">${n1(c.prev/c.p.area)} → ${n1(c.e.v/c.p.area)}</td>
      <td>${c.e.reason?`<span class="rchip">${esc(c.e.reason)}</span>`:'<span class="rchip none">No reason</span>'}</td><td style="white-space:normal;min-width:180px;font-size:12px">${esc(c.e.note||'')}</td><td class="calc">${esc(c.e.by)}</td></tr>`).join('');
   return `<div class="kpis">
-    <div class="kpi"><div class="k">Estimate at ${fmtD(S.since)}</div><div class="v">${n0(before)} t</div></div>
-    <div class="kpi hl"><div class="k">Estimate today</div><div class="v">${n0(after)} t</div><div class="s"><span class="${after-before>=0?'pos':'neg'}">${sgn(after-before)} t since the meeting</span></div></div>
+    <div class="kpi"><div class="k">Estimate at start of ${sinceLbl()}</div><div class="v">${n0(before)} t</div></div>
+    <div class="kpi hl"><div class="k">Estimate today</div><div class="v">${n0(after)} t</div><div class="s"><span class="${after-before>=0?'pos':'neg'}">${sgn(after-before)} t since start of ${sinceLbl()}</span></div></div>
     <div class="kpi"><div class="k">Changes</div><div class="v">${ch.length}</div><div class="s">${new Set(ch.map(c=>c.p.id)).size} plots · ${ch.filter(c=>!c.e.reason).length} without a reason</div></div>
     <div class="kpi"><div class="k">Budget → today</div><div class="v ${after-budget>=0?'pos':'neg'}">${sgn(after-budget)} t</div><div class="s">${sgn((after-budget)/budget*100,n1)}% vs budget</div></div>
   </div>
   <div class="grid2">
-   <div class="card bridge"><h2>Since the ${fmtD(S.since)} meeting</h2><div class="sub">Net tonnes moved, grouped by the reason the agronomist gave.</div>${bridge||'<div class="sub">No changes in this window.</div>'}<div style="height:10px"></div></div>
+   <div class="card bridge"><h2>Since ${sinceLbl()}</h2><div class="sub">Net tonnes moved, grouped by the reason the agronomist gave.</div>${bridge||'<div class="sub">No changes in this window.</div>'}<div style="height:10px"></div></div>
    <div class="card bridge"><h2>Budget to today, by source</h2><div class="sub">Where the ${sgn(after-budget)} t gap from budget came from across the whole season.</div>${bridge2}<div style="height:10px"></div></div>
   </div>
   <div class="card"><h2>Change log</h2><div class="sub" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center"><span class="lbl">Reason</span>
@@ -773,7 +777,7 @@ function openHistory(id){
 }
 function openGroupHistory(key){
   const list=GROUPS[key]||[];const ch=allChanges(list,S.since);const net=ch.reduce((s,c)=>s+c.d,0);
-  modal(`<div class="mh"><div><h3>${esc(key)}</h3><div class="meta">${ch.length} changes since the ${fmtDY(S.since)} meeting · net <span class="${net>=0?'pos':'neg'}">${sgn(net)} t</span></div></div><button class="x" aria-label="Close">×</button></div>
+  modal(`<div class="mh"><div><h3>${esc(key)}</h3><div class="meta">${ch.length} changes since ${sinceLbl()} · net <span class="${net>=0?'pos':'neg'}">${sgn(net)} t</span></div></div><button class="x" aria-label="Close">×</button></div>
    <div class="mb"><div class="table-wrap" style="max-height:55vh"><table><thead><tr><th>Date</th><th>Plot</th><th>Farm</th><th>Was</th><th>Now</th><th>Δ t</th><th>Reason</th><th>By</th></tr></thead><tbody>
    ${ch.map(c=>`<tr><td class="calc">${fmtD(c.e.d)}</td><td><button class="chg" style="margin:0" data-hist="${c.p.id}"><span class="plot">${c.p.sector}-${c.p.plot}</span></button></td><td>${esc(c.p.farm)}</td><td class="num calc">${n0(c.prev)}</td><td class="num">${n0(c.e.v)}</td><td class="num ${c.d>0?'pos':'neg'}">${sgn(c.d)}</td><td>${c.e.reason?`<span class="rchip">${esc(c.e.reason)}</span>`:'<span class="rchip none">—</span>'}</td><td class="calc">${esc(c.e.by)}</td></tr>`).join('')}
    </tbody></table></div></div><div class="mf"><button class="btn" data-close>Close</button></div>`);
@@ -957,7 +961,7 @@ function last7(ps){const ds=[...Array(7)].map((_,i)=>addDays(TODAY,i-7));const a
   if(!a&&!pl)return '<span class="calc">–</span>';return `<span class="av">${vmark(a,pl)}${n0(a)}</span><div class="pln">plan ${n0(pl)}</div>`}
 function presentView(){
   const list=filtered();const A=agg(list,S.since);const sl=S.slide||0;
-  const bar=`<div class="pbar"><span class="t">Citrus harvest · ${S.farm==='All'?'All farms':esc(S.farm)}</span><span class="m">Meeting ${fmtDY(TODAY)} · changes since ${fmtDY(S.since)}</span>
+  const bar=`<div class="pbar"><span class="t">Citrus harvest · ${S.farm==='All'?'All farms':esc(S.farm)}</span><span class="m">Week ${isoWeek(TODAY)} · changes since ${sinceLbl()}</span>
     <span class="spacer"></span>
     <span class="pf">${FARMS.map(f=>`<button data-farm="${f}" class="${S.farm===f?'on':''}">${f}</button>`).join('')}</span>
     <span class="pslides">${SLIDES.map((s,i)=>`<button data-slide="${i}" class="${sl===i?'on':''}">${i+1} · ${s}</button>`).join('')}</span>
@@ -972,11 +976,11 @@ function presentView(){
     <div class="pk kpis">
       <div class="kpi"><div class="k">Budget</div><div class="v">${n0(A.budget)} t</div><div class="s">${n1(A.budget/A.area)} t/fed</div></div>
       <div class="kpi hl"><div class="k">Latest estimate</div><div class="v">${n0(A.est)} t</div><div class="s">${n1(A.est/A.area)} t/fed</div></div>
-      <div class="kpi"><div class="k">Moved since ${fmtD(S.since)}</div><div class="v ${A.est-A.prev>=0?'pos':'neg'}">${sgn(A.est-A.prev)} t</div><div class="s">${A.nNew} plot changes</div></div>
+      <div class="kpi"><div class="k">Moved since ${sinceLbl()}</div><div class="v ${A.est-A.prev>=0?'pos':'neg'}">${sgn(A.est-A.prev)} t</div><div class="s">${A.nNew} plot changes</div></div>
       <div class="kpi"><div class="k">Raw PK harvested</div><div class="v">${n0(A.tot)} t</div><div class="s">+ ${n0(A.local)} sorting &amp; local, ${n0(A.culls)} waste (not counted)</div></div>
       <div class="kpi"><div class="k">Remaining</div><div class="v">${n0(A.rem)} t</div><div class="s">estimate − Raw PK harvested</div></div>
     </div>
-    <div class="table-wrap pt" style="max-height:none"><table><thead><tr><th>Variety</th><th>Harvest window</th><th>TrueFruit</th><th>Budget</th><th>${monthSel()}</th><th>Latest</th><th>vs budget</th><th>Moved since ${fmtD(S.since)}</th><th>Raw PK actual</th><th>Remaining</th><th>Last 7 d<span class="f">actual · vs plan</span></th><th>Planned next 7 d</th></tr></thead><tbody>
+    <div class="table-wrap pt" style="max-height:none"><table><thead><tr><th>Variety</th><th>Harvest window</th><th>TrueFruit</th><th>Budget</th><th>${monthSel()}</th><th>Latest</th><th>vs budget</th><th>Moved since ${sinceLbl()}</th><th>Raw PK actual</th><th>Remaining</th><th>Last 7 d<span class="f">actual · vs plan</span></th><th>Planned next 7 d</th></tr></thead><tbody>
     ${vents.map(([k,ps,a])=>{const mv=a.est-a.prev;const p7=next.slice(0,7).reduce((s,dd)=>s+ps.reduce((t,p)=>t+planVal(p,dd),0),0);
       const mvv=ps.reduce((t,p)=>t+estAt(p,monthEnd(S.month)),0);const l7=last7(ps);
       return `<tr><td class="vname">${esc(k)}</td><td>${winChip(k)}</td><td class="num">${tfAgg(ps)}</td><td class="num calc">${n0(a.budget)}</td><td class="num calc mcell" data-mk="p1|${esc(k)}" data-mv="${mvv}"><span class="mval">${n0(mvv)}</span></td><td class="num" style="color:var(--text);font-weight:700">${n0(a.est)}</td><td class="num ${a.est-a.budget>0.5?'pos':a.est-a.budget<-0.5?'neg':''}">${a.budget&&a.est?sgn(a.est-a.budget):'<span class="calc">–</span>'}</td>
@@ -987,7 +991,7 @@ function presentView(){
     const ch=allChanges(list,S.since);const byR={};ch.forEach(c=>{const k=c.e.reason||'No reason given';byR[k]=(byR[k]||0)+c.d});
     const net=ch.reduce((s,c)=>s+c.d,0);
     const top=[...ch].sort((a,b)=>Math.abs(b.d)-Math.abs(a.d)).slice(0,10);
-    body=`<h2 class="ph">Estimate moved ${sgn(net)} t since the ${fmtD(S.since)} meeting</h2><div class="psub">${ch.length} changes on ${new Set(ch.map(c=>c.p.id)).size} plots · ${ch.filter(c=>!c.e.reason).length} without a reason</div>
+    body=`<h2 class="ph">Estimate moved ${sgn(net)} t since ${sinceLbl()}</h2><div class="psub">${ch.length} changes on ${new Set(ch.map(c=>c.p.id)).size} plots · ${ch.filter(c=>!c.e.reason).length} without a reason</div>
     <div class="grid2"><div class="card bridge"><h2>By reason</h2><div class="sub">Net tonnes, grouped by the reason the agronomist gave.</div>${bridgeRows(Object.entries(byR).sort((a,b)=>Math.abs(b[1])-Math.abs(a[1])))||'<div class="sub">No changes.</div>'}<div style="height:12px"></div></div>
     <div class="card"><h2>Biggest moves</h2><div class="sub">Click a plot for its full history.</div><div class="table-wrap pt"><table><thead><tr><th>Plot</th><th>Variety</th><th>Was → now</th><th>Δ t</th><th>Reason</th></tr></thead><tbody>
     ${top.map(c=>`<tr><td><button class="chg" style="margin:0" data-hist="${c.p.id}">${esc(c.p.farm)} <span class="plot">${c.p.sector}-${c.p.plot}</span></button></td><td class="vname">${esc(c.p.variety)}</td><td class="num calc">${n0(c.prev)} → <b style="color:var(--text)">${n0(c.e.v)}</b></td><td class="num ${c.d>0?'pos':'neg'}">${sgn(c.d)}</td><td>${c.e.reason?`<span class="rchip">${esc(c.e.reason)}</span>`:'<span class="rchip none">No reason</span>'}</td></tr>`).join('')||'<tr><td colspan="5" class="calc">No changes.</td></tr>'}
