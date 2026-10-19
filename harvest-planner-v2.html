@@ -16,7 +16,7 @@
   --amber:#b87820;--amber-bg:#fdf3e0;--amber-border:#e8c87a;
   --red:#b03030;--red-bg:#faeaea;--red-border:#e8a0a0;
   --green:#1e6b3a;--green-bg:#e8f5ec;--green-border:#8ecba4;
-  --text:#111f1f;--text2:#3b4b4a;--text3:#5a6968;--skel-a:#e0e8e6;--skel-b:#cedad7;--past-mix:45%;--grp-bg:#cfe3e0;--grp-fg:#0e3a3d;--grp-line:#9fc4bf;--act-c:#0b6b5f;--plan-c:#4a4fb5;
+  --text:#111f1f;--text2:#3b4b4a;--text3:#5a6968;--skel-a:#e0e8e6;--skel-b:#cedad7;--past-mix:45%;--grp-bg:#cfe3e0;--grp-fg:#0e3a3d;--grp-line:#9fc4bf;--act-c:#0b6b5f;--plan-c:#6a2fb8;
   --border:#c6d4d2;--border2:#aabdbb;--card:#ffffff;--subtot:#edeae4;--subtot-text:#4a4840;
   --shadow:0 10px 30px rgba(14,58,61,.18);
   --font-display:'DM Serif Display',Georgia,serif;
@@ -29,12 +29,12 @@
   --bg:#0f1b1c;--bg2:#172728;--bg3:#203436;--accent:#2a9a96;--accent2:#3bb3ae;--accent-bg:#173a3a;
   --amber:#e0a54a;--amber-bg:#33280f;--amber-border:#6b5320;--red:#e27a7a;--red-bg:#3a1c1c;--red-border:#743434;
   --green:#6cc58e;--green-bg:#15301f;--green-border:#2f6a44;--text:#e6efee;--text2:#bfcfcd;--text3:#8a9d9b;
-  --border:#2a3e3f;--border2:#3a5355;--card:#142223;--subtot:#232a26;--subtot-text:#cfc9bb;--shadow:0 10px 30px rgba(0,0,0,.5);--skel-a:#1f3436;--skel-b:#2d4749;--past-mix:75%;--grp-bg:#1d4446;--grp-fg:#e6f3f1;--grp-line:#2f6264;--act-c:#5fd3bf;--plan-c:#a7adf7;color-scheme:dark}}
+  --border:#2a3e3f;--border2:#3a5355;--card:#142223;--subtot:#232a26;--subtot-text:#cfc9bb;--shadow:0 10px 30px rgba(0,0,0,.5);--skel-a:#1f3436;--skel-b:#2d4749;--past-mix:75%;--grp-bg:#1d4446;--grp-fg:#e6f3f1;--grp-line:#2f6264;--act-c:#5fd3bf;--plan-c:#cfaaff;color-scheme:dark}}
 :root[data-theme="dark"]{
   --bg:#0f1b1c;--bg2:#172728;--bg3:#203436;--accent:#2a9a96;--accent2:#3bb3ae;--accent-bg:#173a3a;
   --amber:#e0a54a;--amber-bg:#33280f;--amber-border:#6b5320;--red:#e27a7a;--red-bg:#3a1c1c;--red-border:#743434;
   --green:#6cc58e;--green-bg:#15301f;--green-border:#2f6a44;--text:#e6efee;--text2:#bfcfcd;--text3:#8a9d9b;
-  --border:#2a3e3f;--border2:#3a5355;--card:#142223;--subtot:#232a26;--subtot-text:#cfc9bb;--shadow:0 10px 30px rgba(0,0,0,.5);--skel-a:#1f3436;--skel-b:#2d4749;--past-mix:75%;--grp-bg:#1d4446;--grp-fg:#e6f3f1;--grp-line:#2f6264;--act-c:#5fd3bf;--plan-c:#a7adf7;color-scheme:dark}
+  --border:#2a3e3f;--border2:#3a5355;--card:#142223;--subtot:#232a26;--subtot-text:#cfc9bb;--shadow:0 10px 30px rgba(0,0,0,.5);--skel-a:#1f3436;--skel-b:#2d4749;--past-mix:75%;--grp-bg:#1d4446;--grp-fg:#e6f3f1;--grp-line:#2f6264;--act-c:#5fd3bf;--plan-c:#cfaaff;color-scheme:dark}
 *{box-sizing:border-box}
 body{margin:0;font-family:var(--font-body);background:var(--bg);color:var(--text);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
 .app{display:flex;min-height:100vh}
@@ -179,6 +179,21 @@ th.today,td.today{background:var(--accent-bg)}
 .av,.mg .act.av{color:var(--act-c);font-weight:600}
 .pc,.mg td.pc,.dayin{color:var(--plan-c)}
 .dayin.z{color:var(--plan-c);opacity:.55}
+.av,.mg .act.av{font-style:normal;font-weight:700}
+.pc,.mg td.pc,.pln{font-style:italic;font-weight:500}
+.pc{text-decoration:underline dashed;text-decoration-thickness:1px;text-underline-offset:3px;text-decoration-color:color-mix(in srgb,var(--plan-c) 60%,transparent)}
+.pln::before{content:'';display:inline-block;width:10px;border-top:1px dashed var(--plan-c);vertical-align:3px;margin-right:3px}
+.dayin{font-style:italic;font-weight:500;border-bottom:1px dashed color-mix(in srgb,var(--plan-c) 55%,transparent)!important}
+/* Log harvest on phones: one card per plot, the 4 categories in 2×2 */
+@media (max-width:700px){
+  #lgrid{max-height:62vh}#lgrid table,#lgrid tbody{display:block}#lgrid thead{display:none}
+  #lgrid tr{display:grid;grid-template-columns:1fr 1fr;gap:8px 10px;padding:12px;border-bottom:1px solid var(--border)}
+  #lgrid td{display:block;padding:0!important;border:0;text-align:left;white-space:normal}
+  #lgrid td.lp{grid-column:1/-1;font-size:13px}
+  #lgrid td[data-label]::before{content:attr(data-label);display:block;font-size:10px;font-style:normal;text-transform:uppercase;letter-spacing:.05em;color:var(--text3);margin-bottom:3px;text-decoration:none}
+  #lgrid td.la .ain{min-width:0;font-size:16px;padding:9px 6px}
+  #lgrid td.lv{grid-column:1/-1}
+}
 .vm{font-size:8px;margin-right:3px;vertical-align:1px}.vm.up{color:var(--green)}.vm.dn{color:var(--red)}
 .mg td.click{cursor:pointer}.mg td.click:hover{outline:1px solid var(--accent);outline-offset:-1px;background:var(--accent-bg)}
 .todayact{all:unset;cursor:pointer;display:block;font-size:10.5px;color:var(--accent);text-align:right;padding:0 4px;font-weight:600}
@@ -649,7 +664,7 @@ function viewEst(part){
     ${days.map((d,i)=>{const t=new Date(d+'T00:00:00Z');return `<th class="day ${i===0?'daystart':''} ${wkCls(d)}">${t.toLocaleDateString('en-GB',{weekday:'short',timeZone:'UTC'})}<span class="f">${fmtD(d)}</span></th>`}).join('')}
     <th class="daystart">Actual so far<span class="f">past days in view</span></th><th>Plan ahead<span class="f">today on, not yet harvested</span></th><th>Left after plan<span class="f">= remaining − plan ahead</span></th></tr></thead>
     <tbody>${rows}</tbody></table></div>
-  <div class="legendrow"><span><b class="av">12</b> Actual (Raw PK)</span><span><b class="pc">10</b> Plan</span><span><span class="vm up">▲</span><span class="vm dn">▼</span> above / below plan</span><span><i class="lg past"></i>Past day</span><span><i class="lg today"></i>Today</span><span><i class="lg fri"></i>Friday (weekend)</span><span><i class="lg off"></i>Outside the variety's harvest window</span><span><i class="lg ok"></i>Plan saved</span></div>
+  <div class="legendrow"><span><b class="av">12</b> Actual (Raw PK): upright, bold</span><span><b class="pc">10</b> Plan: italic, dashed underline</span><span><span class="vm up">▲</span><span class="vm dn">▼</span> above / below plan</span><span><i class="lg past"></i>Past day</span><span><i class="lg today"></i>Today</span><span><i class="lg fri"></i>Friday (weekend)</span><span><i class="lg off"></i>Outside the variety's harvest window</span><span><i class="lg ok"></i>Plan saved</span></div>
   ${part==='grid'?'':sumGrid(p=>p.variety,'Variety')+sumGrid(p=>p.farm,'Farm')}`;
 }
 document.addEventListener('click',e=>{const w=e.target.closest('[data-wk]');if(w){const v=+w.dataset.wk;S.wk=v?(S.wk||0)+v:0;render()}
@@ -861,8 +876,8 @@ function openLog(){
   let date=TODAY,farm=S.farm==='All'?FARMS[1]:S.farm,onlyOpen=true;
   const body=()=>{const ps=PLOTS.filter(p=>p.farm===farm&&(!onlyOpen||!(p.ev.length&&est(p)-total(p)<=1)||planVal(p,date)>0||p.daily[date]));
     return `<table><thead><tr><th>Plot</th><th>Remaining</th><th>Planned</th>${ACOLS.map(c=>`<th class="lh" style="--c:${c[3]}">${colHead(c)}</th>`).join('')}<th>All picked<span class="f">= sum</span></th><th>Raw PK vs plan</th></tr></thead><tbody>
-    ${ps.map(p=>{const a=actRow(p,date);return `<tr data-lrow="${p.id}"><td><span class="plot">${p.sector}-${p.plot}</span> <span class="vname" style="font-size:12px">${esc(p.variety)}</span></td><td class="num calc">${n0(est(p)-total(p))}</td>
-      <td class="num pc">${n0(planVal(p,date))}</td>${a.map((v,j)=>`<td style="padding:4px 5px"><input class="ain" style="--c:${ACOLS[j][3]}" data-ai="${j}" value="${v||''}" placeholder="—" inputmode="decimal" aria-label="${p.sector}-${p.plot} ${ACOLS[j][1]}"></td>`).join('')}<td class="num lt">${aDay(a)?n1(aDay(a)):'0'}</td><td class="lv" data-pl="${planVal(p,date)}">${vsPlan(a,planVal(p,date))}</td></tr>`}).join('')||`<tr><td colspan="9" class="calc" style="white-space:normal;padding:14px">${onlyOpen?'Every plot on this farm is fully harvested against its estimate. Untick \'Hide fully harvested plots\' to see them.':'No plots on this farm.'}</td></tr>`}</tbody></table>`};
+    ${ps.map(p=>{const a=actRow(p,date);return `<tr data-lrow="${p.id}"><td class="lp"><span class="plot">${p.sector}-${p.plot}</span> <span class="vname" style="font-size:12px">${esc(p.variety)}</span></td><td class="num calc" data-label="Remaining">${n0(est(p)-total(p))}</td>
+      <td class="num pc" data-label="Plan">${n0(planVal(p,date))}</td>${a.map((v,j)=>`<td class="la" data-label="${ACOLS[j][1]}" style="padding:4px 5px"><input class="ain" style="--c:${ACOLS[j][3]}" data-ai="${j}" value="${v||''}" placeholder="—" inputmode="decimal" aria-label="${p.sector}-${p.plot} ${ACOLS[j][1]}"></td>`).join('')}<td class="num lt" data-label="All picked">${aDay(a)?n1(aDay(a)):'0'}</td><td class="lv" data-label="Raw PK vs plan" data-pl="${planVal(p,date)}">${vsPlan(a,planVal(p,date))}</td></tr>`}).join('')||`<tr><td colspan="9" class="calc" style="white-space:normal;padding:14px">${onlyOpen?'Every plot on this farm is fully harvested against its estimate. Untick \'Hide fully harvested plots\' to see them.':'No plots on this farm.'}</td></tr>`}</tbody></table>`};
   modal(`<div class="mh"><div><h3>Log harvest</h3><div class="meta">One row per plot. Leave a row empty if nothing was picked. Only To packhouse (Raw PK) counts against the estimate and the plan; the other three are recorded for reference.</div></div><button class="x" aria-label="Close">×</button></div>
    <div class="mb"><div style="display:flex;gap:10px;align-items:end;flex-wrap:wrap">
      <div class="field"><label class="lbl" for="ldate">Date</label><input type="date" id="ldate" data-nd max="${TODAY}" value="${date}" style="font-size:14px"></div>
