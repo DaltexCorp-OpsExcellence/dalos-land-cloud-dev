@@ -155,8 +155,9 @@ th.today,td.today{background:var(--accent-bg)}
 .mg th.stk,.mg th.stk2{z-index:5}
 .mg thead th{z-index:8}.mg thead th.stk,.mg thead th.stk2{z-index:9}
 /* sum rows: one solid colour across every cell, sticky below the header */
-.mg tr.grp td{position:sticky;top:var(--hh,60px);z-index:4;background:var(--grp-bg)!important;color:var(--grp-fg);border-top:1px solid var(--grp-line);border-bottom:1px solid var(--grp-line);font-weight:700}
+.mg tr.grp td{position:sticky;top:var(--hh,60px);z-index:4;height:34px;box-sizing:border-box;white-space:nowrap;box-shadow:0 1px 0 var(--grp-line);background:var(--grp-bg)!important;color:var(--grp-fg);border-top:1px solid var(--grp-line);border-bottom:1px solid var(--grp-line);font-weight:700}
 .mg tr.grp td.stk,.mg tr.grp td.stk2{z-index:6}
+.mg tr.grp td.stk{overflow:hidden;text-overflow:ellipsis}.mg tr.grp td .winchip{margin:0 0 0 6px}
 .mg tr.grp td .calc,.mg tr.grp td .pln{color:var(--grp-fg);opacity:.75}
 .mg tr.tot td{background:var(--subtot)!important}
 .mg tr.tot .stk,.mg tr.tot .stk2{background:var(--subtot)}
@@ -223,7 +224,7 @@ th.lh{border-bottom:3px solid var(--c)}
 .harv{display:flex;flex-direction:row;align-items:center;justify-content:flex-end;gap:6px}
 /* review fixes */
 .mg thead tr:first-child th{height:28px;padding-top:0;padding-bottom:0;box-sizing:border-box}
-.mg thead tr:nth-child(2) th{top:28px}
+.mg thead tr:nth-child(2) th{top:var(--h1,28px)}
 .bad,.ain.bad,.dayin.bad,input.bad{outline:2px solid var(--red)!important;outline-offset:-1px;background:var(--red-bg)!important}
 .dayin.ok{background:var(--green-bg)!important;transition:background .4s}
 .btn:disabled{opacity:.45;pointer-events:none}
@@ -571,7 +572,7 @@ function viewEst(part){
   let rows='';
   for(const [g,ps] of Object.entries(groups)){
     GROUPS[g]=ps;const a=agg(ps,S.since);const dv=sumDays(ps);const per=dv.reduce((s,v)=>s+v,0);
-    rows+=`<tr class="grp"><td class="stk gname">${esc(g)} <span class="calc" style="text-transform:none;letter-spacing:0;font-weight:500">· ${ps.length}</span>${gbadge(g,ps)}${S.group==='variety'?'<br>'+winChip(g):''}</td>
+    rows+=`<tr class="grp"><td class="stk gname">${esc(g)} <span class="calc" style="text-transform:none;letter-spacing:0;font-weight:500">· ${ps.length}</span>${gbadge(g,ps)}${S.group==='variety'?winChip(g):''}</td>
       <td class="stk2 num">${n0(a.est)}</td><td class="num">${n1(a.est/a.area)}</td><td class="num">${n0(a.budget)}</td><td class="num ${a.est-a.budget>0.5?'pos':a.est-a.budget<-0.5?'neg':''}">${a.budget&&a.est?sgn(a.est-a.budget):'<span class="calc">–</span>'}</td><td class="num">${tfAgg(ps)}</td>
       <td class="num">${n0(a.tot)} <span class="calc">${n0(a.tot/a.est*100)}%</span></td><td class="num">${n0(a.rem)}</td>${dayCells(dv,true,ps)}${tail(a.rem,dv,ps)}</tr>`;
     for(const p of ps){
@@ -1002,7 +1003,7 @@ document.addEventListener('keydown',e=>{if(!S.present||root.innerHTML||e.default
   else if(e.key==='Escape')setPresent(false)});
 /* leaving fullscreen keeps Present mode; Exit or Esc leaves it */
 /* sum rows stick under the grid header until the next sum row scrolls up: needs the header's real height */
-function setHH(){document.querySelectorAll('.mg').forEach(m=>{const h=m.querySelector('thead')?.offsetHeight||0;m.style.setProperty('--hh',h+'px')})}
+function setHH(){document.querySelectorAll('.mg').forEach(m=>{const th=m.querySelector('thead');if(!th)return;const r1=th.rows[0]?.getBoundingClientRect().height||28;m.style.setProperty('--h1',r1+'px');m.style.setProperty('--hh',th.getBoundingClientRect().height+'px')})}
 addEventListener('resize',setHH);document.addEventListener('toggle',()=>setTimeout(setHH,0),true);
 function render(){if(S.present){$('#page').innerHTML=presentView();setHH();return}chrome();const pg=$('#page');
   if(S.tab==='plan')S.tab='est';
