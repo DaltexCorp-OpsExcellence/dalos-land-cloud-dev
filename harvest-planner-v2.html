@@ -770,7 +770,7 @@ function openEdit(id,kindIn){
   $('#modeSeg').onclick=e=>{const b=e.target.closest('[data-m]');if(!b)return;const v=tv==null||isNaN(tv)?null:tv;mode=b.dataset.m;
     document.querySelectorAll('#modeSeg button').forEach(x=>x.classList.toggle('on',x===b));
     $('#newvl').textContent=mode==='yield'?'New value (t / feddan)':'New value (tonnes)';
-    if(v!=null){inp.value=mode==='yield'?+(v/p.area).toFixed(3):r2(v);inp.defaultValue=inp.value}upd()};
+    if(v!=null)inp.value=mode==='yield'?+(v/p.area).toFixed(3):r2(v);upd()};
   $('#rs').onclick=e=>{const b=e.target.closest('[data-r]');if(!b)return;reason=reason===b.dataset.r?null:b.dataset.r;
     document.querySelectorAll('#rs .chip').forEach(x=>x.classList.toggle('on',x.dataset.r===reason))};
   $('#saveEst').onclick=async()=>{if(!ok()){inp.focus();inp.classList.add('bad');return}const v=tv;
