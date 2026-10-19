@@ -212,6 +212,9 @@ th.lh{border-bottom:3px solid var(--c)}
 .segtxt{padding:5px 10px;font-size:12px;font-weight:600;color:var(--text);background:var(--card);border-right:1px solid var(--border);white-space:nowrap;font-family:var(--font-num)}
 .legendrow{display:flex;gap:14px;flex-wrap:wrap;font-size:11.5px;color:var(--text3);align-items:center}.legendrow i.lg{display:inline-block;width:14px;height:11px;border-radius:3px;border:1px solid var(--border);vertical-align:-1px;margin-right:5px}
 .lg.past{background:color-mix(in srgb,var(--green-bg) var(--past-mix),var(--card))}.lg.today{background:var(--accent-bg)}.lg.fri{background:var(--bg2)}.lg.off{background:repeating-linear-gradient(135deg,var(--card) 0 3px,var(--bg3) 3px 5px)}.lg.ok{background:var(--green-bg);border-color:var(--green-border)}
+.estcell{display:flex;align-items:center;justify-content:space-between;gap:6px}
+.estcell .bslot{min-width:0;display:flex}.estcell .bslot .chg{margin-left:0}
+.estcell .estbtn{margin-left:auto}
 .harv{display:flex;flex-direction:row;align-items:center;justify-content:flex-end;gap:6px}
 /* review fixes */
 .mg thead tr:first-child th{height:28px;padding-top:0;padding-bottom:0;box-sizing:border-box}
@@ -485,12 +488,12 @@ function harvSplit(p){let a=[0,0,0,0];for(const [d,x] of Object.entries(p.daily)
 function badge(p){
   const all=inSeason(p);if(!all.length)return '';
   const nw=changes(p,S.since).length;
-  return `<button class="chg ${nw?'new':''}" data-hist="${p.id}" data-tip="p:${p.id}" title="${nw?`${nw} new since the ${fmtD(S.since)} meeting · `:''}${all.length} change${all.length>1?'s':''} this season" aria-label="${all.length} changes, view history">${nw?'<span class="d"></span>'+nw+' new':all.length+(all.length>1?' changes':' change')}</button>`;
+  return `<button class="chg ${nw?'new':''}" data-hist="${p.id}" data-tip="p:${p.id}" title="${nw?`${nw} update${nw>1?'s':''} since the ${fmtD(S.since)} meeting · `:''}${all.length} change${all.length>1?'s':''} this season" aria-label="${all.length} changes, view history">${nw?'<span class="d"></span>'+nw+(nw>1?' updates':' update'):all.length+(all.length>1?' changes':' change')}</button>`;
 }
 function gbadge(key,list){
   const nNew=list.reduce((s,p)=>s+changes(p,S.since).length,0);
   if(!nNew)return '';
-  return `<button class="chg new" data-ghist="${esc(key)}" data-tip="g:${esc(key)}"><span class="d"></span>${nNew} new</button>`;
+  return `<button class="chg new" data-ghist="${esc(key)}" data-tip="g:${esc(key)}"><span class="d"></span>${nNew} update${nNew>1?'s':''}</button>`;
 }
 const GROUPS={};
 const tip=$('#tip');
@@ -571,7 +574,7 @@ function viewEst(part){
       const dvals=days.map(dd=>planVal(p,dd));const per=dvals.reduce((s,v)=>s+v,0);
       rows+=`<tr><td class="stk"><span class="plot">${p.sector}-${p.plot}</span> <span class="vname">${S.group==='farm'?esc(p.variety):esc(p.farm)}</span> <span class="pill ${productive(p)?'p':'np'}">${productive(p)?'P':'NP'}</span>
           <div class="pl2">${esc(p.root)} · ${p.planted} · ${n1(p.area)} fed ${S.group==='farm'?winChip(p.variety):''}</div></td>
-        <td class="stk2" style="text-align:right"><button class="estbtn" data-edit="${p.id}" aria-label="Update estimate">${p.ev.length?n0(e):'<span class="calc">+ add</span>'} <span class="pen">✎</span></button>${badge(p)}</td>
+        <td class="stk2"><div class="estcell"><span class="bslot">${badge(p)}</span><button class="estbtn" data-edit="${p.id}" aria-label="Update estimate">${p.ev.length?n0(e):'<span class="calc">+ add</span>'} <span class="pen">✎</span></button></div></td>
         <td class="num calc">${p.ev.length?n1(e/p.area):'–'}</td><td class="num calc"><button class="budbtn" data-budget="${p.id}" aria-label="Set budget">${p.budget?n0(p.budget):'+ budget'}</button></td><td class="num ${d>0.5?'pos':d<-0.5?'neg':''}">${p.budget&&p.ev.length?sgn(d):'<span class="calc">–</span>'}</td><td class="num">${tfCell(p)}</td>
         <td class="num" data-tip="h:${p.id}"><div class="harv">${n0(t)}<span class="bar"><i style="width:${Math.min(100,pct)}%"></i></span></div></td>
         <td class="num ${rem<-0.5?'neg':''}">${n0(rem)}</td>
@@ -616,7 +619,7 @@ function viewEst(part){
     <div class="seg"><button data-wk="-1" aria-label="Previous week" title="Previous week">‹ Week</button><span class="segtxt">${fmtD(s0)} – ${fmtD(s1)}</span><button data-wk="1" aria-label="Next week" title="Next week">Week ›</button></div><button class="btn sm" data-wk="0" ${(S.wk||0)===0?'disabled':''}>Today</button>
     <div class="seg"><button data-days="7" class="${(S.days||7)===7?'on':''}">7 d</button><button data-days="14" class="${S.days===14?'on':''}">14 d</button></div>
     <span class="spacer"></span><span class="btnpair"><button class="btn sm" data-windows>Harvest windows</button><button class="btn sm pri" data-logharvest>+ Log harvest</button></span>
-    <details class="howto" ${S.howto?'open':''}><summary>How this works</summary><p class="hint">Left: the estimate per plot. Click it to update by tonnes or t/fed; every change is saved with who, when and why (<b style="color:var(--amber)">● new</b> = since the selected meeting). Right: Raw PK tonnes per day. Past days show the <b>actual</b> from the harvest log with the plan under it (green = above plan, red = below). Click a past day to enter or correct a plot's harvest, use <b>+ actual</b> under today, or <b>Log harvest</b> to enter a whole farm's day at once. Today and later are plan inputs. <b>Left after plan</b> = remaining − plan ahead; red means the plan is more than the estimate. Hover Raw PK actual for everything picked by category.</p></details>
+    <details class="howto" ${S.howto?'open':''}><summary>How this works</summary><p class="hint">Left: the estimate per plot. Click it to update by tonnes or t/fed; every change is saved with who, when and why (<b style="color:var(--amber)">● updates</b> = since the selected meeting). Right: Raw PK tonnes per day. Past days show the <b>actual</b> from the harvest log with the plan under it (green = above plan, red = below). Click a past day to enter or correct a plot's harvest, use <b>+ actual</b> under today, or <b>Log harvest</b> to enter a whole farm's day at once. Today and later are plan inputs. <b>Left after plan</b> = remaining − plan ahead; red means the plan is more than the estimate. Hover Raw PK actual for everything picked by category.</p></details>
   </div>
   <div class="table-wrap mg"><table>
     <thead><tr><th class="grpcol stk">Plot</th><th class="grpcol stk2">Estimate</th><th class="grpcol" colspan="4">Yield, budget &amp; size</th><th class="grpcol" colspan="2">Actual (harvest log)</th><th class="grpcol daystart" colspan="${days.length}">Raw PK t per day · actual (past) · plan (today on)</th><th class="grpcol daystart" colspan="3">Plan check</th></tr>
@@ -664,7 +667,7 @@ function viewSum(){
       return `<td class="num" style="${ch?'background:var(--amber-bg);color:var(--text)':''}">${n0(v)}</td>`}).join('')}</tr>`}).join('');
   const typeOf=ps=>ps[0].type;
   return kpis(list)+`<div class="grid2">
-   <div class="card"><h2>By variety</h2><div class="sub">Budget → July → November → latest, summed from plots. Hover a <b style="color:var(--amber)">● new</b> badge to see what moved.</div>${rollTable(p=>p.variety,'Variety',list,typeOf)}</div>
+   <div class="card"><h2>By variety</h2><div class="sub">Budget → July → November → latest, summed from plots. Hover a <b style="color:var(--amber)">● updates</b> badge to see what moved.</div>${rollTable(p=>p.variety,'Variety',list,typeOf)}</div>
    <div class="card"><h2>By farm</h2><div class="sub">Same totals, rolled up by farm.</div>${rollTable(p=>p.farm,'Farm',list)}</div>
   </div>
   <div class="card"><h2>Estimate snapshots</h2><div class="sub">Estimate per variety as it stood each week, taken from the change history. This replaces copying the totals into dated columns by hand. Shaded cells changed that week.</div>
