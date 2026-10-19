@@ -495,7 +495,9 @@ function viewEst(part){
   const pastCell=(a,pl,i,bold,pid)=>{const v=a-pl;return `<td class="day dsum past ${pid?'click':''} ${i===0?'daystart':''} ${wkCls(days[i])}" ${pid?`data-act="${pid}|${days[i]}" title="Click to enter or correct the harvest for ${fmtD(days[i])}"`:''}><div class="act" style="${bold?'font-weight:700':''}">${a?n0(a):'<span class="calc">·</span>'}</div><div class="pln ${pl&&Math.abs(v)>0.5?(v>0?'pos':'neg'):''}">${pl?'plan '+n0(pl):''}</div></td>`};
   const dayCells=(vals,bold,ps)=>vals.map((v,i)=>days[i]<TODAY?pastCell(ps.reduce((s,p)=>s+actDay(p,days[i]),0),v,i,bold):`<td class="day dsum ${i===0?'daystart':''} ${wkCls(days[i])}" style="${bold?'font-weight:700':''}">${v?n0(v):'<span class="calc">·</span>'}</td>`).join('');
   const fut=days.map(d=>d>=TODAY);
-  const tail=(rem,vals,ps)=>{const pf=vals.reduce((s,v,i)=>s+(fut[i]?v:0),0),pp=vals.reduce((s,v,i)=>s+(fut[i]?0:v),0);
+  // plan ahead = plan from today on, except today's plan for a plot that already has today's actual (it's in Harvested already)
+  const planAhead=ps=>ps.reduce((s,p)=>s+days.reduce((t,d)=>t+(d>TODAY||(d===TODAY&&!p.daily[TODAY])?planVal(p,d):0),0),0);
+  const tail=(rem,vals,ps)=>{const pf=planAhead(ps),pp=vals.reduce((s,v,i)=>s+(fut[i]?0:v),0);
     const ap=days.reduce((s,d,i)=>s+(d>TODAY?0:ps.reduce((t,p)=>t+actDay(p,d),0)),0);const after=rem-pf;
     return `<td class="num daystart">${pp||ap?`${n0(ap)}<div class="pln ${ap-pp>0.5?'pos':ap-pp<-0.5?'neg':''}">plan ${n0(pp)}</div>`:'<span class="calc">–</span>'}</td><td class="num" style="color:var(--text)">${n0(pf)}</td><td class="num ${after<-0.5?'neg':''}">${n0(after)}</td>`};
   let rows='';
@@ -524,7 +526,7 @@ function viewEst(part){
   const sumGrid=(keyFn,label)=>{const g={};list.forEach(p=>(g[keyFn(p)]=g[keyFn(p)]||[]).push(p));
     const me=monthEnd(S.month);const row=(name,ps,cls)=>{let A=0,PA=0,PQ=0,B=0,N=0,L=0,H=0,SL=0;ps.forEach(p=>{A+=p.area;const e=est(p);if(productive(p)){PA+=p.area;PQ+=e}B+=p.budget;N+=estAt(p,me);L+=e;H+=p.act;SL+=p.local});
       const pv=days.map(d=>ps.reduce((t,p)=>t+planVal(p,d),0)),av=days.map(d=>d<TODAY?ps.reduce((t,p)=>t+actDay(p,d),0):0);
-      const pp=pv.reduce((x,y,i)=>x+(days[i]<TODAY?y:0),0),ap=av.reduce((x,y)=>x+y,0),pf=pv.reduce((x,y,i)=>x+(days[i]<TODAY?0:y),0);
+      const pp=pv.reduce((x,y,i)=>x+(days[i]<TODAY?y:0),0),ap=av.reduce((x,y)=>x+y,0),pf=planAhead(ps);
       const vc=(a,p)=>p&&Math.abs(a-p)>0.5?(a>p?'pos':'neg'):'';
       return `<tr class="${cls||''}"><td class="vname" style="text-align:left">${name}</td><td class="num">${n0(A)}</td><td class="num">${n0(PA)}</td><td class="num">${n0(PQ)}</td><td class="num calc">${n1(PA?PQ/PA:NaN)}</td><td class="num calc">${n1(L/A)}</td>
         <td class="num calc">${n0(B)}</td><td class="num calc mcell" data-mk="${label}|${name}" data-mv="${N}"><span class="mval">${n0(N)}</span>${Math.abs(L-N)>0.5?`<div class="pln ${L>N?'pos':'neg'}">${sgn(L-N)} since</div>`:''}</td><td class="num" style="color:var(--text);font-weight:600">${n0(L)}</td><td class="num">${n0(H)}</td><td class="num">${n0(SL)}</td><td class="num ${L-H-SL<-0.5?'neg':''}">${n0(L-H-SL)}</td>
@@ -554,7 +556,7 @@ function viewEst(part){
     <tr><th class="stk" style="text-align:left">${S.group==='farm'?'Plot · variety':'Plot · farm'}</th><th class="stk2">Latest t<span class="f">input</span></th><th>t/fed<span class="f">= est ÷ area</span></th><th>Budget t</th><th>vs budget</th><th>TrueFruit<span class="f">latest scan · peak count</span></th>
     <th>Harvested<span class="f">= all four</span></th><th>Remaining<span class="f">= est − harvested</span></th>
     ${days.map((d,i)=>{const t=new Date(d+'T00:00:00Z');return `<th class="day ${i===0?'daystart':''} ${wkCls(d)}">${t.toLocaleDateString('en-GB',{weekday:'short',timeZone:'UTC'})}<span class="f">${fmtD(d)}</span></th>`}).join('')}
-    <th class="daystart">Actual so far<span class="f">past days in view</span></th><th>Plan ahead<span class="f">today on</span></th><th>Left after plan<span class="f">= remaining − plan ahead</span></th></tr></thead>
+    <th class="daystart">Actual so far<span class="f">past days in view</span></th><th>Plan ahead<span class="f">today on, not yet harvested</span></th><th>Left after plan<span class="f">= remaining − plan ahead</span></th></tr></thead>
     <tbody>${rows}</tbody></table></div>
   ${part==='grid'?'':sumGrid(p=>p.variety,'Variety')+sumGrid(p=>p.farm,'Farm')}`;
 }
