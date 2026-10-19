@@ -424,13 +424,13 @@ PLOTS.forEach(recalc);
 const productive=p=>p.lifecycle==='EXP';                                     // productive = Land Cloud lifecycle EXP
 const estAt=(p,d)=>{let v=null;for(const e of p.ev) if(e.d<=d) v=e.v;return v??0};
 const est=p=>p.ev.length?p.ev[p.ev.length-1].v:0;                                          // Q: latest estimate (input)
-const total=p=>p.act+p.local+p.culls;                                       // harvested = all four (waste included)
+const total=p=>p.act;   /* Raw PK basis (Ibrahim): only fruit to the packhouse counts against budget, estimate and plan; sorting, local sales and waste are recorded for reference */
 const changes=(p,from,to=TODAY)=>p.ev.filter(e=>!e.round&&e.d>from&&e.d<=to);
 const inSeason=p=>p.ev.filter(e=>!e.round);
 function agg(list,since){
-  const o={area:0,parea:0,budget:0,jul:0,nov:0,est:0,act:0,local:0,tot:0,prev:0,n:0,nNew:0,plots:list.length};
+  const o={area:0,parea:0,budget:0,jul:0,nov:0,est:0,act:0,local:0,culls:0,tot:0,prev:0,n:0,nNew:0,plots:list.length};
   for(const p of list){o.area+=p.area;if(productive(p))o.parea+=p.area;o.budget+=p.budget;o.jul+=estAt(p,JUL_END);o.est+=est(p);
-    o.act+=p.act;o.local+=p.local;o.tot+=total(p);o.prev+=estAt(p,since);o.n+=inSeason(p).length;o.nNew+=changes(p,since).length}
+    o.act+=p.act;o.local+=p.local;o.culls+=p.culls;o.tot+=total(p);o.prev+=estAt(p,since);o.n+=inSeason(p).length;o.nNew+=changes(p,since).length}
   o.rem=o.est-o.tot;return o;
 }
 
@@ -473,7 +473,7 @@ let qT;$('#q').oninput=e=>{clearTimeout(qT);qT=setTimeout(()=>{S.q=e.target.valu
 $('#qClr').onclick=()=>{$('#q').value='';S.q='';render()};
 
 // ---------- change badge + hover ----------
-// harvested split: the 4 categories that make up Harvested (all counted against the estimate)
+/* picked by category: only To packhouse (Raw PK) counts against estimate and plan */
 function harvSplit(p){let a=[0,0,0,0];for(const [d,x] of Object.entries(p.daily))if(d<=TODAY)for(let j=0;j<4;j++)a[j]+=x[j];
   return ['To packhouse','Field sorting','Local sales','Waste'].map((l,j)=>`<div class="row"><span class="calc">${l}</span><span class="num" style="text-align:right">${n0(a[j])} t</span></div>`).join('')}
 function badge(p){
@@ -493,7 +493,7 @@ document.addEventListener('mouseover',e=>{
   const b=e.target.closest('[data-tip]');if(!b){hideTip();return}
   const [k,id]=[b.dataset.tip.slice(0,1),b.dataset.tip.slice(2)];
   let html='';
-  if(k==='h'){const p=PLOTS.find(x=>x.id===id);tip.innerHTML=`<div class="h">${esc(p.farm)} · <span class="plot">${p.sector}-${p.plot}</span> harvested ${n0(total(p))} t</div>${harvSplit(p)}`;tip.hidden=false;
+  if(k==='h'){const p=PLOTS.find(x=>x.id===id);tip.innerHTML=`<div class="h">${esc(p.farm)} · <span class="plot">${p.sector}-${p.plot}</span> Raw PK ${n0(total(p))} t · all picked ${n0(p.act+p.local+p.culls)} t</div>${harvSplit(p)}`;tip.hidden=false;
     const r=b.getBoundingClientRect();tip.style.left=Math.max(12,Math.min(r.left,innerWidth-352))+'px';tip.style.top=(r.bottom+8+tip.offsetHeight>innerHeight?r.top-tip.offsetHeight-8:r.bottom+8)+'px';return}
   if(k==='p'){
     const p=PLOTS.find(x=>x.id===id);const evs=p.ev.slice(-4).reverse();
@@ -524,12 +524,12 @@ function kpis(list){
    <div class="kpi"><div class="k">Budget</div><div class="v">${a.budget?n0(a.budget)+' t':'–'}</div><div class="s">${a.budget?n1(a.budget/a.area)+' t/fed':'not set yet'}</div></div>
    <div class="kpi hl"><div class="k">Latest estimate</div><div class="v">${a.est?n0(a.est)+' t':'–'}</div><div class="s">${a.est&&a.budget?`<span class="${d>=0?'pos':'neg'}">${sgn(d)} t vs budget (${sgn(d/a.budget*100,n1)}%)</span>`:a.est?'no budget yet':'no estimates yet'}</div></div>
    <div class="kpi"><div class="k">Moved since ${fmtD(S.since)}</div><div class="v ${a.est-a.prev>=0?'pos':'neg'}">${sgn(a.est-a.prev)} t</div><div class="s">${a.nNew} plot changes</div></div>
-   <div class="kpi"><div class="k">Harvested total</div><div class="v">${n0(a.tot)} t</div><div class="s">${n0(a.act)} packhouse · ${n0(a.local)} sorting &amp; local · ${n0(a.tot-a.act-a.local)} waste</div></div>
+   <div class="kpi"><div class="k">Raw PK harvested</div><div class="v">${n0(a.tot)} t</div><div class="s">+ ${n0(a.local)} sorting &amp; local, ${n0(a.culls)} waste (not counted)</div></div>
    <div class="kpi"><div class="k">Remaining</div><div class="v">${n0(a.rem)} t</div><div class="s">${a.est?n0(a.tot/a.est*100)+'% of estimate harvested':'needs an estimate'}</div></div>
   </div>`;
 }
 
-// Daily plan values: planned harvest raw t/day per plot (input). Seeded for the mockup.
+// Daily plan values: planned Raw PK t/day per plot (input). Seeded for the mockup.
 const PLAN=DB.plan;
 function planVal(p,d){return PLAN[p.id+'|'+d]||0}
 async function savePlan(k,v,old){const i=k.lastIndexOf('|'),bid=k.slice(0,i),day=k.slice(i+1);
@@ -583,14 +583,14 @@ function viewEst(part){
       const pp=pv.reduce((x,y,i)=>x+(days[i]<TODAY?y:0),0),ap=av.reduce((x,y)=>x+y,0),pf=planAhead(ps);
       const vc=(a,p)=>p&&Math.abs(a-p)>0.5?(a>p?'pos':'neg'):'';
       return `<tr class="${cls||''}"><td class="vname" style="text-align:left">${name}</td><td class="num">${n0(A)}</td><td class="num">${n0(PA)}</td><td class="num">${n0(PQ)}</td><td class="num calc">${n1(PA?PQ/PA:NaN)}</td><td class="num calc">${n1(L/A)}</td>
-        <td class="num calc">${n0(B)}</td><td class="num calc mcell" data-mk="${label}|${name}" data-mv="${N}"><span class="mval">${n0(N)}</span>${Math.abs(L-N)>0.5?`<div class="pln ${L>N?'pos':'neg'}">${sgn(L-N)} since</div>`:''}</td><td class="num" style="color:var(--text);font-weight:600">${n0(L)}</td><td class="num">${n0(H)}</td><td class="num">${n0(SL)}</td><td class="num">${n0(W)}</td><td class="num ${L-H-SL-W<-0.5?'neg':''}">${n0(L-H-SL-W)}</td>
+        <td class="num calc">${n0(B)}</td><td class="num calc mcell" data-mk="${label}|${name}" data-mv="${N}"><span class="mval">${n0(N)}</span>${Math.abs(L-N)>0.5?`<div class="pln ${L>N?'pos':'neg'}">${sgn(L-N)} since</div>`:''}</td><td class="num" style="color:var(--text);font-weight:600">${n0(L)}</td><td class="num">${n0(H)}</td><td class="num">${n0(SL)}</td><td class="num">${n0(W)}</td><td class="num ${L-H<-0.5?'neg':''}">${n0(L-H)}</td>
         <td class="num daystart">${pp||ap?`<span style="color:var(--text)">${n0(ap)}</span><div class="pln ${vc(ap,pp)}">plan ${n0(pp)}</div>`:'<span class="calc">–</span>'}</td><td class="num" style="color:var(--text)">${n0(pf)}</td>
         ${pv.map((v,i)=>days[i]<TODAY?`<td class="num pastc ${i===0?'daystart':''} ${wkCls(days[i])}" style="line-height:1.15"><span style="color:var(--text)">${av[i]?n0(av[i]):'<span class="calc">·</span>'}</span><div class="pln ${vc(av[i],v)}">${v?'plan '+n0(v):''}</div></td>`
           :`<td class="num ${i===0?'daystart':''} ${wkCls(days[i])}">${v?n0(v):'<span class="calc">·</span>'}<div class="pln">${days[i]===TODAY&&actDay?'':''}</div></td>`).join('')}</tr>`};
     const ent=Object.entries(g).sort((a,b)=>a[0].localeCompare(b[0]));
     return `<div class="card"><h2>Summary by ${label.toLowerCase()}</h2><div class="sub">Same columns as the old plan sheet. Past days (shaded) show the actual with the plan under it (green = above plan, red = below); today on shows the plan.</div>
      <div class="table-wrap"><table class="sg"><thead><tr><th style="text-align:left">${label}</th><th>Total area</th><th>Prod. area</th><th>Prod. area qty<span class="f">latest, productive</span></th><th>Yield/area P<span class="f">= qty ÷ prod. area</span></th><th>Yield/area<span class="f">= latest ÷ total area</span></th>
-      <th>Budget qty</th><th>${monthSel()}</th><th>Latest update</th><th>To packhouse</th><th>Sales<span class="f">sorting + local</span></th><th>Waste</th><th>Remaining<span class="f">= latest − all harvested (incl. waste)</span></th><th class="daystart">Actual so far<span class="f">past days · vs plan</span></th><th>Plan ahead<span class="f">today on</span></th>
+      <th>Budget qty</th><th>${monthSel()}</th><th>Latest update</th><th>Raw PK actual</th><th>Sales<span class="f">sorting + local, not counted</span></th><th>Waste<span class="f">not counted</span></th><th>Remaining<span class="f">= latest − Raw PK actual</span></th><th class="daystart">Actual so far<span class="f">past days · vs plan</span></th><th>Plan ahead<span class="f">today on</span></th>
       ${days.map((d,i)=>{const t=new Date(d+'T00:00:00Z');return `<th class="${i===0?'daystart':''} ${wkCls(d)}">${t.toLocaleDateString('en-GB',{weekday:'short',timeZone:'UTC'})}<span class="f">${fmtD(d)}</span></th>`}).join('')}</tr></thead>
       <tbody>${ent.map(([k,ps])=>row(esc(k),ps)).join('')}${row('Total',list,'tot')}</tbody></table></div></div>`};
   const dayNav=`<span class="lbl">Days</span><div class="seg"><button data-wk="-1" aria-label="Earlier">‹</button><button data-wk="0">${fmtD(s0)} – ${fmtD(s1)}</button><button data-wk="1" aria-label="Later">›</button></div>
@@ -598,7 +598,7 @@ function viewEst(part){
   if(part==='sum')return `<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">${dayNav}<span class="spacer"></span><button class="btn sm" data-windows>Harvest windows</button><button class="btn sm pri" data-logharvest>+ Log harvest</button></div>${sumGrid(p=>p.variety,'Variety')}${sumGrid(p=>p.farm,'Farm')}`;
   const fresh=PLOTS.every(p=>!p.ev.length)&&!Object.keys(PLAN).length&&!Object.values(WIN).some(w=>w.start);
   const start=fresh?`<div class="card start"><h2>Start the ${esc(DB.season.name)} plan</h2><ol>
-      <li><b>Budgets.</b> Click <i>+ budget</i> on a plot, or send the budget sheet for a bulk upload.</li>
+      <li><b>Raw PK budgets.</b> Click <i>+ budget</i> on a plot, or send the budget sheet for a bulk upload.</li>
       <li><b>Harvest windows.</b> Set a start and end date per variety with <button class="btn sm" data-windows>Harvest windows</button></li>
       <li><b>Estimates.</b> Click <i>+ add</i> under Latest t whenever the agronomy team updates a plot.</li>
       <li><b>Daily plan and actuals.</b> Type planned tonnes in the day cells; log what was picked with <button class="btn sm" data-logharvest>+ Log harvest</button></li></ol></div>`:'';
@@ -610,12 +610,12 @@ function viewEst(part){
     <div class="seg"><button data-wk="-1" aria-label="Earlier">‹</button><button data-wk="0">${fmtD(s0)} – ${fmtD(s1)}</button><button data-wk="1" aria-label="Later">›</button></div>
     <div class="seg"><button data-days="7" class="${(S.days||7)===7?'on':''}">7 d</button><button data-days="14" class="${S.days===14?'on':''}">14 d</button></div>
     <span class="spacer"></span><span class="btnpair"><button class="btn sm" data-windows>Harvest windows</button><button class="btn sm pri" data-logharvest>+ Log harvest</button></span>
-    <details class="howto" ${S.howto?'open':''}><summary>How this works</summary><p class="hint">Left: the estimate per plot. Click it to update by tonnes or t/fed; every change is saved with who, when and why (<b style="color:var(--amber)">● new</b> = since the selected meeting). Right: harvest raw tonnes per day. Past days show the <b>actual</b> from the harvest log with the plan under it (green = above plan, red = below). Click a past day to enter or correct a plot's harvest, use <b>+ actual</b> under today, or <b>Log harvest</b> to enter a whole farm's day at once. Today and later are plan inputs. <b>Left after plan</b> = remaining − plan ahead; red means the plan is more than the estimate. Hover Harvested for the packhouse / local split.</p></details>
+    <details class="howto" ${S.howto?'open':''}><summary>How this works</summary><p class="hint">Left: the estimate per plot. Click it to update by tonnes or t/fed; every change is saved with who, when and why (<b style="color:var(--amber)">● new</b> = since the selected meeting). Right: Raw PK tonnes per day. Past days show the <b>actual</b> from the harvest log with the plan under it (green = above plan, red = below). Click a past day to enter or correct a plot's harvest, use <b>+ actual</b> under today, or <b>Log harvest</b> to enter a whole farm's day at once. Today and later are plan inputs. <b>Left after plan</b> = remaining − plan ahead; red means the plan is more than the estimate. Hover Raw PK actual for everything picked by category.</p></details>
   </div>
   <div class="table-wrap mg"><table>
-    <thead><tr><th class="grpcol stk">Plot</th><th class="grpcol stk2">Estimate</th><th class="grpcol" colspan="4">Yield, budget &amp; size</th><th class="grpcol" colspan="2">Actual (harvest log)</th><th class="grpcol daystart" colspan="${days.length}">Harvest raw t per day · actual (past) · plan (today on)</th><th class="grpcol daystart" colspan="3">Plan check</th></tr>
-    <tr><th class="stk" style="text-align:left">${S.group==='farm'?'Plot · variety':'Plot · farm'}</th><th class="stk2">Latest t<span class="f">input</span></th><th>t/fed<span class="f">= est ÷ area</span></th><th>Budget t</th><th>vs budget</th><th>TrueFruit<span class="f">latest scan · peak count</span></th>
-    <th>Harvested<span class="f">= all four</span></th><th>Remaining<span class="f">= est − harvested</span></th>
+    <thead><tr><th class="grpcol stk">Plot</th><th class="grpcol stk2">Estimate</th><th class="grpcol" colspan="4">Yield, budget &amp; size</th><th class="grpcol" colspan="2">Actual (harvest log)</th><th class="grpcol daystart" colspan="${days.length}">Raw PK t per day · actual (past) · plan (today on)</th><th class="grpcol daystart" colspan="3">Plan check</th></tr>
+    <tr><th class="stk" style="text-align:left">${S.group==='farm'?'Plot · variety':'Plot · farm'}</th><th class="stk2">Latest t<span class="f">Raw PK</span></th><th>t/fed<span class="f">= est ÷ area</span></th><th>Budget t<span class="f">Raw PK</span></th><th>vs budget</th><th>TrueFruit<span class="f">latest scan · peak count</span></th>
+    <th>Raw PK actual<span class="f">to packhouse</span></th><th>Remaining<span class="f">= est − Raw PK actual</span></th>
     ${days.map((d,i)=>{const t=new Date(d+'T00:00:00Z');return `<th class="day ${i===0?'daystart':''} ${wkCls(d)}">${t.toLocaleDateString('en-GB',{weekday:'short',timeZone:'UTC'})}<span class="f">${fmtD(d)}</span></th>`}).join('')}
     <th class="daystart">Actual so far<span class="f">past days in view</span></th><th>Plan ahead<span class="f">today on, not yet harvested</span></th><th>Left after plan<span class="f">= remaining − plan ahead</span></th></tr></thead>
     <tbody>${rows}</tbody></table></div>
@@ -638,7 +638,7 @@ function rollTable(keyFn,label,list,extraCol){
       <td><span class="pill ${d>0.5?'p':'np'}" style="${d<-0.5?'background:var(--red-bg);color:var(--red)':''}">${d>0.5?'Surplus':d<-0.5?'Deficit':'On budget'}</span></td>
       <td class="num">${n0(a.tot)}</td><td class="num">${n0(a.tot/a.est*100)}%</td></tr>`}).join('');
   const A=agg(list,S.since);
-  return `<div class="table-wrap"><table><thead><tr><th style="text-align:left">${label}</th><th>Budget</th><th>July est.</th><th>${monthSel()}</th><th>Latest</th><th>vs budget</th><th></th><th>Harvested</th><th>% of est.</th></tr></thead>
+  return `<div class="table-wrap"><table><thead><tr><th style="text-align:left">${label}</th><th>Budget</th><th>July est.</th><th>${monthSel()}</th><th>Latest</th><th>vs budget</th><th></th><th>Raw PK actual</th><th>% of est.</th></tr></thead>
    <tbody>${body}<tr class="tot"><td>Total</td><td class="num">${n0(A.budget)}</td><td class="num">${n0(A.jul)}</td><td class="num mcell" data-mk="rt|${label}|Total" data-mv="${list.reduce((t,p)=>t+estAt(p,monthEnd(S.month)),0)}"><span class="mval">${n0(list.reduce((t,p)=>t+estAt(p,monthEnd(S.month)),0))}</span></td><td class="num">${n0(A.est)}</td><td class="num">${sgn(A.est-A.budget)}</td><td></td><td class="num">${n0(A.tot)}</td><td class="num">${n0(A.tot/A.est*100)}%</td></tr></tbody></table></div>`;
 }
 
@@ -719,7 +719,7 @@ function chart(p){
    ${ticks.map(v=>`<line x1="${L}" x2="${W-R}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--border)" /><text x="${L-6}" y="${Y(v)+3}" text-anchor="end">${n0(v)}</text>`).join('')}
    ${months.map(m=>`<text x="${X(m)}" y="${H-8}" text-anchor="middle">${new Date(m).toLocaleDateString('en-GB',{month:'short'})}</text>`).join('')}
    <line x1="${L}" x2="${W-R}" y1="${Y(p.budget)}" y2="${Y(p.budget)}" stroke="var(--text3)" stroke-dasharray="4 4"/><text x="${W-R}" y="${Y(p.budget)-4}" text-anchor="end">budget</text>
-   <line x1="${L}" x2="${W-R}" y1="${Y(total(p))}" y2="${Y(total(p))}" stroke="var(--amber)" stroke-dasharray="2 3"/><text x="${L+4}" y="${Y(total(p))-4}" style="fill:var(--amber)">harvested ${n0(total(p))}</text>
+   <line x1="${L}" x2="${W-R}" y1="${Y(total(p))}" y2="${Y(total(p))}" stroke="var(--amber)" stroke-dasharray="2 3"/><text x="${L+4}" y="${Y(total(p))-4}" style="fill:var(--amber)">Raw PK actual ${n0(total(p))}</text>
    <path d="${d}" fill="none" stroke="var(--accent2)" stroke-width="2.2"/>
    ${pts.map(q=>`<circle cx="${X(q.t)}" cy="${Y(q.v)}" r="3.5" fill="var(--card)" stroke="var(--accent)" stroke-width="2"/>`).join('')}
   </svg>`;
@@ -730,8 +730,8 @@ function openHistory(id){
   modal(`<div class="mh"><div><h3>${esc(p.farm)} · ${p.sector}-${p.plot} · ${esc(p.variety)}</h3>
      <div class="meta">${esc(p.root)} · planted ${p.planted} · ${n1(p.area)} fed (register) · ${productive(p)?'Productive':'Not productive'}</div></div><button class="x" aria-label="Close">×</button></div>
    <div class="mb">
-    <div class="cmp"><div><span>Budget</span><b>${n0(p.budget)} t</b><span>${n1(p.budget/p.area)} t/fed</span></div><div><span>Latest estimate</span><b>${n0(e)} t</b><span>${n1(e/p.area)} t/fed</span></div><div><span>Harvested</span><b>${n0(total(p))} t</b><span>${n0(e-total(p))} t remaining</span></div></div>
-    <details class="hsplit"><summary>Harvested by category</summary><div class="tipgrid">${harvSplit(p)}</div></details>
+    <div class="cmp"><div><span>Budget</span><b>${n0(p.budget)} t</b><span>${n1(p.budget/p.area)} t/fed</span></div><div><span>Latest estimate</span><b>${n0(e)} t</b><span>${n1(e/p.area)} t/fed</span></div><div><span>Raw PK actual</span><b>${n0(total(p))} t</b><span>${n0(e-total(p))} t remaining</span></div></div>
+    <details class="hsplit"><summary>Picked by category</summary><div class="tipgrid">${harvSplit(p)}</div></details>
     ${chart(p)}
     <ul class="tl">${items.map(({ev,prev})=>{const d=prev==null?null:ev.v-prev;
       return `<li class="${ev.round?'round':''}"><div class="when">${fmtDY(ev.d)}</div><div>
@@ -754,7 +754,7 @@ function openEdit(id,kindIn){
   modal(`<div class="mh"><div><h3 id="edT">${kind==='budget'?'Set budget':'Update estimate'}</h3><div class="meta">${esc(p.farm)} · <span class="plot">${p.sector}-${p.plot}</span> ${esc(p.variety)} · ${n1(p.area)} fed from the register</div></div><button class="x" aria-label="Close">×</button></div>
    <div class="mb">
     <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><span class="lbl">Enter as</span><div class="seg" id="modeSeg"><button data-m="volume" class="on">Tonnes</button><button data-m="yield">t / feddan</button></div></div>
-    <div class="field"><label class="lbl" for="newv" id="newvl">New value (tonnes)</label><input id="newv" inputmode="decimal" value="${hasPrev?r2(cur):''}"></div>
+    <div class="field"><label class="lbl" for="newv" id="newvl">New value (Raw PK tonnes)</label><input id="newv" inputmode="decimal" value="${hasPrev?r2(cur):''}"></div>
     <div class="cmp" id="cmp"></div>
     <div class="field" id="rsWrap"><span class="lbl">Where is the change coming from? <span style="text-transform:none;letter-spacing:0;font-weight:400">(optional)</span></span><div class="reasons" id="rs">${REASONS.map(r=>`<button class="chip" data-r="${esc(r)}">${esc(r)}</button>`).join('')}</div></div>
     <div class="field"><label class="lbl" for="note">Note <span style="text-transform:none;letter-spacing:0;font-weight:400">(optional)</span></label><textarea id="note" placeholder="e.g. counted 20 trees per row, fruit set lower on the north side"></textarea></div>
@@ -769,7 +769,7 @@ function openEdit(id,kindIn){
   inp.oninput=upd;upd();inp.focus();inp.select();
   $('#modeSeg').onclick=e=>{const b=e.target.closest('[data-m]');if(!b)return;const v=tv==null||isNaN(tv)?null:tv;mode=b.dataset.m;
     document.querySelectorAll('#modeSeg button').forEach(x=>x.classList.toggle('on',x===b));
-    $('#newvl').textContent=mode==='yield'?'New value (t / feddan)':'New value (tonnes)';
+    $('#newvl').textContent=mode==='yield'?'New value (Raw PK t / feddan)':'New value (Raw PK tonnes)';
     if(v!=null)inp.value=mode==='yield'?+(v/p.area).toFixed(3):r2(v);upd()};
   $('#rs').onclick=e=>{const b=e.target.closest('[data-r]');if(!b)return;reason=reason===b.dataset.r?null:b.dataset.r;
     document.querySelectorAll('#rs .chip').forEach(x=>x.classList.toggle('on',x.dataset.r===reason))};
@@ -790,8 +790,8 @@ $('#sideOv').onclick=()=>setSide(false);if($('#sideClose'))$('#sideClose').oncli
 document.addEventListener('keydown',e=>{if(e.key==='Escape')setSide(false)});
 // ---------- actuals entry (agronomists; same columns as the old Entry tab) ----------
 const ACOLS=[['pack','To packhouse','وارد محطة','var(--accent)'],['sort','Field sorting','فرزة أرض','#55707a'],['local','Local sales','خام تجار','var(--amber)'],['waste','Waste','إعدامات','var(--red)']];
-const aHarv=a=>a[0]+a[1]+a[2], aDay=a=>aHarv(a)+a[3];   // harvested (counts against the estimate) · day total = all four
-const vsPlan=(a,pl)=>{const t=aDay(a);if(!t)return '<span class="vp">—</span>';if(!pl)return '<span class="vp up">unplanned</span>';const r=t/pl;
+const aDay=a=>a[0]+a[1]+a[2]+a[3];   /* everything picked that day; only a[0] (Raw PK) counts against estimate and plan */
+const vsPlan=(a,pl)=>{const t=a[0];   /* plan is Raw PK, so compare Raw PK */if(!t)return '<span class="vp">—</span>';if(!pl)return '<span class="vp up">unplanned</span>';const r=t/pl;
   return r>1.1?'<span class="vp up">above +'+n0(t-pl)+'</span>':r<0.9?'<span class="vp dn">below −'+n0(pl-t)+'</span>':'<span class="vp">on plan</span>'};
 function applyAct(p,d,arr,meta){p.ameta=p.ameta||{};if(arr.every(v=>!v)){delete p.daily[d];delete p.ameta[d]}else{p.daily[d]=arr;p.ameta[d]=meta}recalc(p)}
 // read the 4 boxes of one entry: marks bad boxes red, returns null if any box is invalid
@@ -816,7 +816,7 @@ function openActual(id,d){
    <div class="agrid" id="aflds">${actFields(actRow(p,date),'af')}</div><div class="cmp" id="acmp"></div></div>
    <div class="mf"><button class="btn" id="clrAct" style="margin-right:auto" ${p.daily[date]?'':'hidden'}>Clear this day</button><button class="btn" data-close>Cancel</button><button class="btn pri" id="saveAct">Save entry</button></div>`,true);
   const read=()=>softAin($('#aflds'));
-  const upd=()=>{const a=read(),pl=planVal(p,date);$('#acmp').innerHTML=`<div><span>Day total</span><b>${n1(aDay(a))}</b><span>= sum of the four</span></div><div><span>Planned</span><b>${n0(pl)}</b><span>${fmtD(date)}</span></div><div><span>Vs plan</span><b style="font-size:13px;padding-top:4px">${vsPlan(a,pl)}</b><span>±10% = on plan</span></div>`};
+  const upd=()=>{const a=read(),pl=planVal(p,date);$('#acmp').innerHTML=`<div><span>Raw PK</span><b>${n1(a[0])}</b><span>all picked ${n1(aDay(a))} t</span></div><div><span>Planned</span><b>${n0(pl)}</b><span>${fmtD(date)}</span></div><div><span>Vs plan</span><b style="font-size:13px;padding-top:4px">${vsPlan(a,pl)}</b><span>±10% = on plan</span></div>`};
   $('#aflds').oninput=upd;upd();document.querySelector('#af0').focus();
   $('#adate').onchange=e=>{if(modalDirty()&&!confirm('Discard the entries you typed for '+fmtD(date)+'?')){e.target.value=date;return}date=e.target.value||TODAY;$('#aflds').innerHTML=actFields(actRow(p,date),'af');$('#ameta').textContent=meta().replace(/&amp;/g,'&');$('#clrAct').hidden=!p.daily[date];upd()};
   $('#clrAct').onclick=async()=>{if(!confirm('Delete the harvest entry for '+fmtD(date)+'?'))return;if(!await saveActs(date,[{p,a:[0,0,0,0]}]))return;closeModal(true);keepScroll(render);toast(`Cleared · ${p.sector}-${p.plot} ${fmtD(date)}`)};
@@ -825,10 +825,10 @@ function openActual(id,d){
 function openLog(){
   let date=TODAY,farm=S.farm==='All'?FARMS[1]:S.farm,onlyOpen=true;
   const body=()=>{const ps=PLOTS.filter(p=>p.farm===farm&&(!onlyOpen||!(p.ev.length&&est(p)-total(p)<=1)||planVal(p,date)>0||p.daily[date]));
-    return `<table><thead><tr><th style="text-align:left">Plot</th><th>Remaining</th><th>Planned</th>${ACOLS.map(c=>`<th class="lh" style="--c:${c[3]}">${colHead(c)}</th>`).join('')}<th>Day total<span class="f">= sum</span></th><th>Vs plan</th></tr></thead><tbody>
+    return `<table><thead><tr><th style="text-align:left">Plot</th><th>Remaining</th><th>Planned</th>${ACOLS.map(c=>`<th class="lh" style="--c:${c[3]}">${colHead(c)}</th>`).join('')}<th>All picked<span class="f">= sum</span></th><th>Raw PK vs plan</th></tr></thead><tbody>
     ${ps.map(p=>{const a=actRow(p,date);return `<tr data-lrow="${p.id}"><td><span class="plot">${p.sector}-${p.plot}</span> <span class="vname" style="font-size:12px">${esc(p.variety)}</span></td><td class="num calc">${n0(est(p)-total(p))}</td>
       <td class="num calc">${n0(planVal(p,date))}</td>${a.map((v,j)=>`<td style="padding:4px 5px"><input class="ain" style="--c:${ACOLS[j][3]}" data-ai="${j}" value="${v||''}" placeholder="—" inputmode="decimal" aria-label="${p.sector}-${p.plot} ${ACOLS[j][1]}"></td>`).join('')}<td class="num lt">${aDay(a)?n1(aDay(a)):'0'}</td><td class="lv" data-pl="${planVal(p,date)}">${vsPlan(a,planVal(p,date))}</td></tr>`}).join('')||`<tr><td colspan="9" class="calc" style="white-space:normal;padding:14px">${onlyOpen?'Every plot on this farm is fully harvested against its estimate. Untick \'Hide fully harvested plots\' to see them.':'No plots on this farm.'}</td></tr>`}</tbody></table>`};
-  modal(`<div class="mh"><div><h3>Log harvest</h3><div class="meta">One row per plot. Leave a row empty if nothing was picked. Harvested (counted against the estimate) = all four, waste included.</div></div><button class="x" aria-label="Close">×</button></div>
+  modal(`<div class="mh"><div><h3>Log harvest</h3><div class="meta">One row per plot. Leave a row empty if nothing was picked. Only To packhouse (Raw PK) counts against the estimate and the plan; the other three are recorded for reference.</div></div><button class="x" aria-label="Close">×</button></div>
    <div class="mb"><div style="display:flex;gap:10px;align-items:end;flex-wrap:wrap">
      <div class="field"><label class="lbl" for="ldate">Date</label><input type="date" id="ldate" data-nd max="${TODAY}" value="${date}" style="font-size:14px"></div>
      <div class="field"><label class="lbl" for="lfarm">Farm</label><select class="sel" id="lfarm" style="font-size:14px;padding:7px 10px">${FARMS.slice(1).map(f=>`<option ${f===farm?'selected':''}>${f}</option>`).join('')}</select></div>
@@ -919,8 +919,7 @@ document.addEventListener('change',e=>{const m=e.target.closest('[data-month]');
 const SLIDES=['Season position','What changed','Plan vs actual','Plots & daily plan'];
 function bridgeRows(entries){const mx=Math.max(1,...entries.map(r=>Math.abs(r[1])));
   return entries.map(([k,v])=>`<div class="brow"><span>${esc(k)}</span><span class="track"><i style="left:${v<0?50-Math.abs(v)/mx*50:50}%;width:${Math.abs(v)/mx*50}%;background:${v<0?'var(--red)':'var(--green)'}"></i><i style="left:50%;width:1px;background:var(--border2)"></i></span><span class="num ${v<0?'neg':'pos'}">${sgn(v)} t</span></div>`).join('')}
-// harvest raw for a plot-day = all four categories (packhouse + field sorting + local sales + waste)
-function dayTot(p,d){const a=p.daily[d];return a?a[0]+a[1]+a[2]+a[3]:0}
+function dayTot(p,d){const a=p.daily[d];return a?a[0]:0}   /* Raw PK for a plot-day */
 function last7(ps){const ds=[...Array(7)].map((_,i)=>addDays(TODAY,i-7));const a=ds.reduce((s,d)=>s+ps.reduce((t,p)=>t+dayTot(p,d),0),0),pl=ds.reduce((s,d)=>s+ps.reduce((t,p)=>t+planVal(p,d),0),0);
   if(!a&&!pl)return '<span class="calc">–</span>';return `${n0(a)}<div class="pln ${a-pl>0.5?'pos':a-pl<-0.5?'neg':''}">plan ${n0(pl)}</div>`}
 function presentView(){
@@ -941,10 +940,10 @@ function presentView(){
       <div class="kpi"><div class="k">Budget</div><div class="v">${n0(A.budget)} t</div><div class="s">${n1(A.budget/A.area)} t/fed</div></div>
       <div class="kpi hl"><div class="k">Latest estimate</div><div class="v">${n0(A.est)} t</div><div class="s">${n1(A.est/A.area)} t/fed</div></div>
       <div class="kpi"><div class="k">Moved since ${fmtD(S.since)}</div><div class="v ${A.est-A.prev>=0?'pos':'neg'}">${sgn(A.est-A.prev)} t</div><div class="s">${A.nNew} plot changes</div></div>
-      <div class="kpi"><div class="k">Harvested</div><div class="v">${n0(A.tot)} t</div><div class="s">${n0(A.act)} packhouse · ${n0(A.local)} sorting &amp; local · ${n0(A.tot-A.act-A.local)} waste</div></div>
-      <div class="kpi"><div class="k">Remaining</div><div class="v">${n0(A.rem)} t</div><div class="s">estimate − harvested</div></div>
+      <div class="kpi"><div class="k">Raw PK harvested</div><div class="v">${n0(A.tot)} t</div><div class="s">+ ${n0(A.local)} sorting &amp; local, ${n0(A.culls)} waste (not counted)</div></div>
+      <div class="kpi"><div class="k">Remaining</div><div class="v">${n0(A.rem)} t</div><div class="s">estimate − Raw PK harvested</div></div>
     </div>
-    <div class="table-wrap pt" style="max-height:none"><table><thead><tr><th style="text-align:left">Variety</th><th>Harvest window</th><th>TrueFruit</th><th>Budget</th><th>${monthSel()}</th><th>Latest</th><th>vs budget</th><th>Moved since ${fmtD(S.since)}</th><th>Harvested</th><th>Remaining</th><th>Last 7 d<span class="f">actual · vs plan</span></th><th>Planned next 7 d</th></tr></thead><tbody>
+    <div class="table-wrap pt" style="max-height:none"><table><thead><tr><th style="text-align:left">Variety</th><th>Harvest window</th><th>TrueFruit</th><th>Budget</th><th>${monthSel()}</th><th>Latest</th><th>vs budget</th><th>Moved since ${fmtD(S.since)}</th><th>Raw PK actual</th><th>Remaining</th><th>Last 7 d<span class="f">actual · vs plan</span></th><th>Planned next 7 d</th></tr></thead><tbody>
     ${vents.map(([k,ps,a])=>{const mv=a.est-a.prev;const p7=next.slice(0,7).reduce((s,dd)=>s+ps.reduce((t,p)=>t+planVal(p,dd),0),0);
       const mvv=ps.reduce((t,p)=>t+estAt(p,monthEnd(S.month)),0);const l7=last7(ps);
       return `<tr><td class="vname">${esc(k)}</td><td>${winChip(k)}</td><td class="num">${tfAgg(ps)}</td><td class="num calc">${n0(a.budget)}</td><td class="num calc mcell" data-mk="p1|${esc(k)}" data-mv="${mvv}"><span class="mval">${n0(mvv)}</span></td><td class="num" style="color:var(--text);font-weight:700">${n0(a.est)}</td><td class="num ${a.est-a.budget>=0?'pos':'neg'}">${sgn(a.est-a.budget)}</td>
@@ -963,7 +962,7 @@ function presentView(){
   } else if(sl===2){
     const pastD=[...Array(7)].map((_,i)=>addDays(TODAY,i-7));
     const ap=pastD.reduce((s,d)=>s+list.reduce((t,p)=>t+dayTot(p,d),0),0),pp=pastD.reduce((s,d)=>s+list.reduce((t,p)=>t+planVal(p,d),0),0);
-    body=`<h2 class="ph">Last 7 days: ${n0(ap)} t harvested${pp?` against a plan of ${n0(pp)} t`:', no plan entered for these days'}</h2><div class="psub">${pp?`${sgn(ap-pp)} t (${sgn((ap-pp)/pp*100,n1)}%)`:'–'} · daily actual vs plan by variety and farm, with the plan ahead</div>
+    body=`<h2 class="ph">Last 7 days: ${n0(ap)} t Raw PK${pp?` against a plan of ${n0(pp)} t`:', no plan entered for these days'}</h2><div class="psub">${pp?`${sgn(ap-pp)} t (${sgn((ap-pp)/pp*100,n1)}%)`:'–'} · daily actual vs plan by variety and farm, with the plan ahead</div>
     <div class="pest">${viewEst('sum')}</div>`;
   } else {
     body=`<div class="pest">${viewEst('grid')}</div>`;
