@@ -572,14 +572,14 @@ function viewEst(part){
   let rows='';
   for(const [g,ps] of Object.entries(groups)){
     GROUPS[g]=ps;const a=agg(ps,S.since);const dv=sumDays(ps);const per=dv.reduce((s,v)=>s+v,0);
-    rows+=`<tr class="grp"><td class="stk gname">${esc(g)} <span class="calc" style="text-transform:none;letter-spacing:0;font-weight:500">· ${ps.length}</span>${gbadge(g,ps)}${S.group==='variety'?winChip(g):''}</td>
+    rows+=`<tr class="grp"><td class="stk gname">${esc(g)} <span class="calc" style="text-transform:none;letter-spacing:0;font-weight:500">· ${ps.length}</span>${gbadge(g,ps)}</td>
       <td class="stk2 num">${n0(a.est)}</td><td class="num">${n1(a.est/a.area)}</td><td class="num">${n0(a.budget)}</td><td class="num ${a.est-a.budget>0.5?'pos':a.est-a.budget<-0.5?'neg':''}">${a.budget&&a.est?sgn(a.est-a.budget):'<span class="calc">–</span>'}</td><td class="num">${tfAgg(ps)}</td>
       <td class="num">${n0(a.tot)} <span class="calc">${n0(a.tot/a.est*100)}%</span></td><td class="num">${n0(a.rem)}</td>${dayCells(dv,true,ps)}${tail(a.rem,dv,ps)}</tr>`;
     for(const p of ps){
       const e=est(p),d=e-p.budget,t=total(p),rem=e-t,pct=e?t/e*100:0;
       const dvals=days.map(dd=>planVal(p,dd));const per=dvals.reduce((s,v)=>s+v,0);
       rows+=`<tr><td class="stk"><span class="plot">${p.sector}-${p.plot}</span> <span class="vname">${S.group==='farm'?esc(p.variety):esc(p.farm)}</span> <span class="pill ${productive(p)?'p':'np'}" title="${productive(p)?'EXP: export-bearing':'WIP: not yet bearing'}">${productive(p)?'EXP':'WIP'}</span>
-          <div class="pl2">${esc(p.root)} · ${p.planted} · ${n1(p.area)} fed ${S.group==='farm'?winChip(p.variety):''}</div></td>
+          <div class="pl2">${esc(p.root)} · ${p.planted} · ${n1(p.area)} fed</div></td>
         <td class="stk2"><div class="estcell"><span class="bslot">${badge(p)}</span><button class="estbtn" data-edit="${p.id}" aria-label="Update estimate">${p.ev.length?n0(e):'<span class="calc">+ add</span>'} <span class="pen">✎</span></button></div></td>
         <td class="num calc">${p.ev.length?n1(e/p.area):'–'}</td><td class="num calc"><button class="budbtn" data-budget="${p.id}" aria-label="Set budget">${p.budget?n0(p.budget):'+ budget'}</button></td><td class="num ${d>0.5?'pos':d<-0.5?'neg':''}">${p.budget&&p.ev.length?sgn(d):'<span class="calc">–</span>'}</td><td class="num">${tfCell(p)}</td>
         <td class="num" data-tip="h:${p.id}"><div class="harv">${n0(t)}<span class="bar"><i style="width:${Math.min(100,pct)}%"></i></span></div></td>
