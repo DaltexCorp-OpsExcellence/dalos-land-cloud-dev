@@ -339,7 +339,7 @@ async function boot(){
         tf[bid]=[Number(r.avg_size_mm),pk||'',r.measurement_date]});
     }catch(e){console.warn('TrueFruit not loaded',e)}
     const today=cairoDate(Date.now());
-    const meetings=[];{const t=new Date(today+'T00:00:00Z');const back=(t.getUTCDay()+6)%7;t.setUTCDate(t.getUTCDate()-back);for(let k=0;k<8;k++){meetings.push(t.toISOString().slice(0,10));t.setUTCDate(t.getUTCDate()-7)}}
+    const meetings=[];{const t=new Date(today+'T00:00:00Z');const back=((t.getUTCDay()+6)%7)||7;t.setUTCDate(t.getUTCDate()-back);for(let k=0;k<8;k++){meetings.push(t.toISOString().slice(0,10));t.setUTCDate(t.getUTCDate()-7)}}
     startApp({sb:SBC,season,seasonId:S_ID,y1,today,plots,plan:PLAN,windows,tf,reasons,meetings,me:{id:session.user.id,name:acct.name||'Me'}});
   }catch(err){gate('Could not load','Live-data load error: '+esc0((err&&err.message)||String(err))+'. Refresh if you just signed in.',false);console.error(err)}
 }
