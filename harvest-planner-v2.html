@@ -369,7 +369,8 @@ const r2=x=>Math.round(x*100)/100;
 const addDays=(d,n)=>{const t=new Date(d+'T00:00:00Z');t.setUTCDate(t.getUTCDate()+n);return t.toISOString().slice(0,10)};
 const fmtD=d=>{const t=new Date(d+'T00:00:00Z');return t.toLocaleDateString('en-GB',{day:'2-digit',month:'short',timeZone:'UTC'})};
 const fmtDY=d=>{const t=new Date(d+'T00:00:00Z');return t.toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'2-digit',timeZone:'UTC'})};
-const n0=x=>x==null||isNaN(x)?'–':Math.round(x).toLocaleString('en-US');
+// tonnes: whole numbers stay whole; anything with a fraction shows 1 decimal so parts always add up (4.5 + 95.5 = 100, not 5 + 96)
+const n0=x=>x==null||isNaN(x)?'–':(Math.abs(x-Math.round(x))<0.05?Math.round(x).toLocaleString('en-US'):x.toLocaleString('en-US',{minimumFractionDigits:1,maximumFractionDigits:1}));
 const n1=x=>x==null||isNaN(x)||!isFinite(x)?'–':x.toLocaleString('en-US',{minimumFractionDigits:1,maximumFractionDigits:1});
 const sgn=(x,f=n0)=>x>0.5?'+'+f(x):x<-0.5?'−'+f(-x):'0';
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
