@@ -1,0 +1,903 @@
+<title>Harvest Planner v2</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.110.8/dist/umd/supabase.js"></script>
+<script src="shell.js?cb=5"></script>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Mono:wght@400;500&family=Instrument+Sans:wght@400;500;600&family=Space+Grotesk:wght@400;500;600;700&family=Noto+Sans+Arabic:wght@400;500;600&display=swap">
+<style>
+/* Layout: Land Cloud shell — dark teal sidebar, sticky topbar + filter bar, dense plot tables. Tokens copied from dalos-land-cloud. */
+:root{
+  --bg:#eef1f0;--bg2:#e0e8e6;--bg3:#cedad7;
+  --sidebar:#0e3a3d;--sidebar2:#164c4f;--sidebar-text:#bdd8d6;--sidebar-muted:#5f8583;
+  --accent:#0d6a68;--accent2:#159490;--accent-bg:#dcefed;
+  --amber:#b87820;--amber-bg:#fdf3e0;--amber-border:#e8c87a;
+  --red:#b03030;--red-bg:#faeaea;--red-border:#e8a0a0;
+  --green:#1e6b3a;--green-bg:#e8f5ec;--green-border:#8ecba4;
+  --text:#111f1f;--text2:#3b4b4a;--text3:#6a7a79;
+  --border:#c6d4d2;--border2:#aabdbb;--card:#ffffff;--subtot:#edeae4;--subtot-text:#4a4840;
+  --shadow:0 10px 30px rgba(14,58,61,.18);
+  --font-display:'DM Serif Display',Georgia,serif;
+  --font-body:'Instrument Sans','Noto Sans Arabic',system-ui,sans-serif;
+  --font-mono:'DM Mono','Noto Sans Arabic',ui-monospace,monospace;
+  --font-num:'Space Grotesk','DM Mono',ui-monospace,monospace;
+  --r:8px;--r2:12px;--sidebar-w:218px;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0f1b1c;--bg2:#172728;--bg3:#203436;--accent:#2a9a96;--accent2:#3bb3ae;--accent-bg:#173a3a;
+  --amber:#e0a54a;--amber-bg:#33280f;--amber-border:#6b5320;--red:#e27a7a;--red-bg:#3a1c1c;--red-border:#743434;
+  --green:#6cc58e;--green-bg:#15301f;--green-border:#2f6a44;--text:#e6efee;--text2:#bfcfcd;--text3:#8a9d9b;
+  --border:#2a3e3f;--border2:#3a5355;--card:#142223;--subtot:#232a26;--subtot-text:#cfc9bb;--shadow:0 10px 30px rgba(0,0,0,.5);color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0f1b1c;--bg2:#172728;--bg3:#203436;--accent:#2a9a96;--accent2:#3bb3ae;--accent-bg:#173a3a;
+  --amber:#e0a54a;--amber-bg:#33280f;--amber-border:#6b5320;--red:#e27a7a;--red-bg:#3a1c1c;--red-border:#743434;
+  --green:#6cc58e;--green-bg:#15301f;--green-border:#2f6a44;--text:#e6efee;--text2:#bfcfcd;--text3:#8a9d9b;
+  --border:#2a3e3f;--border2:#3a5355;--card:#142223;--subtot:#232a26;--subtot-text:#cfc9bb;--shadow:0 10px 30px rgba(0,0,0,.5);color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0;font-family:var(--font-body);background:var(--bg);color:var(--text);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
+.app{display:flex;min-height:100vh}
+.sidebar{width:var(--sidebar-w);background:var(--sidebar);flex-shrink:0;display:flex;flex-direction:column;padding:16px 0;position:sticky;top:0;height:100vh;overflow-y:auto}
+.logo{padding:0 18px 16px;border-bottom:1px solid rgba(255,255,255,.07);margin-bottom:12px}
+.logo .name{font-family:var(--font-display);font-size:19px;color:#fff;line-height:1.1}
+.logo .sub{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--sidebar-muted);margin-top:5px;display:flex;align-items:center;gap:6px}
+.dot{width:6px;height:6px;border-radius:50%;background:#159490;display:inline-block}
+.nav-sec{font-size:10px;letter-spacing:.11em;text-transform:uppercase;color:var(--sidebar-muted);padding:14px 18px 6px}
+.nav-item{display:flex;align-items:center;gap:10px;padding:8px 18px;font-size:13px;color:var(--sidebar-text);cursor:pointer}
+.nav-item:hover{background:rgba(255,255,255,.04)}
+.nav-item.active{background:#0d6a68;color:#fff;font-weight:500}
+.nav-item .tag{margin-left:auto;font-size:9px;letter-spacing:.08em;text-transform:uppercase;background:rgba(255,255,255,.14);padding:1px 6px;border-radius:10px}
+.side-foot{margin-top:auto;padding:12px 18px 0;border-top:1px solid rgba(255,255,255,.07);font-size:12px;color:var(--sidebar-text)}
+.side-foot .r{font-size:10px;color:var(--sidebar-muted);text-transform:uppercase;letter-spacing:.08em}
+.main{flex:1;min-width:0;display:flex;flex-direction:column}
+.topbar{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;min-height:52px;background:var(--bg);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px;padding:8px 18px;flex-wrap:wrap}
+.topbar h1{font-family:var(--font-display);font-size:18px;font-weight:400;margin:0}
+.topbar .mock{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--amber);background:var(--amber-bg);border:1px solid var(--amber-border);padding:2px 8px;border-radius:10px;font-weight:600}
+.spacer{flex:1}
+.pageswitch{display:inline-flex;border:1px solid var(--border2);border-radius:var(--r);overflow:hidden;flex-wrap:wrap}
+.pageswitch button,.seg button{all:unset;padding:6px 15px;font-size:13px;font-weight:500;cursor:pointer;color:var(--text2);background:var(--card);border-right:1px solid var(--border)}
+.pageswitch button:last-child,.seg button:last-child{border-right:none}
+.pageswitch button.on,.seg button.on{background:var(--accent);color:#fff}
+.pageswitch button:focus-visible,.seg button:focus-visible,.btn:focus-visible,.chip:focus-visible,.estbtn:focus-visible,.chg:focus-visible{outline:2px solid var(--accent2);outline-offset:2px}
+.seg{display:inline-flex;border:1px solid var(--border2);border-radius:var(--r);overflow:hidden}
+.seg button{padding:5px 12px;font-size:12px}
+.sel{background:var(--card);color:var(--text);border:1px solid var(--border2);border-radius:var(--r);padding:5px 10px;font-size:12px;font-family:var(--font-body)}
+.filterbar{display:flex;align-items:center;gap:8px;padding:9px 18px;border-bottom:1px solid var(--border);flex-wrap:wrap;background:var(--bg)}
+.lbl{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--text3);font-weight:600}
+.chip{all:unset;display:inline-flex;align-items:center;gap:6px;padding:5px 12px;border-radius:20px;border:1px solid var(--border2);background:var(--card);color:var(--text2);font-size:12.5px;font-weight:500;cursor:pointer;white-space:nowrap}
+.chip.on{background:var(--accent);color:#fff;border-color:var(--accent);font-weight:600}
+.search{border:1px solid var(--border2);background:var(--card);color:var(--text);border-radius:var(--r);padding:5px 10px;font-size:12.5px;font-family:inherit;width:170px;max-width:100%}
+.page{padding:16px 18px 48px;display:flex;flex-direction:column;gap:14px;min-width:0}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.kpi{background:var(--card);border:1px solid var(--border);border-radius:var(--r2);padding:10px 14px;min-width:0}
+.kpi .k{font-size:10px;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);font-weight:600}
+.kpi .v{font-family:var(--font-num);font-size:22px;font-weight:600;font-variant-numeric:tabular-nums;color:var(--text)}
+.kpi .s{font-size:11.5px;color:var(--text3)}
+.kpi.hl{border-color:var(--accent);background:var(--accent-bg)}
+.hint{font-size:12px;color:var(--text3);max-width:90ch;margin:0}
+.card{background:var(--card);border:1px solid var(--border);border-radius:var(--r2);min-width:0}
+.card h2{font-family:var(--font-display);font-weight:400;font-size:17px;margin:0;padding:12px 14px 2px}
+.card .sub{font-size:12px;color:var(--text3);padding:0 14px 10px}
+.table-wrap{overflow:auto;border:1px solid var(--border);border-radius:var(--r2);background:var(--card);max-height:70vh}
+.card .table-wrap{border:none;border-top:1px solid var(--border);border-radius:0 0 var(--r2) var(--r2);max-height:none}
+table{border-collapse:collapse;width:100%}
+th{font-size:10px;text-transform:uppercase;letter-spacing:.04em;color:var(--text3);text-align:center;padding:8px 9px;border-bottom:2px solid var(--border2);white-space:nowrap;font-weight:600;background:var(--card);position:sticky;top:0;z-index:2}
+th .f{display:block;font-size:9px;letter-spacing:.02em;text-transform:none;color:var(--accent);font-weight:500}
+th.grpcol{border-bottom:1px solid var(--border);font-size:9.5px;color:var(--text2);background:var(--bg2)}
+td{font-size:13px;color:var(--text2);padding:5px 9px;border-bottom:1px solid var(--border);white-space:nowrap}
+.num{font-family:var(--font-num);font-size:12px;text-align:right;font-variant-numeric:tabular-nums;font-weight:500}
+.calc{color:var(--text3)}
+.plot{font-family:var(--font-mono);font-size:11px;background:var(--bg2);border-radius:4px;padding:1px 6px;color:var(--text)}
+.vname{font-weight:600;color:var(--text)}
+tr.grp td{background:var(--bg2);font-weight:600;color:var(--text);font-size:11.5px}
+tr.grp td.gname{text-transform:uppercase;letter-spacing:.05em}
+tr.tot td{background:var(--subtot);color:var(--subtot-text);font-weight:700;border-top:2px solid var(--border2)}
+.pill{display:inline-block;font-size:10px;font-weight:600;padding:1px 7px;border-radius:10px;letter-spacing:.03em}
+.pill.p{background:var(--green-bg);color:var(--green)}
+.pill.np{background:var(--bg2);color:var(--text3)}
+.pos{color:var(--green)}.neg{color:var(--red)}
+.estbtn{all:unset;cursor:pointer;display:inline-flex;align-items:center;gap:6px;padding:2px 7px;border-radius:6px;border:1px dashed var(--border2);background:var(--card);font-family:var(--font-num);font-size:12px;font-weight:600;color:var(--text);font-variant-numeric:tabular-nums}
+.estbtn:hover{border-color:var(--accent);background:var(--accent-bg)}
+.estbtn .pen{font-size:10px;color:var(--text3)}
+.chg{all:unset;cursor:pointer;display:inline-flex;align-items:center;gap:4px;font-size:10.5px;font-weight:600;padding:1px 7px;border-radius:10px;background:var(--bg2);color:var(--text2);font-family:var(--font-body);margin-left:6px}
+.chg.new{background:var(--amber-bg);color:var(--amber);border:1px solid var(--amber-border)}
+.chg .d{width:6px;height:6px;border-radius:50%;background:currentColor}
+.bar{height:6px;background:var(--bg2);border-radius:4px;overflow:hidden;width:64px;display:inline-block;vertical-align:middle;margin-left:6px}
+.bar i{display:block;height:100%;background:var(--accent2)}
+.rchip{display:inline-block;font-size:10.5px;padding:1px 8px;border-radius:10px;background:var(--accent-bg);color:var(--accent);font-weight:600}
+.rchip.none{background:var(--bg2);color:var(--text3);font-weight:500}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,460px),1fr));gap:14px}
+#tip{position:fixed;z-index:60;background:var(--card);border:1px solid var(--border2);border-radius:var(--r2);box-shadow:var(--shadow);padding:10px 12px;font-size:12px;max-width:340px;pointer-events:none}
+#tip .h{font-weight:600;color:var(--text);margin-bottom:6px}
+#tip .row{display:grid;grid-template-columns:auto 1fr;gap:2px 10px;padding:4px 0;border-top:1px solid var(--border)}
+#tip .foot{color:var(--accent);font-size:11px;margin-top:6px}
+.ovl{position:fixed;inset:0;background:rgba(10,30,32,.45);z-index:50;display:flex;align-items:flex-start;justify-content:center;padding:6vh 16px;overflow:auto}
+.modal{background:var(--card);border-radius:14px;box-shadow:var(--shadow);width:min(760px,100%);border:1px solid var(--border)}
+.modal.sm{width:min(520px,100%)}
+.mh{display:flex;align-items:flex-start;gap:10px;padding:16px 18px;border-bottom:1px solid var(--border)}
+.mh h3{font-family:var(--font-display);font-weight:400;font-size:20px;margin:0}
+.mh .meta{font-size:12px;color:var(--text3)}
+.mb{padding:14px 18px;display:flex;flex-direction:column;gap:12px}
+.mf{display:flex;gap:8px;justify-content:flex-end;padding:12px 18px;border-top:1px solid var(--border)}
+.x{all:unset;cursor:pointer;margin-left:auto;font-size:20px;color:var(--text3);line-height:1;padding:2px 6px}
+.btn{all:unset;cursor:pointer;border-radius:var(--r);font-size:13px;font-weight:500;padding:7px 14px;border:1px solid var(--border2);background:var(--card);color:var(--text2)}
+.btn.pri{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.sm{padding:4px 10px;font-size:12px}
+.field{display:flex;flex-direction:column;gap:4px}
+.field input,.field textarea{font-family:var(--font-num);font-size:16px;padding:8px 10px;border:1px solid var(--border2);border-radius:var(--r);background:var(--card);color:var(--text)}
+.field textarea{font-family:var(--font-body);font-size:13px;min-height:56px}
+.cmp{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.cmp div{background:var(--bg);border-radius:var(--r);padding:8px 10px}
+.cmp b{display:block;font-family:var(--font-num);font-size:17px;color:var(--text)}
+.cmp span{font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--text3)}
+.reasons{display:flex;flex-wrap:wrap;gap:6px}
+.tl{list-style:none;margin:0;padding:0}
+.tl li{display:grid;grid-template-columns:96px 1fr;gap:10px;padding:9px 0;border-top:1px solid var(--border)}
+.tl .when{font-size:11.5px;color:var(--text3);font-family:var(--font-mono)}
+.tl .what{font-size:13px;color:var(--text)}
+.tl .why{font-size:12px;color:var(--text2);margin-top:2px}
+.tl li.round .what{color:var(--text2)}
+svg text{fill:var(--text3);font-family:var(--font-num);font-size:10px}
+.toast{position:fixed;bottom:calc(20px + env(safe-area-inset-bottom,0px));left:50%;transform:translateX(-50%);background:var(--sidebar);color:#fff;padding:9px 16px;border-radius:var(--r);font-size:13px;z-index:70;box-shadow:var(--shadow)}
+.bridge .brow{display:grid;grid-template-columns:minmax(120px,190px) 1fr 80px;gap:10px;align-items:center;padding:5px 14px;font-size:12.5px}
+.bridge .track{position:relative;height:16px;background:var(--bg);border-radius:4px}
+.bridge .track i{position:absolute;top:0;bottom:0;border-radius:3px}
+.dayin{width:58px;font-family:var(--font-num);font-size:12px;text-align:right;border:1px solid transparent;background:transparent;color:var(--text);padding:3px 4px;border-radius:4px}
+.dayin:hover,.dayin:focus{border-color:var(--border2);background:var(--card);outline:none}
+.dayin.z{color:var(--text3)}
+th.today,td.today{background:var(--accent-bg)}
+/* merged estimates + daily plan grid */
+.mg th,.mg td{padding:4px 7px}
+.mg .stk{position:sticky;left:0;z-index:3;background:var(--card);min-width:200px;max-width:200px;white-space:normal}
+.mg .stk2{position:sticky;left:200px;z-index:3;background:var(--card);border-right:2px solid var(--border2);min-width:132px}
+.mg th.stk,.mg th.stk2{z-index:5}
+.mg tr.grp .stk,.mg tr.grp .stk2{background:var(--bg2)}
+.mg tr.tot .stk,.mg tr.tot .stk2{background:var(--subtot)}
+.mg .pl2{font-size:11px;color:var(--text3);line-height:1.3}
+.mg th.day{min-width:52px}
+.mg th.daystart,.mg td.daystart{border-left:2px solid var(--border2)}
+.mg td.day{padding:1px 2px;text-align:right}
+.mg th.wk,.mg td.wk{background:color-mix(in srgb,var(--bg2) 55%,transparent)}
+.mg .dsum{font-family:var(--font-num);font-size:11.5px;font-variant-numeric:tabular-nums;padding-right:6px}
+.mg .dayin{width:48px}
+.kpis{grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px}
+.kpi{padding:7px 12px}.kpi .v{font-size:18px}
+.mg{max-height:calc(100vh - 230px);min-height:360px}
+@media (max-width:700px){.mg .stk{min-width:130px;max-width:130px}.mg .stk2{left:130px;min-width:96px}.mg .pl2{display:none}}
+.mg td.past{background:color-mix(in srgb,var(--green-bg) 45%,transparent);text-align:right;line-height:1.15}
+.mg .act{color:var(--text);font-family:var(--font-num);font-size:12px}
+.pln{font-size:9.5px;color:var(--text3);font-family:var(--font-num)}
+.mg td.click{cursor:pointer}.mg td.click:hover{outline:1px solid var(--accent);outline-offset:-1px;background:var(--accent-bg)}
+.todayact{all:unset;cursor:pointer;display:block;font-size:9.5px;color:var(--accent);text-align:right;padding:0 4px;font-weight:600}
+.todayact:hover,.todayact:focus-visible{text-decoration:underline}
+.agrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px}
+.ch{display:flex;flex-direction:column;align-items:center;gap:1px;line-height:1.2}
+.ch .ar{font-family:'Noto Sans Arabic',var(--font-body);font-size:11px;text-transform:none;letter-spacing:0;font-weight:500;color:var(--text3)}
+.field .ch{align-items:flex-start}
+th.lh{border-bottom:3px solid var(--c)}
+.ain{width:100%;min-width:72px;text-align:center;font-family:var(--font-num);font-size:14px;padding:7px 6px;border:1px solid var(--border2);border-bottom:3px solid var(--c);border-radius:7px;background:var(--amber-bg);color:var(--text)}
+.ain:focus{outline:2px solid var(--c);outline-offset:1px;background:var(--card)}
+.field .ain{font-size:16px;padding:9px}
+.vp{display:inline-block;font-family:var(--font-mono);font-size:11px;padding:2px 10px;border-radius:12px;border:1px solid var(--border2);background:var(--bg2);color:var(--text2);white-space:nowrap}
+.vp.up{background:var(--green-bg);color:var(--green);border-color:var(--green-border)}
+.vp.dn{background:var(--red-bg);color:var(--red);border-color:var(--red-border)}
+.winchip{all:unset;cursor:pointer;display:inline-flex;align-items:center;gap:4px;font-size:10.5px;font-weight:500;color:var(--text2);border:1px solid var(--border2);border-radius:12px;padding:0 7px;background:var(--card);white-space:nowrap;font-family:var(--font-body);text-transform:none;letter-spacing:0;margin-top:2px}
+.winchip:hover,.winchip:focus-visible{border-color:var(--accent);color:var(--accent)}
+.mg td.offwin{background:repeating-linear-gradient(135deg,transparent 0 5px,var(--bg2) 5px 7px)}
+.mg td.offwin .dayin{color:var(--text3)}
+.tf{font-family:var(--font-num);font-size:12px;white-space:nowrap}.tf small{font-size:9.5px;color:var(--text3);margin-left:1px}
+.tf .cnt{display:inline-block;margin-left:5px;font-size:10px;font-weight:600;padding:0 6px;border-radius:9px;background:var(--accent-bg);color:var(--accent)}
+.tf .cnt.u{background:var(--amber-bg);color:var(--amber)}
+.wdate,.wnote{font-family:var(--font-body);font-size:13px;padding:5px 7px;border:1px solid var(--border2);border-radius:6px;background:var(--card);color:var(--text)}
+.wnote{width:100%;min-width:160px}
+.sg td,.sg th{padding:5px 8px}.sg td.pastc{background:color-mix(in srgb,var(--green-bg) 45%,transparent)}
+.sg th.daystart,.sg td.daystart{border-left:2px solid var(--border2)}
+.msel{font-family:var(--font-body);font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--accent);background:var(--accent-bg);border:1px solid var(--accent);border-radius:6px;padding:2px 4px;cursor:pointer}
+.mcell .mval{display:inline-block}
+.mcell.m-up{animation:mflashUp 1.1s ease-out}.mcell.m-dn{animation:mflashDn 1.1s ease-out}
+.mcell.m-up .mval{animation:mslideUp .45s cubic-bezier(.2,.8,.2,1)}.mcell.m-dn .mval{animation:mslideDn .45s cubic-bezier(.2,.8,.2,1)}
+@keyframes mslideUp{from{transform:translateY(70%);opacity:0}to{transform:none;opacity:1}}
+@keyframes mslideDn{from{transform:translateY(-70%);opacity:0}to{transform:none;opacity:1}}
+@keyframes mflashUp{0%,30%{background:var(--green-bg);box-shadow:inset 0 0 0 1px var(--green-border)}100%{background:transparent}}
+@keyframes mflashDn{0%,30%{background:var(--red-bg);box-shadow:inset 0 0 0 1px var(--red-border)}100%{background:transparent}}
+@media (prefers-reduced-motion:reduce){.mcell .mval{animation:none!important}}
+.budbtn{all:unset;cursor:pointer;font-family:var(--font-num);font-size:12px;color:var(--text3);padding:1px 5px;border-radius:5px;border:1px dashed transparent}
+.budbtn:hover,.budbtn:focus-visible{border-color:var(--border2);color:var(--accent)}
+.harv{display:flex;flex-direction:column;align-items:flex-end;gap:2px}
+.harv .bar{margin:0;width:56px}
+.legendrow{display:flex;gap:16px;flex-wrap:wrap;font-size:11.5px;color:var(--text3);align-items:center}
+/* sidebar = drawer, hidden by default */
+.sidebar{position:fixed;left:0;top:0;z-index:40;transform:translateX(-100%);transition:transform .2s ease;box-shadow:none}
+body.side-open .sidebar{transform:none;box-shadow:var(--shadow)}
+.side-ov{position:fixed;inset:0;z-index:39;background:rgba(10,30,32,.35)}
+.menubtn{all:unset;cursor:pointer;width:32px;height:32px;border-radius:var(--r);border:1px solid var(--border2);background:var(--card);display:inline-flex;align-items:center;justify-content:center;color:var(--text2)}
+.menubtn:hover{background:var(--bg2)}.menubtn:focus-visible{outline:2px solid var(--accent2);outline-offset:2px}
+.menubtn svg{width:16px;height:16px}
+.side-close{all:unset;cursor:pointer;position:absolute;top:12px;right:12px;color:var(--sidebar-text);font-size:20px;line-height:1;padding:2px 6px}
+@media (max-width:860px){.topbar{position:static}}
+/* present mode: meeting-room view, read-only, large type */
+body.present .topbar,body.present .filterbar,body.present #menuBtn{display:none}
+body.present .page{padding:0 0 32px;gap:0}
+.pbar{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:10px 28px;background:var(--sidebar);color:#fff}
+.pbar .t{font-family:var(--font-display);font-size:20px}
+.pbar .m{font-size:12px;color:var(--sidebar-text)}
+.pbar .pslides{display:inline-flex;gap:4px;flex-wrap:wrap}
+.pbar .pslides button,.pbar .pf button,.pbar .pbtn{all:unset;cursor:pointer;padding:5px 12px;border-radius:16px;font-size:12.5px;color:var(--sidebar-text);border:1px solid rgba(255,255,255,.18)}
+.pbar .pslides button.on,.pbar .pf button.on{background:#159490;color:#fff;border-color:#159490}
+.pbar .pf{display:inline-flex;gap:4px;flex-wrap:wrap}
+.pbar button:focus-visible{outline:2px solid #fff;outline-offset:2px}
+.pbody{padding:22px 28px;display:flex;flex-direction:column;gap:18px}
+.pbody h2.ph{font-family:var(--font-display);font-weight:400;font-size:clamp(24px,2.6vw,34px);margin:0;text-wrap:balance}
+.pbody .psub{font-size:14px;color:var(--text3);margin-top:-12px}
+.pk{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}
+.pk .kpi{padding:14px 18px}.pk .kpi .v{font-size:clamp(24px,2.4vw,34px)}.pk .kpi .k{font-size:11px}.pk .kpi .s{font-size:13px}
+.pt td{font-size:15px;padding:8px 12px}.pt .num{font-size:15px}.pt th{font-size:11px;padding:10px 12px}
+.pt .chg{font-size:12px}
+.pt .dayin{width:54px;font-size:14px;border-color:var(--border)}
+.pt td.today,.pt th.today{background:var(--accent-bg)}
+.pbody .bridge .brow{font-size:15px;grid-template-columns:minmax(140px,240px) 1fr 100px;padding:8px 16px}
+.pbody .bridge .track{height:22px}
+.pest{display:flex;flex-direction:column;gap:14px}
+.pest td{font-size:14px}.pest .num,.pest .estbtn{font-size:13.5px}.pest .dayin{font-size:13.5px;width:52px}
+.pest .mg{max-height:calc(100vh - 300px)}
+.pnav{display:flex;justify-content:space-between;padding:0 28px;color:var(--text3);font-size:12px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+<div class="app">
+  <div class="side-ov" id="sideOv" hidden></div>
+  <aside class="sidebar" id="sidebar" aria-label="Land Cloud menu" style="padding:0">
+    <button class="side-close" id="sideClose" aria-label="Close menu">×</button>
+    <div id="lcshell"></div>
+  </aside>
+  <div class="main">
+    <div class="topbar">
+      <button class="menubtn" id="menuBtn" aria-label="Open menu" aria-expanded="false"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M2 4h12M2 8h12M2 12h12"/></svg></button>
+      <h1>Harvest Planner</h1><span class="mock">v2 · Test</span>
+      <div class="spacer"></div>
+      <div class="pageswitch" id="tabs">
+        <button data-t="est" class="on">Estimates</button>
+        <button data-t="sum">Summary</button>
+        <button data-t="chg">Changes</button>
+      </div>
+      <button class="btn sm pri" id="presentBtn">▶ Present</button>
+      <select class="sel" id="season" aria-label="Season"></select>
+    </div>
+    <div class="filterbar">
+      <span class="lbl">Farm</span><span id="farmChips" style="display:contents"></span>
+      <span class="lbl" style="margin-left:8px">Type</span>
+      <select class="sel" id="typeSel" aria-label="Type"></select>
+      <input class="search" id="q" placeholder="Search plot or variety" aria-label="Search">
+      <div class="spacer"></div>
+      <span class="lbl">Changes since</span>
+      <select class="sel" id="since" aria-label="Changes since meeting"></select>
+    </div>
+    <div class="page" id="page"></div>
+  </div>
+</div>
+<div id="tip" hidden></div>
+<div id="modalRoot"></div>
+
+<script>
+// ===== Harvest Planner v2 — data loader (Supabase, hp2_* tables). Builds DB, then startApp(DB). =====
+const SB_URL='https://sfyjvgjwvtwkrnqrvqyc.supabase.co', SB_ANON='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNmeWp2Z2p3dnR3a3JucXJ2cXljIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ4NzIxNjYsImV4cCI6MjA5MDQ0ODE2Nn0.FjA75XZsp0Kx5Xam_rrnYoAHX4JHKey6vEFCH_zlMuQ';
+const SBC=window.supabase.createClient(SB_URL,SB_ANON);
+const LC_HOME='/dalos-land-cloud-dev/';
+const cairoDate=d=>new Date(d).toLocaleDateString('en-CA',{timeZone:'Africa/Cairo'});
+async function paged(mk){const out=[];for(let from=0;;from+=1000){const {data,error}=await mk().range(from,from+999);if(error)throw error;out.push(...(data||[]));if(!data||data.length<1000)break;}return out;}
+function gate(title,msg,link){document.getElementById('page').innerHTML=`<div style="max-width:460px;margin:12vh auto;text-align:center;color:var(--text2)"><h2 style="font-family:var(--font-display);font-weight:400;font-size:24px;margin:0 0 8px;color:var(--text)">${title}</h2><p style="color:var(--text3);margin:0 0 18px">${msg}</p>${link?`<a href="${LC_HOME}" class="btn pri" style="text-decoration:none">Open Land Cloud →</a>`:''}</div>`;}
+function loading(){let r='';for(let i=0;i<12;i++)r+=`<div class="skel" style="height:22px;width:${70+(i*7)%28}%;margin:8px 0"></div>`;document.getElementById('page').innerHTML=r;}
+async function boot(){
+  loading();
+  let session=null;try{session=(await SBC.auth.getSession()).data.session}catch(e){}
+  if(!session){gate('Harvest Planner v2','This page shows live Land Cloud data, so it needs your Land Cloud sign-in. Open Land Cloud, sign in, then reopen this page.',true);return}
+  const acct=window.LCShell?await LCShell.loadAccount(SBC,session.user.id):{name:'',role:null};
+  if(window.LCShell)LCShell.render(document.getElementById('lcshell'),{active:'plannerv2',account:acct,onSignOut:()=>SBC.auth.signOut().then(()=>location.reload())});
+  if(!['admin','power_user'].includes(acct.role)){gate('Harvest Planner v2','v2 is in testing and open to admins and power users only for now. Use the Harvest Planner in the menu.',false);return}
+  try{
+    const ss=(await SBC.from('seasons').select('id,name,active').order('name')).data||[];
+    let pick=null;try{pick=localStorage.getItem('hp2_season')}catch(e){}
+    const season=ss.find(s=>s.id===pick)||ss.find(s=>s.name==='2026/27')||ss.find(s=>s.active)||ss[ss.length-1];
+    const sel=document.getElementById('season');
+    sel.innerHTML=ss.filter(s=>/^\d{4}\/\d{2}$/.test(s.name)).map(s=>`<option value="${s.id}" ${s.id===season.id?'selected':''}>Citrus ${s.name}</option>`).join('');
+    sel.onchange=()=>{try{localStorage.setItem('hp2_season',sel.value)}catch(e){}location.reload()};
+    const m=(season.name||'').match(/(\d{4})\s*\/\s*(\d{2})/);const y1=m?+m[1]:new Date().getFullYear();
+    const S_ID=season.id;
+    const [blocks,events,plan,acts,wins,winEv,reasons]=await Promise.all([
+      paged(()=>SBC.from('farm_blocks').select('id,farm_id,sector_code,plot_code,block_add,planting_year,total_area_fed,planted_area_fed,lifecycle,variety_id,varieties(name,categories(name)),farms(name),farm_rootstocks(name)').eq('product_id','citrus').eq('active',true).in('lifecycle',['EXP','WIP']).not('variety_id','is',null).not('farm_id','is',null).order('id')),
+      paged(()=>SBC.from('hp2_estimate_events').select('id,block_id,kind,value_t,entered_as,reason_code,note,created_by,created_at').eq('season_id',S_ID).order('created_at').order('id')),
+      paged(()=>SBC.from('hp2_plan_days').select('block_id,day,planned_t').eq('season_id',S_ID).order('day')),
+      paged(()=>SBC.from('hp2_actual_days').select('block_id,day,to_packhouse_t,field_sorting_t,local_sales_t,waste_t,entered_by,entered_at').eq('season_id',S_ID).order('day')),
+      SBC.from('hp2_windows').select('variety_id,start_date,end_date').eq('season_id',S_ID).then(r=>{if(r.error)throw r.error;return r.data||[]}),
+      SBC.from('hp2_window_events').select('variety_id,start_date,end_date,note,created_by,created_at').eq('season_id',S_ID).order('created_at').then(r=>{if(r.error)throw r.error;return r.data||[]}),
+      SBC.from('hp2_reasons').select('code,label,sort').eq('active',true).order('sort').then(r=>{if(r.error)throw r.error;return r.data||[]})]);
+    // user names for "by"
+    const uids=[...new Set([...events.map(e=>e.created_by),...acts.map(a=>a.entered_by),...winEv.map(w=>w.created_by)])].filter(Boolean);
+    const names={};names[session.user.id]=acct.name||'Me';
+    for(let i=0;i<uids.length;i+=150){try{const r=await SBC.from('users').select('id,full_name,email').in('id',uids.slice(i,i+150));(r.data||[]).forEach(u=>names[u.id]=u.full_name||u.email)}catch(e){}}
+    const who=id=>names[id]||'User';
+    const rlabel=Object.fromEntries(reasons.map(r=>[r.code,r.label]));
+    const plots=blocks.map(b=>({id:b.id,farmId:b.farm_id,farm:(b.farms&&b.farms.name)||'—',sector:b.sector_code||'',plot:(b.plot_code||'')+(b.block_add||''),
+      type:(b.varieties&&b.varieties.categories&&b.varieties.categories.name)||'',root:(b.farm_rootstocks&&b.farm_rootstocks.name)||'—',variety:(b.varieties&&b.varieties.name)||'—',varietyId:b.variety_id,
+      planted:b.planting_year||'',lifecycle:b.lifecycle,area:Number(b.planted_area_fed||b.total_area_fed||0)||0.0001,budget:0,ev:[],daily:{},ameta:{}}))
+      .sort((a,b)=>a.farm.localeCompare(b.farm)||a.sector.localeCompare(b.sector)||a.plot.localeCompare(b.plot));
+    const byId=Object.fromEntries(plots.map(p=>[p.id,p]));
+    events.forEach(e=>{const p=byId[e.block_id];if(!p)return;p.ev.push({d:cairoDate(e.created_at),at:e.created_at,v:Number(e.value_t),by:who(e.created_by),mode:e.entered_as==='t_fed'?'yield':'volume',
+      reason:e.kind==='budget'?'Budget':(rlabel[e.reason_code]||null),note:e.note||'',round:e.kind==='budget',kind:e.kind});if(e.kind==='budget')p.budget=Number(e.value_t)});
+    acts.forEach(a=>{const p=byId[a.block_id];if(!p)return;p.daily[a.day]=[+a.to_packhouse_t,+a.field_sorting_t,+a.local_sales_t,+a.waste_t];p.ameta[a.day]={by:who(a.entered_by),at:new Date(a.entered_at).toLocaleString('en-GB',{timeZone:'Africa/Cairo',dateStyle:'short',timeStyle:'short'})}});
+    const PLAN={};plan.forEach(r=>PLAN[r.block_id+'|'+r.day]=Number(r.planned_t));
+    const vname={};plots.forEach(p=>vname[p.varietyId]=p.variety);
+    const windows={};plots.forEach(p=>{if(!windows[p.variety])windows[p.variety]={varietyId:p.varietyId,start:null,end:null,log:[]}});
+    wins.forEach(w=>{const k=vname[w.variety_id];if(k){windows[k].start=w.start_date;windows[k].end=w.end_date}});
+    winEv.forEach(w=>{const k=vname[w.variety_id];if(k)windows[k].log.push({d:cairoDate(w.created_at),start:w.start_date,end:w.end_date,by:who(w.created_by),note:w.note||''})});
+    // TrueFruit: latest Aerobotics scan per linked block (read-only)
+    const tf={};
+    try{const ids=plots.map(p=>p.id),links=[];
+      for(let i=0;i<ids.length;i+=150){const {data,error}=await SBC.from('aero_block_links').select('block_id,orchard_id,aero_orchards(hectares)').eq('status','linked').in('block_id',ids.slice(i,i+150));if(error)throw error;links.push(...(data||[]))}
+      const best={};links.forEach(l=>{const ha=Number(l.aero_orchards&&l.aero_orchards.hectares)||0,c=best[l.block_id];if(!c||ha>c.ha)best[l.block_id]={oid:l.orchard_id,ha}});
+      const oids=[...new Set(Object.values(best).map(x=>x.oid))];const latest={};
+      for(let i=0;i<oids.length;i+=100){const rows=await paged(()=>SBC.from('aero_fruit_measurements').select('orchard_id,measurement_date,avg_size_mm,size_dist').in('orchard_id',oids.slice(i,i+100)).order('orchard_id').order('measurement_date',{ascending:false}));
+        rows.forEach(r=>{if(!latest[r.orchard_id])latest[r.orchard_id]=r})}
+      Object.entries(best).forEach(([bid,{oid}])=>{const r=latest[oid];if(!r||r.avg_size_mm==null)return;let pk='';
+        if(Array.isArray(r.size_dist)){let mx=-1;r.size_dist.forEach(x=>{if(+x.percentage>mx){mx=+x.percentage;pk=x.label}})}
+        tf[bid]=[Number(r.avg_size_mm),pk||'',r.measurement_date]});
+    }catch(e){console.warn('TrueFruit not loaded',e)}
+    const today=cairoDate(Date.now());
+    const meetings=[];{const t=new Date(today+'T00:00:00Z');const back=(t.getUTCDay()+6)%7;t.setUTCDate(t.getUTCDate()-back);for(let k=0;k<8;k++){meetings.push(t.toISOString().slice(0,10));t.setUTCDate(t.getUTCDate()-7)}}
+    startApp({sb:SBC,season,seasonId:S_ID,y1,today,plots,plan:PLAN,windows,tf,reasons,meetings,me:{id:session.user.id,name:acct.name||'Me'}});
+  }catch(err){gate('Could not load','Live-data load error: '+esc0((err&&err.message)||String(err))+'. Refresh if you just signed in.',false);console.error(err)}
+}
+function esc0(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
+</script>
+<script>
+function startApp(DB){
+const TODAY=DB.today, BEARING_AGE=7, SB=DB.sb;
+const cairoDate0=d=>new Date(d).toLocaleDateString('en-CA',{timeZone:'Africa/Cairo'});
+const REASONS=DB.reasons.map(r=>r.label), REASON_CODE=Object.fromEntries(DB.reasons.map(r=>[r.label,r.code]));
+const MEETINGS=DB.meetings;
+const JUL_END=DB.y1+'-07-31';
+
+let seed=7;const rnd=()=>{seed=(seed*16807)%2147483647;return (seed-1)/2147483646};
+const r2=x=>Math.round(x*100)/100;
+const addDays=(d,n)=>{const t=new Date(d+'T00:00:00Z');t.setUTCDate(t.getUTCDate()+n);return t.toISOString().slice(0,10)};
+const fmtD=d=>{const t=new Date(d+'T00:00:00Z');return t.toLocaleDateString('en-GB',{day:'2-digit',month:'short',timeZone:'UTC'})};
+const fmtDY=d=>{const t=new Date(d+'T00:00:00Z');return t.toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'2-digit',timeZone:'UTC'})};
+const n0=x=>x==null||isNaN(x)?'–':Math.round(x).toLocaleString('en-US');
+const n1=x=>x==null||isNaN(x)||!isFinite(x)?'–':x.toLocaleString('en-US',{minimumFractionDigits:1,maximumFractionDigits:1});
+const sgn=(x,f=n0)=>x>0.5?'+'+f(x):x<-0.5?'−'+f(-x):'0';
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+// ---------- plots (from farm_blocks + hp2_* tables, built by the loader) ----------
+const PLOTS=DB.plots;
+function recalc(p){let aR=0,aL=0,aC=0;for(const [d,a] of Object.entries(p.daily))if(d<=TODAY){aR+=a[0];aL+=a[1]+a[2];aC+=a[3]}p.act=r2(aR);p.local=r2(aL);p.culls=r2(aC)}
+PLOTS.forEach(recalc);
+
+// ---------- formulas (mirror of the sheet) ----------
+const productive=p=>p.lifecycle==='EXP';                                     // productive = Land Cloud lifecycle EXP
+const estAt=(p,d)=>{let v=null;for(const e of p.ev) if(e.d<=d) v=e.v;return v??0};
+const est=p=>p.ev.length?p.ev[p.ev.length-1].v:0;                                          // Q: latest estimate (input)
+const total=p=>p.act+p.local+p.culls;                                       // harvested = all four (waste included)
+const changes=(p,from,to=TODAY)=>p.ev.filter(e=>!e.round&&e.d>from&&e.d<=to);
+const inSeason=p=>p.ev.filter(e=>!e.round);
+function agg(list,since){
+  const o={area:0,parea:0,budget:0,jul:0,nov:0,est:0,act:0,local:0,tot:0,prev:0,n:0,nNew:0,plots:list.length};
+  for(const p of list){o.area+=p.area;if(productive(p))o.parea+=p.area;o.budget+=p.budget;o.jul+=estAt(p,JUL_END);o.est+=est(p);
+    o.act+=p.act;o.local+=p.local;o.tot+=total(p);o.prev+=estAt(p,since);o.n+=inSeason(p).length;o.nNew+=changes(p,since).length}
+  o.rem=o.est-o.tot;return o;
+}
+
+// ---------- state ----------
+const S={tab:'est',farm:'All',type:'All',q:'',since:MEETINGS[0],group:'farm',reason:'All'};
+try{const u=JSON.parse(localStorage.getItem('hp2-ui')||'{}');S.tab=u.tab||S.tab;S.group=u.group||S.group;if(MEETINGS.includes(u.since))S.since=u.since}catch(e){}
+const saveUI=()=>{try{localStorage.setItem('hp2-ui',JSON.stringify({tab:S.tab,group:S.group,since:S.since}))}catch(e){}};
+const FARMS=['All',...new Set(PLOTS.map(p=>p.farm))];
+const TYPES=['All',...new Set(PLOTS.map(p=>p.type))];
+const filtered=()=>PLOTS.filter(p=>(S.farm==='All'||p.farm===S.farm)&&(S.type==='All'||p.type===S.type)&&
+  (!S.q||(p.plot+' '+p.variety+' '+p.farm+' '+p.sector).toLowerCase().includes(S.q.toLowerCase())));
+
+// ---------- chrome ----------
+const $=s=>document.querySelector(s);
+function chrome(){
+  $('#farmChips').innerHTML=FARMS.map(f=>`<button class="chip ${S.farm===f?'on':''}" data-farm="${f}">${f}</button>`).join('');
+  $('#typeSel').innerHTML=TYPES.map(t=>`<option ${S.type===t?'selected':''}>${t}</option>`).join('');
+  $('#since').innerHTML=MEETINGS.map(m=>`<option value="${m}" ${S.since===m?'selected':''}>Meeting ${fmtDY(m)}</option>`).join('');
+  document.querySelectorAll('#tabs button').forEach(b=>b.classList.toggle('on',b.dataset.t===S.tab));
+}
+document.addEventListener('click',e=>{
+  const f=e.target.closest('[data-farm]');if(f){S.farm=f.dataset.farm;render()}
+  const t=e.target.closest('#tabs button');if(t){S.tab=t.dataset.t;saveUI();render()}
+  const g=e.target.closest('[data-group]');if(g){S.group=g.dataset.group;saveUI();render()}
+  const rs=e.target.closest('[data-reasonf]');if(rs){S.reason=rs.dataset.reasonf;render()}
+  const h=e.target.closest('[data-hist]');if(h){hideTip();openHistory(h.dataset.hist);return}
+  const ed=e.target.closest('[data-edit]');if(ed){openEdit(ed.dataset.edit)}
+  const bd=e.target.closest('[data-budget]');if(bd){openEdit(bd.dataset.budget,'budget')}
+  const gh=e.target.closest('[data-ghist]');if(gh){hideTip();openGroupHistory(gh.dataset.ghist)}
+});
+$('#typeSel').onchange=e=>{S.type=e.target.value;render()};
+$('#since').onchange=e=>{S.since=e.target.value;saveUI();render()};
+$('#q').oninput=e=>{S.q=e.target.value;render()};
+
+// ---------- change badge + hover ----------
+function badge(p){
+  const all=inSeason(p);if(!all.length)return '';
+  const nw=changes(p,S.since).length;
+  return `<button class="chg ${nw?'new':''}" data-hist="${p.id}" data-tip="p:${p.id}" aria-label="${all.length} changes, view history">${nw?'<span class="d"></span>'+nw+' new':all.length+' chg'}</button>`;
+}
+function gbadge(key,list){
+  const nNew=list.reduce((s,p)=>s+changes(p,S.since).length,0);
+  if(!nNew)return '';
+  return `<button class="chg new" data-ghist="${esc(key)}" data-tip="g:${esc(key)}"><span class="d"></span>${nNew} new</button>`;
+}
+const GROUPS={};
+const tip=$('#tip');
+function hideTip(){tip.hidden=true}
+document.addEventListener('mouseover',e=>{
+  const b=e.target.closest('[data-tip]');if(!b){hideTip();return}
+  const [k,id]=[b.dataset.tip.slice(0,1),b.dataset.tip.slice(2)];
+  let html='';
+  if(k==='p'){
+    const p=PLOTS.find(x=>x.id===id);const evs=p.ev.slice(-4).reverse();
+    html=`<div class="h">${esc(p.farm)} · <span class="plot">${p.sector}-${p.plot}</span> ${esc(p.variety)}</div>`+
+      evs.map((e,i)=>{const prev=p.ev[p.ev.length-1-i-1];const d=prev?e.v-prev.v:0;
+        return `<div class="row"><span class="calc">${fmtD(e.d)}</span><span><b class="num" style="font-size:12px">${n0(e.v)} t</b> <span class="${d>0?'pos':d<0?'neg':''}">${prev?sgn(d)+' t':''}</span> · ${e.reason?esc(e.reason):'<i>no reason given</i>'}<br><span class="calc">${esc(e.by)}</span></span></div>`}).join('')+
+      `<div class="foot">Click for full history</div>`;
+  } else {
+    const list=GROUPS[id]||[];const evs=[];
+    list.forEach(p=>changes(p,S.since).forEach(e=>{const i=p.ev.indexOf(e);evs.push({p,e,d:e.v-p.ev[i-1].v})}));
+    evs.sort((a,b)=>Math.abs(b.d)-Math.abs(a.d));
+    const net=evs.reduce((s,x)=>s+x.d,0);
+    html=`<div class="h">${esc(id)} · ${evs.length} changes since ${fmtD(S.since)} · net <span class="${net>0?'pos':'neg'}">${sgn(net)} t</span></div>`+
+      evs.slice(0,5).map(x=>`<div class="row"><span class="plot">${x.p.sector}-${x.p.plot}</span><span><span class="${x.d>0?'pos':'neg'}">${sgn(x.d)} t</span> · ${x.e.reason?esc(x.e.reason):'<i>no reason</i>'} <span class="calc">${esc(x.p.farm)}</span></span></div>`).join('')+
+      (evs.length>5?`<div class="calc" style="margin-top:4px">+${evs.length-5} more</div>`:'')+`<div class="foot">Click for details</div>`;
+  }
+  tip.innerHTML=html;tip.hidden=false;
+  const r=b.getBoundingClientRect();const w=Math.min(340,innerWidth-24);
+  tip.style.left=Math.max(12,Math.min(r.left,innerWidth-w-12))+'px';
+  const below=r.bottom+8;tip.style.top=(below+tip.offsetHeight>innerHeight?r.top-tip.offsetHeight-8:below)+'px';
+});
+
+// ---------- views ----------
+function kpis(list){
+  const a=agg(list,S.since);const d=a.est-a.budget;
+  return `<div class="kpis">
+   <div class="kpi"><div class="k">Area · productive</div><div class="v">${n0(a.area)} <span style="font-size:13px;color:var(--text3)">fed</span></div><div class="s">${n0(a.parea)} fed productive · ${a.plots} plots</div></div>
+   <div class="kpi"><div class="k">Budget</div><div class="v">${n0(a.budget)} t</div><div class="s">${n1(a.budget/a.area)} t/fed</div></div>
+   <div class="kpi hl"><div class="k">Latest estimate</div><div class="v">${n0(a.est)} t</div><div class="s"><span class="${d>=0?'pos':'neg'}">${sgn(d)} t vs budget (${sgn(d/a.budget*100,n1)}%)</span></div></div>
+   <div class="kpi"><div class="k">Moved since ${fmtD(S.since)}</div><div class="v ${a.est-a.prev>=0?'pos':'neg'}">${sgn(a.est-a.prev)} t</div><div class="s">${a.nNew} plot changes</div></div>
+   <div class="kpi"><div class="k">Harvested total</div><div class="v">${n0(a.tot)} t</div><div class="s">${n0(a.act)} t packhouse · ${n0(a.tot-a.act)} t sorting, local &amp; waste</div></div>
+   <div class="kpi"><div class="k">Remaining</div><div class="v">${n0(a.rem)} t</div><div class="s">${n0(a.tot/a.est*100)}% of estimate harvested</div></div>
+  </div>`;
+}
+
+// Daily plan values: planned packhouse raw t/day per plot (input). Seeded for the mockup.
+const PLAN=DB.plan;
+function planVal(p,d){return PLAN[p.id+'|'+d]||0}
+async function savePlan(k,v,old){const i=k.lastIndexOf('|'),bid=k.slice(0,i),day=k.slice(i+1);
+  const r=v>0?await SB.from('hp2_plan_days').upsert({season_id:DB.seasonId,block_id:bid,day,planned_t:v,updated_by:DB.me.id},{onConflict:'season_id,block_id,day'})
+             :await SB.from('hp2_plan_days').delete().eq('season_id',DB.seasonId).eq('block_id',bid).eq('day',day);
+  if(r.error){PLAN[k]=old;keepScroll(render);toast('Plan not saved: '+r.error.message)}}
+const planDays=()=>{const n=S.days||7;const s=addDays(TODAY,(S.wk||0)*7-3);return [...Array(n)].map((_,i)=>addDays(s,i))};
+function viewEst(part){
+  const list=filtered();const days=planDays();
+  const key=S.group==='farm'?(p=>p.farm):(p=>p.variety);
+  const groups={};list.forEach(p=>(groups[key(p)]=groups[key(p)]||[]).push(p));
+  const wkCls=d=>{const w=new Date(d+'T00:00:00Z').getUTCDay();return (d===TODAY?'today ':'')+(w===5?'wk':'')};
+  const sumDays=ps=>days.map(d=>ps.reduce((s,p)=>s+planVal(p,d),0));
+  const actDay=(p,d)=>(p.daily[d]||[0])[0];
+  const pastCell=(a,pl,i,bold,pid)=>{const v=a-pl;return `<td class="day dsum past ${pid?'click':''} ${i===0?'daystart':''} ${wkCls(days[i])}" ${pid?`data-act="${pid}|${days[i]}" title="Click to enter or correct the harvest for ${fmtD(days[i])}"`:''}><div class="act" style="${bold?'font-weight:700':''}">${a?n0(a):'<span class="calc">·</span>'}</div><div class="pln ${pl&&Math.abs(v)>0.5?(v>0?'pos':'neg'):''}">${pl?'plan '+n0(pl):''}</div></td>`};
+  const dayCells=(vals,bold,ps)=>vals.map((v,i)=>days[i]<TODAY?pastCell(ps.reduce((s,p)=>s+actDay(p,days[i]),0),v,i,bold):`<td class="day dsum ${i===0?'daystart':''} ${wkCls(days[i])}" style="${bold?'font-weight:700':''}">${v?n0(v):'<span class="calc">·</span>'}</td>`).join('');
+  const fut=days.map(d=>d>=TODAY);
+  const tail=(rem,vals,ps)=>{const pf=vals.reduce((s,v,i)=>s+(fut[i]?v:0),0),pp=vals.reduce((s,v,i)=>s+(fut[i]?0:v),0);
+    const ap=days.reduce((s,d,i)=>s+(d>TODAY?0:ps.reduce((t,p)=>t+actDay(p,d),0)),0);const after=rem-pf;
+    return `<td class="num daystart">${pp||ap?`${n0(ap)}<div class="pln ${ap-pp>0.5?'pos':ap-pp<-0.5?'neg':''}">plan ${n0(pp)}</div>`:'<span class="calc">–</span>'}</td><td class="num" style="color:var(--text)">${n0(pf)}</td><td class="num ${after<-0.5?'neg':''}">${n0(after)}</td>`};
+  let rows='';
+  for(const [g,ps] of Object.entries(groups)){
+    GROUPS[g]=ps;const a=agg(ps,S.since);const dv=sumDays(ps);const per=dv.reduce((s,v)=>s+v,0);
+    rows+=`<tr class="grp"><td class="stk gname">${esc(g)} <span class="calc" style="text-transform:none;letter-spacing:0;font-weight:500">· ${ps.length}</span>${gbadge(g,ps)}${S.group==='variety'?'<br>'+winChip(g):''}</td>
+      <td class="stk2 num">${n0(a.est)}</td><td class="num">${n1(a.est/a.area)}</td><td class="num">${n0(a.budget)}</td><td class="num ${a.est-a.budget>=0?'pos':'neg'}">${sgn(a.est-a.budget)}</td><td class="num">${tfAgg(ps)}</td>
+      <td class="num">${n0(a.tot)} <span class="calc">${n0(a.tot/a.est*100)}%</span></td><td class="num">${n0(a.rem)}</td>${dayCells(dv,true,ps)}${tail(a.rem,dv,ps)}</tr>`;
+    for(const p of ps){
+      const e=est(p),d=e-p.budget,t=total(p),rem=e-t,pct=e?t/e*100:0;
+      const dvals=days.map(dd=>planVal(p,dd));const per=dvals.reduce((s,v)=>s+v,0);
+      rows+=`<tr><td class="stk"><span class="plot">${p.sector}-${p.plot}</span> <span class="vname">${S.group==='farm'?esc(p.variety):esc(p.farm)}</span> <span class="pill ${productive(p)?'p':'np'}">${productive(p)?'P':'NP'}</span>
+          <div class="pl2">${esc(p.root)} · ${p.planted} · ${n1(p.area)} fed ${S.group==='farm'?winChip(p.variety):''}</div></td>
+        <td class="stk2" style="text-align:right"><button class="estbtn" data-edit="${p.id}" aria-label="Update estimate">${p.ev.length?n0(e):'<span class="calc">+ add</span>'} <span class="pen">✎</span></button>${badge(p)}</td>
+        <td class="num calc">${p.ev.length?n1(e/p.area):'–'}</td><td class="num calc"><button class="budbtn" data-budget="${p.id}" aria-label="Set budget">${p.budget?n0(p.budget):'+ budget'}</button></td><td class="num ${d>=0?'pos':'neg'}">${p.budget&&p.ev.length?sgn(d):'<span class="calc">–</span>'}</td><td class="num">${tfCell(p)}</td>
+        <td class="num" title="To packhouse ${n0(p.act)} t · field sorting + local sales ${n0(p.local)} t · waste ${n0(p.culls)} t"><div class="harv">${n0(t)}<span class="bar"><i style="width:${Math.min(100,pct)}%"></i></span></div></td>
+        <td class="num ${rem<-0.5?'neg':''}">${n0(rem)}</td>
+        ${dvals.map((v,i)=>days[i]<TODAY?pastCell(actDay(p,days[i]),v,i,false,p.id):`<td class="day ${i===0?'daystart':''} ${wkCls(days[i])} ${inWin(p.variety,days[i])?'':'offwin'}" ${inWin(p.variety,days[i])?'':'title="Outside the '+esc(p.variety)+' harvest window"'}><input class="dayin ${v?'':'z'}" data-plan="${p.id}|${days[i]}" value="${v||''}" placeholder="·" inputmode="decimal" aria-label="Plan ${p.sector}-${p.plot} ${days[i]}">${days[i]===TODAY?`<button class="todayact" data-act="${p.id}|${TODAY}">${actDay(p,TODAY)?'act '+n0(actDay(p,TODAY)):'+ actual'}</button>`:''}</td>`).join('')}
+        ${tail(rem,dvals,[p])}</tr>`;
+    }
+  }
+  const A=agg(list,S.since);const dv=sumDays(list);const per=dv.reduce((s,v)=>s+v,0);
+  rows+=`<tr class="tot"><td class="stk">Total · ${list.length} plots</td><td class="stk2 num">${n0(A.est)}</td><td class="num">${n1(A.est/A.area)}</td><td class="num">${n0(A.budget)}</td><td class="num">${sgn(A.est-A.budget)}</td><td class="num">${tfAgg(list)}</td><td class="num">${n0(A.tot)}</td><td class="num">${n0(A.rem)}</td>${dayCells(dv,true,list)}${tail(A.rem,dv,list)}</tr>`;
+  const s0=days[0],s1=days[days.length-1];
+  // the two roll-up tables from the old Plan tab (by variety, by farm), same day window as the grid above
+  const sumGrid=(keyFn,label)=>{const g={};list.forEach(p=>(g[keyFn(p)]=g[keyFn(p)]||[]).push(p));
+    const me=monthEnd(S.month);const row=(name,ps,cls)=>{let A=0,PA=0,PQ=0,B=0,N=0,L=0,H=0,SL=0;ps.forEach(p=>{A+=p.area;const e=est(p);if(productive(p)){PA+=p.area;PQ+=e}B+=p.budget;N+=estAt(p,me);L+=e;H+=p.act;SL+=p.local});
+      const pv=days.map(d=>ps.reduce((t,p)=>t+planVal(p,d),0)),av=days.map(d=>d<TODAY?ps.reduce((t,p)=>t+actDay(p,d),0):0);
+      const pp=pv.reduce((x,y,i)=>x+(days[i]<TODAY?y:0),0),ap=av.reduce((x,y)=>x+y,0),pf=pv.reduce((x,y,i)=>x+(days[i]<TODAY?0:y),0);
+      const vc=(a,p)=>p&&Math.abs(a-p)>0.5?(a>p?'pos':'neg'):'';
+      return `<tr class="${cls||''}"><td class="vname" style="text-align:left">${name}</td><td class="num">${n0(A)}</td><td class="num">${n0(PA)}</td><td class="num">${n0(PQ)}</td><td class="num calc">${n1(PA?PQ/PA:NaN)}</td><td class="num calc">${n1(L/A)}</td>
+        <td class="num calc">${n0(B)}</td><td class="num calc mcell" data-mk="${label}|${name}" data-mv="${N}"><span class="mval">${n0(N)}</span>${Math.abs(L-N)>0.5?`<div class="pln ${L>N?'pos':'neg'}">${sgn(L-N)} since</div>`:''}</td><td class="num" style="color:var(--text);font-weight:600">${n0(L)}</td><td class="num">${n0(H)}</td><td class="num">${n0(SL)}</td><td class="num ${L-H-SL<-0.5?'neg':''}">${n0(L-H-SL)}</td>
+        <td class="num daystart">${pp||ap?`<span style="color:var(--text)">${n0(ap)}</span><div class="pln ${vc(ap,pp)}">plan ${n0(pp)}</div>`:'<span class="calc">–</span>'}</td><td class="num" style="color:var(--text)">${n0(pf)}</td>
+        ${pv.map((v,i)=>days[i]<TODAY?`<td class="num pastc ${i===0?'daystart':''} ${wkCls(days[i])}" style="line-height:1.15"><span style="color:var(--text)">${av[i]?n0(av[i]):'<span class="calc">·</span>'}</span><div class="pln ${vc(av[i],v)}">${v?'plan '+n0(v):''}</div></td>`
+          :`<td class="num ${i===0?'daystart':''} ${wkCls(days[i])}">${v?n0(v):'<span class="calc">·</span>'}<div class="pln">${days[i]===TODAY&&actDay?'':''}</div></td>`).join('')}</tr>`};
+    const ent=Object.entries(g).sort((a,b)=>a[0].localeCompare(b[0]));
+    return `<div class="card"><h2>Summary by ${label.toLowerCase()}</h2><div class="sub">Same columns as the old plan sheet. Past days (shaded) show the actual with the plan under it (green = above plan, red = below); today on shows the plan.</div>
+     <div class="table-wrap"><table class="sg"><thead><tr><th style="text-align:left">${label}</th><th>Total area</th><th>Prod. area</th><th>Prod. area qty<span class="f">latest, productive</span></th><th>Yield/area P<span class="f">= qty ÷ prod. area</span></th><th>Yield/area<span class="f">= latest ÷ total area</span></th>
+      <th>Budget qty</th><th>${monthSel()}</th><th>Latest update</th><th>Harvested<span class="f">packhouse</span></th><th>Sales<span class="f">sorting + local</span></th><th>Remaining<span class="f">= latest − harv. − sales</span></th><th class="daystart">Actual so far<span class="f">past days · vs plan</span></th><th>Plan ahead<span class="f">today on</span></th>
+      ${days.map((d,i)=>{const t=new Date(d+'T00:00:00Z');return `<th class="${i===0?'daystart':''} ${wkCls(d)}">${t.toLocaleDateString('en-GB',{weekday:'short',timeZone:'UTC'})}<span class="f">${fmtD(d)}</span></th>`}).join('')}</tr></thead>
+      <tbody>${ent.map(([k,ps])=>row(esc(k),ps)).join('')}${row('Total',list,'tot')}</tbody></table></div></div>`};
+  const dayNav=`<span class="lbl">Days</span><div class="seg"><button data-wk="-1" aria-label="Earlier">‹</button><button data-wk="0">${fmtD(s0)} – ${fmtD(s1)}</button><button data-wk="1" aria-label="Later">›</button></div>
+    <div class="seg"><button data-days="7" class="${(S.days||7)===7?'on':''}">7 d</button><button data-days="14" class="${S.days===14?'on':''}">14 d</button></div>`;
+  if(part==='sum')return `<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">${dayNav}<span class="spacer"></span><button class="btn sm" data-windows>Harvest windows</button><button class="btn sm pri" data-logharvest>+ Log harvest</button></div>${sumGrid(p=>p.variety,'Variety')}${sumGrid(p=>p.farm,'Farm')}`;
+  return kpis(list)+`
+  <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+    <span class="lbl">Group by</span><div class="seg"><button data-group="farm" class="${S.group==='farm'?'on':''}">Farm</button><button data-group="variety" class="${S.group==='variety'?'on':''}">Variety</button></div>
+    <span class="lbl" style="margin-left:6px">Plan days</span>
+    <div class="seg"><button data-wk="-1" aria-label="Earlier">‹</button><button data-wk="0">${fmtD(s0)} – ${fmtD(s1)}</button><button data-wk="1" aria-label="Later">›</button></div>
+    <div class="seg"><button data-days="7" class="${(S.days||7)===7?'on':''}">7 d</button><button data-days="14" class="${S.days===14?'on':''}">14 d</button></div>
+    <span class="spacer"></span><button class="btn sm" data-windows>Harvest windows</button><button class="btn sm pri" data-logharvest>+ Log harvest</button>
+    <p class="hint" style="flex-basis:100%">Left: the estimate per plot. Click it to update by tonnes or t/fed; every change is saved with who, when and why (<b style="color:var(--amber)">● new</b> = since the selected meeting). Right: packhouse raw tonnes per day. Past days show the <b>actual</b> from the harvest log with the plan under it (green = above plan, red = below). Click a past day to enter or correct a plot's harvest, use <b>+ actual</b> under today, or <b>Log harvest</b> to enter a whole farm's day at once. Today and later are plan inputs. <b>Left after plan</b> = remaining − plan ahead; red means the plan is more than the estimate. Hover Harvested for the packhouse / local split.</p>
+  </div>
+  <div class="table-wrap mg"><table>
+    <thead><tr><th class="grpcol stk">Plot</th><th class="grpcol stk2">Estimate</th><th class="grpcol" colspan="4">Yield, budget &amp; size</th><th class="grpcol" colspan="2">Actual (harvest log)</th><th class="grpcol daystart" colspan="${days.length}">Packhouse raw t per day · actual (past) · plan (today on)</th><th class="grpcol daystart" colspan="3">Plan check</th></tr>
+    <tr><th class="stk" style="text-align:left">${S.group==='farm'?'Plot · variety':'Plot · farm'}</th><th class="stk2">Latest t<span class="f">input</span></th><th>t/fed<span class="f">= est ÷ area</span></th><th>Budget t</th><th>vs budget</th><th>TrueFruit<span class="f">latest scan · peak count</span></th>
+    <th>Harvested<span class="f">= all four</span></th><th>Remaining<span class="f">= est − harvested</span></th>
+    ${days.map((d,i)=>{const t=new Date(d+'T00:00:00Z');return `<th class="day ${i===0?'daystart':''} ${wkCls(d)}">${t.toLocaleDateString('en-GB',{weekday:'short',timeZone:'UTC'})}<span class="f">${fmtD(d)}</span></th>`}).join('')}
+    <th class="daystart">Actual so far<span class="f">past days in view</span></th><th>Plan ahead<span class="f">today on</span></th><th>Left after plan<span class="f">= remaining − plan ahead</span></th></tr></thead>
+    <tbody>${rows}</tbody></table></div>
+  ${part==='grid'?'':sumGrid(p=>p.variety,'Variety')+sumGrid(p=>p.farm,'Farm')}`;
+}
+document.addEventListener('click',e=>{const w=e.target.closest('[data-wk]');if(w){const v=+w.dataset.wk;S.wk=v?(S.wk||0)+v:0;render()}
+  const d=e.target.closest('[data-days]');if(d){S.days=+d.dataset.days;render()}});
+document.addEventListener('change',e=>{const i=e.target.closest('[data-plan]');if(!i)return;const k=i.dataset.plan,x=parseFloat(i.value),v=isNaN(x)||x<0?0:r2(x),old=PLAN[k]||0;if(v===old)return;PLAN[k]=v;savePlan(k,v,old);
+  const nxt=i.closest('td')?.nextElementSibling?.querySelector('input')?.dataset.plan;keepScroll(render);
+  if(nxt)document.querySelector(`[data-plan="${nxt}"]`)?.focus();});
+function keepScroll(fn){const w=document.querySelector('.mg,#pgrid');const y=scrollY,sx=w?.scrollLeft,sy=w?.scrollTop;fn();scrollTo(0,y);
+  const w2=document.querySelector('.mg,#pgrid');if(w2){w2.scrollLeft=sx||0;w2.scrollTop=sy||0}}
+
+function rollTable(keyFn,label,list,extraCol){
+  const g={};list.forEach(p=>(g[keyFn(p)]=g[keyFn(p)]||[]).push(p));
+  const ent=Object.entries(g).sort((a,b)=>agg(b[1],S.since).est-agg(a[1],S.since).est);
+  const body=ent.map(([k,ps])=>{GROUPS[k]=ps;const a=agg(ps,S.since);const d=a.est-a.budget;
+    return `<tr><td class="vname">${esc(k)}${extraCol?` <span class="calc" style="font-weight:400">${esc(extraCol(ps))}</span><br>${winChip(k)}`:''}</td><td class="num">${n0(a.budget)}</td><td class="num calc">${n0(a.jul)}</td><td class="num calc mcell" data-mk="rt|${label}|${esc(k)}" data-mv="${ps.reduce((t,p)=>t+estAt(p,monthEnd(S.month)),0)}"><span class="mval">${n0(ps.reduce((t,p)=>t+estAt(p,monthEnd(S.month)),0))}</span></td>
+      <td class="num" style="color:var(--text);font-weight:700">${n0(a.est)}${gbadge(k,ps)}</td><td class="num ${d>=0?'pos':'neg'}">${sgn(d)}</td>
+      <td><span class="pill ${d>0.5?'p':'np'}" style="${d<-0.5?'background:var(--red-bg);color:var(--red)':''}">${d>0.5?'Surplus':d<-0.5?'Deficit':'On budget'}</span></td>
+      <td class="num">${n0(a.tot)}</td><td class="num">${n0(a.tot/a.est*100)}%</td></tr>`}).join('');
+  const A=agg(list,S.since);
+  return `<div class="table-wrap"><table><thead><tr><th style="text-align:left">${label}</th><th>Budget</th><th>July est.</th><th>${monthSel()}</th><th>Latest</th><th>vs budget</th><th></th><th>Harvested</th><th>% of est.</th></tr></thead>
+   <tbody>${body}<tr class="tot"><td>Total</td><td class="num">${n0(A.budget)}</td><td class="num">${n0(A.jul)}</td><td class="num mcell" data-mk="rt|${label}|Total" data-mv="${list.reduce((t,p)=>t+estAt(p,monthEnd(S.month)),0)}"><span class="mval">${n0(list.reduce((t,p)=>t+estAt(p,monthEnd(S.month)),0))}</span></td><td class="num">${n0(A.est)}</td><td class="num">${sgn(A.est-A.budget)}</td><td></td><td class="num">${n0(A.tot)}</td><td class="num">${n0(A.tot/A.est*100)}%</td></tr></tbody></table></div>`;
+}
+
+function viewSum(){
+  const list=filtered();
+  // weekly snapshots replace the hand-frozen dated columns in the old Plan tab
+  const snaps=[];for(let d=addDays(TODAY,-63);d<TODAY;d=addDays(d,7))snaps.push(d);snaps.push(TODAY);
+  const g={};list.forEach(p=>(g[p.variety]=g[p.variety]||[]).push(p));
+  const ent=Object.entries(g).sort((a,b)=>agg(b[1],S.since).est-agg(a[1],S.since).est);
+  const snapRows=ent.map(([k,ps])=>{const vals=snaps.map(d=>ps.reduce((s,p)=>s+estAt(p,d),0));
+    return `<tr><td class="vname">${esc(k)}</td><td class="num calc">${n0(agg(ps).budget)}</td>${vals.map((v,i)=>{const ch=i&&Math.abs(v-vals[i-1])>0.5;
+      return `<td class="num" style="${ch?'background:var(--amber-bg);color:var(--text)':''}">${n0(v)}</td>`}).join('')}</tr>`}).join('');
+  const typeOf=ps=>ps[0].type;
+  return kpis(list)+`<div class="grid2">
+   <div class="card"><h2>By variety</h2><div class="sub">Budget → July → November → latest, summed from plots. Hover a <b style="color:var(--amber)">● new</b> badge to see what moved.</div>${rollTable(p=>p.variety,'Variety',list,typeOf)}</div>
+   <div class="card"><h2>By farm</h2><div class="sub">Same totals, rolled up by farm.</div>${rollTable(p=>p.farm,'Farm',list)}</div>
+  </div>
+  <div class="card"><h2>Estimate snapshots</h2><div class="sub">Estimate per variety as it stood each week, taken from the change history. This replaces copying the totals into dated columns by hand. Shaded cells changed that week.</div>
+   <div class="table-wrap"><table><thead><tr><th style="text-align:left">Variety</th><th>Budget</th>${snaps.map(d=>`<th>${d===TODAY?'Today':fmtD(d)}</th>`).join('')}</tr></thead><tbody>${snapRows}</tbody></table></div></div>`;
+}
+
+function allChanges(list,from,to=TODAY){
+  const out=[];list.forEach(p=>p.ev.forEach((e,i)=>{if(!e.round&&e.d>from&&e.d<=to){const prev=p.ev[i-1].v;out.push({p,e,prev,d:e.v-prev})}}));
+  return out.sort((a,b)=>b.e.d.localeCompare(a.e.d)||Math.abs(b.d)-Math.abs(a.d));
+}
+function viewChg(){
+  const list=filtered();const ch=allChanges(list,S.since);
+  const before=list.reduce((s,p)=>s+estAt(p,S.since),0),after=list.reduce((s,p)=>s+est(p),0);
+  const byR={};ch.forEach(c=>{const k=c.e.reason||'No reason given';byR[k]=(byR[k]||0)+c.d});
+  const rs=Object.entries(byR).sort((a,b)=>Math.abs(b[1])-Math.abs(a[1]));
+  const max=Math.max(1,...rs.map(r=>Math.abs(r[1])));
+  const bridge=rs.map(([k,v])=>`<div class="brow"><span>${esc(k)}</span><span class="track"><i style="left:${v<0?50-Math.abs(v)/max*50:50}%;width:${Math.abs(v)/max*50}%;background:${v<0?'var(--red)':'var(--green)'}"></i><i style="left:50%;width:1px;background:var(--border2)"></i></span><span class="num ${v<0?'neg':'pos'}">${sgn(v)} t</span></div>`).join('');
+  // season-long: budget -> latest by source
+  const all=allChanges(list,'1900-01-01');const rounds={};
+  list.forEach(p=>p.ev.forEach((e,i)=>{if(i&&e.round){rounds[e.reason]=(rounds[e.reason]||0)+e.v-p.ev[i-1].v}}));
+  const srcAll={...rounds};all.forEach(c=>{const k=c.e.reason||'No reason given';srcAll[k]=(srcAll[k]||0)+c.d});
+  const sa=Object.entries(srcAll).sort((a,b)=>Math.abs(b[1])-Math.abs(a[1]));const mx2=Math.max(1,...sa.map(r=>Math.abs(r[1])));
+  const budget=list.reduce((s,p)=>s+p.budget,0);
+  const bridge2=sa.map(([k,v])=>`<div class="brow"><span>${esc(k)}</span><span class="track"><i style="left:${v<0?50-Math.abs(v)/mx2*50:50}%;width:${Math.abs(v)/mx2*50}%;background:${v<0?'var(--red)':'var(--green)'}"></i><i style="left:50%;width:1px;background:var(--border2)"></i></span><span class="num ${v<0?'neg':'pos'}">${sgn(v)} t</span></div>`).join('');
+  const shown=ch.filter(c=>S.reason==='All'||(c.e.reason||'No reason given')===S.reason);
+  const feed=shown.map(c=>`<tr><td class="num calc">${fmtD(c.e.d)}</td><td>${esc(c.p.farm)}</td><td><button class="chg" style="margin:0" data-hist="${c.p.id}"><span class="plot">${c.p.sector}-${c.p.plot}</span></button></td><td class="vname">${esc(c.p.variety)}</td>
+     <td class="num calc">${n0(c.prev)}</td><td class="num" style="color:var(--text)">${n0(c.e.v)}</td><td class="num ${c.d>0?'pos':'neg'}">${sgn(c.d)}</td><td class="num calc">${n1(c.prev/c.p.area)} → ${n1(c.e.v/c.p.area)}</td>
+     <td>${c.e.reason?`<span class="rchip">${esc(c.e.reason)}</span>`:'<span class="rchip none">No reason</span>'}</td><td style="white-space:normal;min-width:180px;font-size:12px">${esc(c.e.note||'')}</td><td class="calc">${esc(c.e.by)}</td></tr>`).join('');
+  return `<div class="kpis">
+    <div class="kpi"><div class="k">Estimate at ${fmtD(S.since)}</div><div class="v">${n0(before)} t</div></div>
+    <div class="kpi hl"><div class="k">Estimate today</div><div class="v">${n0(after)} t</div><div class="s"><span class="${after-before>=0?'pos':'neg'}">${sgn(after-before)} t since the meeting</span></div></div>
+    <div class="kpi"><div class="k">Changes</div><div class="v">${ch.length}</div><div class="s">${new Set(ch.map(c=>c.p.id)).size} plots · ${ch.filter(c=>!c.e.reason).length} without a reason</div></div>
+    <div class="kpi"><div class="k">Budget → today</div><div class="v ${after-budget>=0?'pos':'neg'}">${sgn(after-budget)} t</div><div class="s">${sgn((after-budget)/budget*100,n1)}% vs budget</div></div>
+  </div>
+  <div class="grid2">
+   <div class="card bridge"><h2>Since the ${fmtD(S.since)} meeting</h2><div class="sub">Net tonnes moved, grouped by the reason the agronomist gave.</div>${bridge||'<div class="sub">No changes in this window.</div>'}<div style="height:10px"></div></div>
+   <div class="card bridge"><h2>Budget to today, by source</h2><div class="sub">Where the ${sgn(after-budget)} t gap from budget came from across the whole season.</div>${bridge2}<div style="height:10px"></div></div>
+  </div>
+  <div class="card"><h2>Change log</h2><div class="sub" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center"><span class="lbl">Reason</span>
+    ${['All',...rs.map(r=>r[0])].map(r=>`<button class="chip ${S.reason===r?'on':''}" data-reasonf="${esc(r)}">${esc(r)}</button>`).join('')}</div>
+    <div class="table-wrap"><table><thead><tr><th>Date</th><th>Farm</th><th>Plot</th><th>Variety</th><th>Was t</th><th>Now t</th><th>Δ t</th><th>t/fed</th><th>Reason</th><th style="text-align:left">Note</th><th>By</th></tr></thead>
+    <tbody>${feed||'<tr><td colspan="11" class="calc">No changes match.</td></tr>'}</tbody></table></div></div>`;
+}
+
+// ---------- modals ----------
+const root=$('#modalRoot');
+function closeModal(){root.innerHTML=''}
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&root.innerHTML){closeModal();e.preventDefault()}});
+function modal(html,sm){root.innerHTML=`<div class="ovl" id="ovl"><div class="modal ${sm?'sm':''}" role="dialog" aria-modal="true">${html}</div></div>`;
+  $('#ovl').addEventListener('click',e=>{if(e.target.id==='ovl'||e.target.closest('.x,[data-close]'))closeModal()});}
+
+function chart(p){
+  const W=700,H=170,L=46,R=12,T=12,B=26;
+  const pts=p.ev.map(e=>({t:+new Date(e.d),v:e.v}));const t1=+new Date(TODAY);
+  const t0=pts[0].t;const vs=[...pts.map(x=>x.v),total(p)];const vmax=Math.max(...vs)*1.12||1;
+  const X=t=>L+(t-t0)/(t1-t0)*(W-L-R),Y=v=>T+(1-v/vmax)*(H-T-B);
+  let d=`M${X(pts[0].t)},${Y(pts[0].v)}`;pts.forEach((q,i)=>{if(i)d+=`H${X(q.t)}V${Y(q.v)}`});d+=`H${X(t1)}`;
+  const ticks=[0,.5,1].map(f=>Math.round(vmax*f/1.12));
+  const months=[];for(let m=new Date(new Date(t0).toISOString().slice(0,8)+'01');+m<=t1;m.setMonth(m.getMonth()+1))months.push(+m);
+  return `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Estimate over time">
+   ${ticks.map(v=>`<line x1="${L}" x2="${W-R}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--border)" /><text x="${L-6}" y="${Y(v)+3}" text-anchor="end">${n0(v)}</text>`).join('')}
+   ${months.map(m=>`<text x="${X(m)}" y="${H-8}" text-anchor="middle">${new Date(m).toLocaleDateString('en-GB',{month:'short'})}</text>`).join('')}
+   <line x1="${L}" x2="${W-R}" y1="${Y(p.budget)}" y2="${Y(p.budget)}" stroke="var(--text3)" stroke-dasharray="4 4"/><text x="${W-R}" y="${Y(p.budget)-4}" text-anchor="end">budget</text>
+   <line x1="${L}" x2="${W-R}" y1="${Y(total(p))}" y2="${Y(total(p))}" stroke="var(--amber)" stroke-dasharray="2 3"/><text x="${L+4}" y="${Y(total(p))-4}" style="fill:var(--amber)">harvested ${n0(total(p))}</text>
+   <path d="${d}" fill="none" stroke="var(--accent2)" stroke-width="2.2"/>
+   ${pts.map(q=>`<circle cx="${X(q.t)}" cy="${Y(q.v)}" r="3.5" fill="var(--card)" stroke="var(--accent)" stroke-width="2"/>`).join('')}
+  </svg>`;
+}
+function openHistory(id){
+  const p=PLOTS.find(x=>x.id===id);const e=est(p);
+  const items=p.ev.map((ev,i)=>({ev,prev:i?p.ev[i-1].v:null})).reverse();
+  modal(`<div class="mh"><div><h3>${esc(p.farm)} · ${p.sector}-${p.plot} · ${esc(p.variety)}</h3>
+     <div class="meta">${esc(p.root)} · planted ${p.planted} · ${n1(p.area)} fed (register) · ${productive(p)?'Productive':'Not productive'}</div></div><button class="x" aria-label="Close">×</button></div>
+   <div class="mb">
+    <div class="cmp"><div><span>Budget</span><b>${n0(p.budget)} t</b><span>${n1(p.budget/p.area)} t/fed</span></div><div><span>Latest estimate</span><b>${n0(e)} t</b><span>${n1(e/p.area)} t/fed</span></div><div><span>Harvested</span><b>${n0(total(p))} t</b><span>${n0(e-total(p))} t remaining</span></div></div>
+    ${chart(p)}
+    <ul class="tl">${items.map(({ev,prev})=>{const d=prev==null?null:ev.v-prev;
+      return `<li class="${ev.round?'round':''}"><div class="when">${fmtDY(ev.d)}</div><div>
+       <div class="what"><b class="num" style="font-size:13px">${prev==null?'':n0(prev)+' → '}${n0(ev.v)} t</b> ${d!=null?`<span class="${d>0?'pos':d<0?'neg':''}">(${sgn(d)} t)</span>`:''} <span class="calc">· ${n1(ev.v/p.area)} t/fed${ev.mode?` · entered as ${ev.mode==='yield'?'t/fed':'tonnes'}`:''}</span></div>
+       <div class="why">${ev.reason?`<span class="rchip ${ev.round?'none':''}">${esc(ev.reason)}</span>`:'<span class="rchip none">No reason given</span>'} ${ev.note?'· '+esc(ev.note):''} <span class="calc">· ${esc(ev.by)}</span></div></div></li>`}).join('')}</ul>
+   </div>
+   <div class="mf"><button class="btn" data-close>Close</button><button class="btn pri" data-edit="${p.id}">Update estimate</button></div>`);
+}
+function openGroupHistory(key){
+  const list=GROUPS[key]||[];const ch=allChanges(list,S.since);const net=ch.reduce((s,c)=>s+c.d,0);
+  modal(`<div class="mh"><div><h3>${esc(key)}</h3><div class="meta">${ch.length} changes since the ${fmtDY(S.since)} meeting · net <span class="${net>=0?'pos':'neg'}">${sgn(net)} t</span></div></div><button class="x" aria-label="Close">×</button></div>
+   <div class="mb"><div class="table-wrap" style="max-height:55vh"><table><thead><tr><th>Date</th><th>Plot</th><th>Farm</th><th>Was</th><th>Now</th><th>Δ t</th><th>Reason</th><th>By</th></tr></thead><tbody>
+   ${ch.map(c=>`<tr><td class="num calc">${fmtD(c.e.d)}</td><td><button class="chg" style="margin:0" data-hist="${c.p.id}"><span class="plot">${c.p.sector}-${c.p.plot}</span></button></td><td>${esc(c.p.farm)}</td><td class="num calc">${n0(c.prev)}</td><td class="num">${n0(c.e.v)}</td><td class="num ${c.d>0?'pos':'neg'}">${sgn(c.d)}</td><td>${c.e.reason?`<span class="rchip">${esc(c.e.reason)}</span>`:'<span class="rchip none">—</span>'}</td><td class="calc">${esc(c.e.by)}</td></tr>`).join('')}
+   </tbody></table></div></div><div class="mf"><button class="btn" data-close>Close</button></div>`);
+}
+function openEdit(id,kindIn){
+  const p=PLOTS.find(x=>x.id===id);let kind=kindIn||'update';let mode='volume',reason=null;
+  const curOf=()=>kind==='budget'?p.budget:est(p);let cur=curOf();
+  modal(`<div class="mh"><div><h3 id="edT">${kind==='budget'?'Set budget':'Update estimate'}</h3><div class="meta">${esc(p.farm)} · <span class="plot">${p.sector}-${p.plot}</span> ${esc(p.variety)} · ${n1(p.area)} fed from the register</div></div><button class="x" aria-label="Close">×</button></div>
+   <div class="mb">
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><span class="lbl">This is the</span><div class="seg" id="kindSeg"><button data-k="update" class="${kind==='update'?'on':''}">Latest estimate</button><button data-k="budget" class="${kind==='budget'?'on':''}">Budget</button></div>
+      <span class="lbl" style="margin-left:8px">Enter as</span><div class="seg" id="modeSeg"><button data-m="volume" class="on">Tonnes</button><button data-m="yield">t / feddan</button></div></div>
+    <div class="field"><label class="lbl" for="newv" id="newvl">New value (tonnes)</label><input id="newv" inputmode="decimal" value="${cur?Math.round(cur):''}"></div>
+    <div class="cmp" id="cmp"></div>
+    <div class="field" id="rsWrap"><span class="lbl">Where is the change coming from? <span style="text-transform:none;letter-spacing:0;font-weight:400">(optional)</span></span><div class="reasons" id="rs">${REASONS.map(r=>`<button class="chip" data-r="${esc(r)}">${esc(r)}</button>`).join('')}</div></div>
+    <div class="field"><label class="lbl" for="note">Note <span style="text-transform:none;letter-spacing:0;font-weight:400">(optional)</span></label><textarea id="note" placeholder="e.g. counted 20 trees per row, fruit set lower on the north side"></textarea></div>
+   </div>
+   <div class="mf"><button class="btn" data-close>Cancel</button><button class="btn pri" id="saveEst">Save</button></div>`,true);
+  const inp=$('#newv');
+  const val=()=>{const x=parseFloat(inp.value);if(isNaN(x))return null;return mode==='yield'?x*p.area:x};
+  const upd=()=>{const v=val();const d=v==null?0:v-cur;$('#rsWrap').hidden=kind==='budget';
+    $('#cmp').innerHTML=`<div><span>Current ${kind==='budget'?'budget':'estimate'}</span><b>${cur?n0(cur)+' t':'–'}</b><span>${cur?n1(cur/p.area)+' t/fed':'not set'}</span></div><div><span>New</span><b>${v==null?'–':n0(v)+' t'}</b><span>${v==null?'':n1(v/p.area)+' t/fed'}</span></div><div><span>Change</span><b class="${d>0?'pos':d<0?'neg':''}">${sgn(d)} t</b><span>${cur?sgn(d/cur*100,n1)+'%':''}</span></div>`};
+  inp.oninput=upd;upd();inp.focus();inp.select();
+  $('#kindSeg').onclick=e=>{const b=e.target.closest('[data-k]');if(!b)return;kind=b.dataset.k;cur=curOf();
+    document.querySelectorAll('#kindSeg button').forEach(x=>x.classList.toggle('on',x===b));$('#edT').textContent=kind==='budget'?'Set budget':'Update estimate';upd()};
+  $('#modeSeg').onclick=e=>{const b=e.target.closest('[data-m]');if(!b)return;const v=val();mode=b.dataset.m;
+    document.querySelectorAll('#modeSeg button').forEach(x=>x.classList.toggle('on',x===b));
+    $('#newvl').textContent=mode==='yield'?'New value (t / feddan)':'New value (tonnes)';
+    if(v!=null)inp.value=mode==='yield'?(v/p.area).toFixed(1):Math.round(v);upd()};
+  $('#rs').onclick=e=>{const b=e.target.closest('[data-r]');if(!b)return;reason=reason===b.dataset.r?null:b.dataset.r;
+    document.querySelectorAll('#rs .chip').forEach(x=>x.classList.toggle('on',x.dataset.r===reason))};
+  $('#saveEst').onclick=async()=>{const v=val();if(v==null||v<0){inp.focus();inp.style.borderColor='var(--red)';return}
+    if(p.ev.length&&Math.abs(v-cur)<0.005&&kind==='update'){closeModal();return}
+    const btn=$('#saveEst');btn.textContent='Saving…';btn.style.pointerEvents='none';
+    const row={season_id:DB.seasonId,block_id:p.id,kind,value_t:r2(v),entered_as:mode==='yield'?'t_fed':'t',reason_code:kind==='budget'?null:(REASON_CODE[reason]||null),note:$('#note').value.trim()||null,created_by:DB.me.id};
+    const {data,error}=await SB.from('hp2_estimate_events').insert(row).select('created_at').single();
+    if(error){btn.textContent='Save';btn.style.pointerEvents='';toast('Not saved: '+error.message);return}
+    p.ev.push({d:cairoDate0(data.created_at),at:data.created_at,v:r2(v),by:DB.me.name,mode,reason:kind==='budget'?'Budget':reason,note:row.note||'',round:kind==='budget',kind});
+    if(kind==='budget')p.budget=r2(v);
+    closeModal();keepScroll(render);toast(`Saved · ${p.sector}-${p.plot} ${kind==='budget'?'budget':'estimate'} ${cur?n0(cur)+' → ':''}${n0(v)} t`)};
+}
+function toast(m){const t=document.createElement('div');t.className='toast';t.textContent=m;document.body.appendChild(t);setTimeout(()=>t.remove(),2600)}
+
+function setSide(open){document.body.classList.toggle('side-open',open);$('#sideOv').hidden=!open;$('#menuBtn').setAttribute('aria-expanded',open)}
+$('#menuBtn').onclick=()=>setSide(!document.body.classList.contains('side-open'));
+$('#sideOv').onclick=()=>setSide(false);if($('#sideClose'))$('#sideClose').onclick=()=>setSide(false);
+document.addEventListener('keydown',e=>{if(e.key==='Escape')setSide(false)});
+// ---------- actuals entry (agronomists; same columns as the old Entry tab) ----------
+const ACOLS=[['pack','To packhouse','وارد محطة','var(--accent)'],['sort','Field sorting','فرزة أرض','#55707a'],['local','Local sales','خام تجار','var(--amber)'],['waste','Waste','إعدامات','var(--red)']];
+const aHarv=a=>a[0]+a[1]+a[2], aDay=a=>aHarv(a)+a[3];   // harvested (counts against the estimate) · day total = all four
+const vsPlan=(a,pl)=>{const t=aDay(a);if(!t&&!pl)return '<span class="vp">—</span>';if(!pl)return '<span class="vp up">unplanned</span>';const r=t/pl;
+  return r>1.1?'<span class="vp up">above +'+n0(t-pl)+'</span>':r<0.9?'<span class="vp dn">below −'+n0(pl-t)+'</span>':'<span class="vp">on plan</span>'};
+function applyAct(p,d,arr,meta){if(arr.every(v=>!v))delete p.daily[d];else p.daily[d]=arr;(p.ameta=p.ameta||{})[d]=meta;recalc(p)}
+// rows = [{p, a:[pack,sort,local,waste]}] for ONE day → one atomic RPC
+async function saveActs(d,rows){
+  if(!rows.length)return true;
+  const {error}=await SB.rpc('hp2_save_actuals_day',{p_season:DB.seasonId,p_day:d,p_rows:rows.map(({p,a})=>({block_id:p.id,to_packhouse_t:a[0],field_sorting_t:a[1],local_sales_t:a[2],waste_t:a[3]}))});
+  if(error){toast('Not saved: '+error.message);return false}
+  const m={by:DB.me.name,at:new Date().toLocaleString('en-GB',{timeZone:'Africa/Cairo',dateStyle:'short',timeStyle:'short'})};
+  rows.forEach(({p,a})=>applyAct(p,d,a,m));return true;
+}
+const actRow=(p,d)=>(p.daily[d]||[0,0,0,0]).slice();
+const colHead=([k,l,ar,c])=>`<span class="ch">${l}<span class="ar" lang="ar">${ar}</span></span>`;
+function actFields(arr,pre){return ACOLS.map((c,j)=>`<div class="field"><label class="lbl" for="${pre}${j}">${colHead(c)}</label><input class="ain" style="--c:${c[3]}" id="${pre}${j}" data-ai="${j}" inputmode="decimal" value="${arr[j]||''}" placeholder="—"></div>`).join('')}
+function openActual(id,d){
+  const p=PLOTS.find(x=>x.id===id);let date=d||TODAY;
+  const meta=()=>p.ameta?.[date]?`Last entered by ${esc(p.ameta[date].by)} · ${esc(p.ameta[date].at)}`:(p.daily[date]?'From the harvest log':'No entry yet for this day');
+  modal(`<div class="mh"><div><h3>Harvest entry</h3><div class="meta">${esc(p.farm)} · <span class="plot">${p.sector}-${p.plot}</span> ${esc(p.variety)} · tonnes</div></div><button class="x" aria-label="Close">×</button></div>
+   <div class="mb"><div style="display:flex;gap:10px;align-items:end;flex-wrap:wrap"><div class="field"><label class="lbl" for="adate">Date</label><input type="date" id="adate" max="${TODAY}" value="${date}" style="font-size:14px"></div><span class="calc" id="ameta" style="font-size:12px;padding-bottom:9px">${meta()}</span></div>
+   <div class="agrid" id="aflds">${actFields(actRow(p,date),'af')}</div><div class="cmp" id="acmp"></div></div>
+   <div class="mf"><button class="btn" data-close>Cancel</button><button class="btn pri" id="saveAct">Save entry</button></div>`,true);
+  const read=()=>[...document.querySelectorAll('#aflds [data-ai]')].map(i=>Math.max(0,parseFloat(i.value)||0));
+  const upd=()=>{const a=read(),pl=planVal(p,date);$('#acmp').innerHTML=`<div><span>Day total</span><b>${n1(aDay(a))}</b><span>= sum of the four</span></div><div><span>Planned</span><b>${n0(pl)}</b><span>${fmtD(date)}</span></div><div><span>Vs plan</span><b style="font-size:13px;padding-top:4px">${vsPlan(a,pl)}</b><span>±10% = on plan</span></div>`};
+  $('#aflds').oninput=upd;upd();document.querySelector('#af0').focus();
+  $('#adate').onchange=e=>{date=e.target.value||TODAY;$('#aflds').innerHTML=actFields(actRow(p,date),'af');$('#ameta').textContent=meta().replace(/&amp;/g,'&');upd()};
+  $('#saveAct').onclick=async()=>{const a=read();if(!await saveActs(date,[{p,a}]))return;closeModal();keepScroll(render);toast(`Saved · ${p.sector}-${p.plot} ${fmtD(date)} · ${n1(aDay(a))} t`)};
+}
+function openLog(){
+  let date=TODAY,farm=S.farm==='All'?FARMS[1]:S.farm,onlyOpen=true;
+  const body=()=>{const ps=PLOTS.filter(p=>p.farm===farm&&(!onlyOpen||est(p)-total(p)>1||p.daily[date]));
+    return `<table><thead><tr><th style="text-align:left">Plot</th><th>Remaining</th><th>Planned</th>${ACOLS.map(c=>`<th class="lh" style="--c:${c[3]}">${colHead(c)}</th>`).join('')}<th>Day total<span class="f">= sum</span></th><th>Vs plan</th></tr></thead><tbody>
+    ${ps.map(p=>{const a=actRow(p,date);return `<tr data-lrow="${p.id}"><td><span class="plot">${p.sector}-${p.plot}</span> <span class="vname" style="font-size:12px">${esc(p.variety)}</span></td><td class="num calc">${n0(est(p)-total(p))}</td>
+      <td class="num calc">${n0(planVal(p,date))}</td>${a.map((v,j)=>`<td style="padding:4px 5px"><input class="ain" style="--c:${ACOLS[j][3]}" data-ai="${j}" value="${v||''}" placeholder="—" inputmode="decimal" aria-label="${p.sector}-${p.plot} ${ACOLS[j][1]}"></td>`).join('')}<td class="num lt">${aDay(a)?n1(aDay(a)):'0'}</td><td class="lv" data-pl="${planVal(p,date)}">${vsPlan(a,planVal(p,date))}</td></tr>`}).join('')||'<tr><td colspan="9" class="calc">No plots.</td></tr>'}</tbody></table>`};
+  modal(`<div class="mh"><div><h3>Log harvest</h3><div class="meta">One row per plot. Leave a row empty if nothing was picked. Harvested (counted against the estimate) = all four, waste included.</div></div><button class="x" aria-label="Close">×</button></div>
+   <div class="mb"><div style="display:flex;gap:10px;align-items:end;flex-wrap:wrap">
+     <div class="field"><label class="lbl" for="ldate">Date</label><input type="date" id="ldate" max="${TODAY}" value="${date}" style="font-size:14px"></div>
+     <div class="field"><label class="lbl" for="lfarm">Farm</label><select class="sel" id="lfarm" style="font-size:14px;padding:7px 10px">${FARMS.slice(1).map(f=>`<option ${f===farm?'selected':''}>${f}</option>`).join('')}</select></div>
+     <label style="font-size:12.5px;color:var(--text2);display:flex;gap:6px;align-items:center;padding-bottom:8px"><input type="checkbox" id="lopen" checked> Only plots with fruit left</label></div>
+   <div class="table-wrap" id="lgrid" style="max-height:55vh">${body()}</div><div class="calc" id="lsum" style="font-size:12.5px"></div></div>
+   <div class="mf"><button class="btn" data-close>Cancel</button><button class="btn pri" id="saveLog">Save day</button></div>`);
+  document.querySelector('.modal').style.width='min(1000px,100%)';
+  const sum=()=>{let t=0,n=0;document.querySelectorAll('#lgrid [data-lrow]').forEach(r=>{const a=[...r.querySelectorAll('[data-ai]')].map(i=>parseFloat(i.value)||0);const v=aDay(a);r.querySelector('.lt').textContent=v?n1(v):'0';r.querySelector('.lv').innerHTML=vsPlan(a,+r.querySelector('.lv').dataset.pl);if(v){t+=v;n++}});$('#lsum').textContent=`${n} plots · ${n1(t)} t total on ${fmtDY(date)}`};
+  const redraw=()=>{$('#lgrid').innerHTML=body();sum()};
+  $('#lgrid').oninput=sum;sum();
+  $('#ldate').onchange=e=>{date=e.target.value||TODAY;redraw()};$('#lfarm').onchange=e=>{farm=e.target.value;redraw()};$('#lopen').onchange=e=>{onlyOpen=e.target.checked;redraw()};
+  $('#saveLog').onclick=async()=>{const rows=[];document.querySelectorAll('#lgrid [data-lrow]').forEach(r=>{const p=PLOTS.find(x=>x.id===r.dataset.lrow);
+      const a=[...r.querySelectorAll('[data-ai]')].map(i=>Math.max(0,parseFloat(i.value)||0));const old=actRow(p,date);
+      if(a.some((v,j)=>Math.abs(v-old[j])>0.0001))rows.push({p,a})});
+    if(!rows.length){closeModal();toast('No changes to save');return}
+    const b=$('#saveLog');b.textContent='Saving…';b.style.pointerEvents='none';
+    if(!await saveActs(date,rows)){b.textContent='Save day';b.style.pointerEvents='';return}
+    closeModal();keepScroll(render);toast(`Saved ${rows.length} plot entries for ${fmtD(date)}`)};
+}
+document.addEventListener('click',e=>{const c=e.target.closest('[data-act]');if(c){const [i,d]=[c.dataset.act.slice(0,c.dataset.act.lastIndexOf('|')),c.dataset.act.slice(c.dataset.act.lastIndexOf('|')+1)];openActual(i,d)}
+  if(e.target.closest('[data-logharvest]'))openLog()});
+
+// ---------- harvest windows per variety (editable, every change kept) ----------
+const WIN=DB.windows;
+const inWin=(v,d)=>!WIN[v]||!WIN[v].start||(d>=WIN[v].start&&d<=WIN[v].end);
+const winChip=v=>WIN[v]&&WIN[v].start?`<button class="winchip" data-win="${esc(v)}" title="Harvest window for ${esc(v)}: click to change"><svg viewBox="0 0 12 12" width="10" height="10" aria-hidden="true"><circle cx="6" cy="6" r="4.6" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M6 3.4V6l1.8 1.1" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>${fmtD(WIN[v].start)}→${fmtD(WIN[v].end)}</button>`
+  :(WIN[v]?`<button class="winchip" data-win="${esc(v)}" style="opacity:.7">+ window</button>`:'');
+function openWindows(focus){
+  const vs=Object.keys(WIN).sort();
+  modal(`<div class="mh"><div><h3>Harvest windows</h3><div class="meta">One window per variety. Days outside it are shaded in the daily plan. Every change is kept with who, when and why.</div></div><button class="x" aria-label="Close">×</button></div>
+   <div class="mb"><div class="table-wrap" style="max-height:58vh"><table><thead><tr><th style="text-align:left">Variety</th><th>Start</th><th>End</th><th>Days</th><th style="text-align:left">Why (optional)</th><th style="text-align:left">Last change</th></tr></thead><tbody>
+   ${vs.map(v=>{const w=WIN[v],l=w.log[w.log.length-1];return `<tr data-wrow="${esc(v)}" ${v===focus?'class="grp"':''}><td class="vname">${esc(v)}</td>
+     <td><input type="date" class="wdate" data-w="start" value="${w.start||''}" aria-label="${esc(v)} start"></td><td><input type="date" class="wdate" data-w="end" value="${w.end||''}" aria-label="${esc(v)} end"></td>
+     <td class="num calc wdays">${w.start&&w.end?Math.round((new Date(w.end)-new Date(w.start))/864e5)+1:'–'}</td>
+     <td><input class="wnote" placeholder="e.g. colour break late" aria-label="${esc(v)} reason"></td>
+     <td class="calc" style="font-size:12px" title="${esc(w.log.map(x=>fmtDY(x.d)+': '+fmtD(x.start)+'→'+fmtD(x.end)+' · '+x.by+(x.note?' · '+x.note:'')).join('\n'))}">${l?`${fmtDY(l.d)} · ${esc(l.by)}${w.log.length>1?` <span class="chg" style="margin-left:4px">${w.log.length-1} chg</span>`:''}`:'Not set'}</td></tr>`}).join('')}
+   </tbody></table></div></div>
+   <div class="mf"><button class="btn" data-close>Cancel</button><button class="btn pri" id="saveWin">Save windows</button></div>`);
+  document.querySelector('.modal').style.width='min(900px,100%)';
+  const f=document.querySelector('tr.grp .wdate');if(f){f.focus();f.closest('tr').scrollIntoView({block:'center'})}
+  document.querySelectorAll('[data-wrow]').forEach(r=>r.oninput=()=>{const a=r.querySelector('[data-w=start]').value,b=r.querySelector('[data-w=end]').value;r.querySelector('.wdays').textContent=a&&b?Math.round((new Date(b)-new Date(a))/864e5)+1:'–'});
+  $('#saveWin').onclick=async()=>{const rows=[];let bad=0;document.querySelectorAll('[data-wrow]').forEach(r=>{const v=r.dataset.wrow,w=WIN[v];const a=r.querySelector('[data-w=start]').value,b=r.querySelector('[data-w=end]').value;
+      if(a&&b&&a>b){bad++;return}
+      if(a&&b&&(a!==w.start||b!==w.end))rows.push({v,a,b,note:r.querySelector('.wnote').value.trim()})});
+    if(bad){toast('End date must be after start date');return}
+    if(!rows.length){closeModal();toast('No changes to save');return}
+    const {error}=await SB.rpc('hp2_save_windows',{p_season:DB.seasonId,p_rows:rows.map(x=>({variety_id:WIN[x.v].varietyId,start_date:x.a,end_date:x.b,note:x.note}))});
+    if(error){toast('Not saved: '+error.message);return}
+    rows.forEach(x=>{const w=WIN[x.v];w.start=x.a;w.end=x.b;w.log.push({d:TODAY,start:x.a,end:x.b,by:DB.me.name,note:x.note})});
+    closeModal();keepScroll(render);toast(`Saved ${rows.length} window${rows.length>1?'s':''}`)};
+}
+// ---------- TrueFruit (Aerobotics) latest scan per plot ----------
+const TF=DB.tf;
+const tf=p=>TF[p.id];
+const tfCell=p=>{const t=tf(p);if(!t)return '<span class="calc" title="No Aerobotics link for this plot">—</span>';
+  const under=t[1]==='Undersize'||+t[1]<6&&t[1]!=='';
+  return `<span class="tf" title="TrueFruit scan ${fmtDY(t[2])} · avg ${t[0]} mm · peak count ${t[1]||'n/a'}">${n1(t[0])}<small>mm</small>${t[1]?`<span class="cnt ${t[1]==='Undersize'?'u':''}">${t[1]==='Undersize'?'Under':t[1]}</span>`:''}</span>`};
+const tfAgg=ps=>{let s=0,a=0;ps.forEach(p=>{const t=tf(p);if(t){s+=t[0]*p.area;a+=p.area}});return a?`<span class="tf">${n1(s/a)}<small>mm</small></span>`:'<span class="calc">—</span>'};
+document.addEventListener('click',e=>{const w=e.target.closest('[data-win]');if(w){hideTip();openWindows(w.dataset.win)}if(e.target.closest('[data-windows]'))openWindows()});
+
+// ---------- "as of month" estimate (replaces the fixed Nov update column) ----------
+const MONTHS=(()=>{const out=[];for(let y=DB.y1,m=7;`${y}-${String(m).padStart(2,'0')}`<=TODAY.slice(0,7);m===12?(y++,m=1):m++)out.push(`${y}-${String(m).padStart(2,'0')}`);return out})();
+const monthEnd=ym=>{const [y,m]=ym.split('-').map(Number);const d=new Date(Date.UTC(y,m,0)).toISOString().slice(0,10);return d>TODAY?TODAY:d};
+const monthLbl=ym=>new Date(ym+'-01T00:00:00Z').toLocaleDateString('en-GB',{month:'short',year:'2-digit',timeZone:'UTC'});
+if(!S.month||!MONTHS.includes(S.month))S.month=MONTHS[MONTHS.length-1];
+const monthSel=()=>`<select class="msel" data-month aria-label="Estimate as of month">${MONTHS.map(m=>`<option value="${m}" ${m===S.month?'selected':''}>${monthLbl(m)} update</option>`).join('')}</select><span class="f">estimate at ${fmtD(monthEnd(S.month))}</span>`;
+// month switch animation: each changed cell slides in from the direction of the change and counts to the new value
+const RM=matchMedia('(prefers-reduced-motion: reduce)');
+document.addEventListener('change',e=>{const m=e.target.closest('[data-month]');if(!m)return;
+  const old={};document.querySelectorAll('[data-mk]').forEach(c=>old[c.dataset.mk]=+c.dataset.mv);
+  S.month=m.value;keepScroll(render);
+  document.querySelectorAll('[data-month]').forEach(x=>{if(x.value===S.month&&x.closest('th')===null)x.focus()});
+  document.querySelectorAll('[data-mk]').forEach((c,i)=>{const a=old[c.dataset.mk],b=+c.dataset.mv;if(a==null||Math.abs(a-b)<0.5)return;
+    const v=c.querySelector('.mval');c.classList.remove('m-up','m-dn');void c.offsetWidth;c.classList.add(b>a?'m-up':'m-dn');
+    if(RM.matches){v.textContent=n0(b);return}
+    const t0=performance.now()+Math.min(i,20)*18,dur=520;
+    const step=t=>{const k=Math.min(1,Math.max(0,(t-t0)/dur)),e2=1-Math.pow(1-k,3);v.textContent=n0(a+(b-a)*e2);if(k<1)requestAnimationFrame(step)};
+    requestAnimationFrame(step)});
+});
+
+// ---------- present mode ----------
+const SLIDES=['Season position','What changed','Plan vs actual','Plots & daily plan'];
+function bridgeRows(entries){const mx=Math.max(1,...entries.map(r=>Math.abs(r[1])));
+  return entries.map(([k,v])=>`<div class="brow"><span>${esc(k)}</span><span class="track"><i style="left:${v<0?50-Math.abs(v)/mx*50:50}%;width:${Math.abs(v)/mx*50}%;background:${v<0?'var(--red)':'var(--green)'}"></i><i style="left:50%;width:1px;background:var(--border2)"></i></span><span class="num ${v<0?'neg':'pos'}">${sgn(v)} t</span></div>`).join('')}
+function last7(ps){const ds=[...Array(7)].map((_,i)=>addDays(TODAY,i-7));const a=ds.reduce((s,d)=>s+ps.reduce((t,p)=>t+(p.daily[d]||[0])[0],0),0),pl=ds.reduce((s,d)=>s+ps.reduce((t,p)=>t+planVal(p,d),0),0);
+  if(!a&&!pl)return '<span class="calc">–</span>';return `${n0(a)}<div class="pln ${a-pl>0.5?'pos':a-pl<-0.5?'neg':''}">plan ${n0(pl)}</div>`}
+function presentView(){
+  const list=filtered();const A=agg(list,S.since);const sl=S.slide||0;
+  const bar=`<div class="pbar"><span class="t">Citrus harvest · ${S.farm==='All'?'All farms':esc(S.farm)}</span><span class="m">Meeting ${fmtDY(TODAY)} · changes since ${fmtDY(S.since)}</span>
+    <span class="spacer"></span>
+    <span class="pf">${FARMS.map(f=>`<button data-farm="${f}" class="${S.farm===f?'on':''}">${f}</button>`).join('')}</span>
+    <span class="pslides">${SLIDES.map((s,i)=>`<button data-slide="${i}" class="${sl===i?'on':''}">${i+1} · ${s}</button>`).join('')}</span>
+    <button class="pbtn" id="exitPresent">Exit ✕</button></div>`;
+  const byV={};list.forEach(p=>(byV[p.variety]=byV[p.variety]||[]).push(p));
+  const vents=Object.entries(byV).map(([k,ps])=>{GROUPS[k]=ps;return [k,ps,agg(ps,S.since)]}).sort((a,b)=>b[2].est-a[2].est);
+  const next=[...Array(14)].map((_,i)=>addDays(TODAY,i));
+  let body='';
+  if(sl===0){
+    const d=A.est-A.budget;
+    body=`<h2 class="ph">Latest estimate ${n0(A.est)} t, ${sgn(d)} t vs budget</h2><div class="psub">${A.plots} plots · ${n0(A.area)} fed · ${n0(A.tot/A.est*100)}% harvested</div>
+    <div class="pk kpis">
+      <div class="kpi"><div class="k">Budget</div><div class="v">${n0(A.budget)} t</div><div class="s">${n1(A.budget/A.area)} t/fed</div></div>
+      <div class="kpi hl"><div class="k">Latest estimate</div><div class="v">${n0(A.est)} t</div><div class="s">${n1(A.est/A.area)} t/fed</div></div>
+      <div class="kpi"><div class="k">Moved since ${fmtD(S.since)}</div><div class="v ${A.est-A.prev>=0?'pos':'neg'}">${sgn(A.est-A.prev)} t</div><div class="s">${A.nNew} plot changes</div></div>
+      <div class="kpi"><div class="k">Harvested</div><div class="v">${n0(A.tot)} t</div><div class="s">${n0(A.act)} packhouse · ${n0(A.local)} local</div></div>
+      <div class="kpi"><div class="k">Remaining</div><div class="v">${n0(A.rem)} t</div><div class="s">estimate − harvested</div></div>
+    </div>
+    <div class="table-wrap pt" style="max-height:none"><table><thead><tr><th style="text-align:left">Variety</th><th>Harvest window</th><th>TrueFruit</th><th>Budget</th><th>${monthSel()}</th><th>Latest</th><th>vs budget</th><th>Moved since ${fmtD(S.since)}</th><th>Harvested</th><th>Remaining</th><th>Last 7 d<span class="f">actual · vs plan</span></th><th>Planned next 7 d</th></tr></thead><tbody>
+    ${vents.map(([k,ps,a])=>{const mv=a.est-a.prev;const p7=next.slice(0,7).reduce((s,dd)=>s+ps.reduce((t,p)=>t+planVal(p,dd),0),0);
+      const mvv=ps.reduce((t,p)=>t+estAt(p,monthEnd(S.month)),0);const l7=last7(ps);
+      return `<tr><td class="vname">${esc(k)}</td><td>${winChip(k)}</td><td class="num">${tfAgg(ps)}</td><td class="num calc">${n0(a.budget)}</td><td class="num calc mcell" data-mk="p1|${esc(k)}" data-mv="${mvv}"><span class="mval">${n0(mvv)}</span></td><td class="num" style="color:var(--text);font-weight:700">${n0(a.est)}</td><td class="num ${a.est-a.budget>=0?'pos':'neg'}">${sgn(a.est-a.budget)}</td>
+      <td class="num ${mv>0.5?'pos':mv<-0.5?'neg':'calc'}">${Math.abs(mv)>0.5?sgn(mv):'–'}${gbadge(k,ps)}</td><td class="num">${n0(a.tot)} <span class="calc">${n0(a.tot/a.est*100)}%</span></td><td class="num">${n0(a.rem)}</td><td class="num">${l7}</td><td class="num">${p7?n0(p7):'–'}</td></tr>`}).join('')}
+    <tr class="tot"><td>Total</td><td></td><td class="num">${tfAgg(list)}</td><td class="num">${n0(A.budget)}</td><td class="num mcell" data-mk="p1|Total" data-mv="${list.reduce((t,p)=>t+estAt(p,monthEnd(S.month)),0)}"><span class="mval">${n0(list.reduce((t,p)=>t+estAt(p,monthEnd(S.month)),0))}</span></td><td class="num">${n0(A.est)}</td><td class="num">${sgn(A.est-A.budget)}</td><td class="num">${sgn(A.est-A.prev)}</td><td class="num">${n0(A.tot)}</td><td class="num">${n0(A.rem)}</td><td class="num">${last7(list)}</td><td class="num">${n0(next.slice(0,7).reduce((s,dd)=>s+list.reduce((t,p)=>t+planVal(p,dd),0),0))}</td></tr>
+    </tbody></table></div>`;
+  } else if(sl===1){
+    const ch=allChanges(list,S.since);const byR={};ch.forEach(c=>{const k=c.e.reason||'No reason given';byR[k]=(byR[k]||0)+c.d});
+    const net=ch.reduce((s,c)=>s+c.d,0);
+    const top=[...ch].sort((a,b)=>Math.abs(b.d)-Math.abs(a.d)).slice(0,10);
+    body=`<h2 class="ph">Estimate moved ${sgn(net)} t since the ${fmtD(S.since)} meeting</h2><div class="psub">${ch.length} changes on ${new Set(ch.map(c=>c.p.id)).size} plots · ${ch.filter(c=>!c.e.reason).length} without a reason</div>
+    <div class="grid2"><div class="card bridge"><h2>By reason</h2><div class="sub">Net tonnes, grouped by the reason the agronomist gave.</div>${bridgeRows(Object.entries(byR).sort((a,b)=>Math.abs(b[1])-Math.abs(a[1])))||'<div class="sub">No changes.</div>'}<div style="height:12px"></div></div>
+    <div class="card"><h2>Biggest moves</h2><div class="sub">Click a plot for its full history.</div><div class="table-wrap pt"><table><thead><tr><th>Plot</th><th style="text-align:left">Variety</th><th>Was → now</th><th>Δ t</th><th style="text-align:left">Reason</th></tr></thead><tbody>
+    ${top.map(c=>`<tr><td><button class="chg" style="margin:0" data-hist="${c.p.id}">${esc(c.p.farm)} <span class="plot">${c.p.sector}-${c.p.plot}</span></button></td><td class="vname">${esc(c.p.variety)}</td><td class="num calc">${n0(c.prev)} → <b style="color:var(--text)">${n0(c.e.v)}</b></td><td class="num ${c.d>0?'pos':'neg'}">${sgn(c.d)}</td><td>${c.e.reason?`<span class="rchip">${esc(c.e.reason)}</span>`:'<span class="rchip none">No reason</span>'}</td></tr>`).join('')||'<tr><td colspan="5" class="calc">No changes.</td></tr>'}
+    </tbody></table></div></div></div>`;
+  } else if(sl===2){
+    const pastD=[...Array(7)].map((_,i)=>addDays(TODAY,i-7));
+    const ap=pastD.reduce((s,d)=>s+list.reduce((t,p)=>t+(p.daily[d]||[0])[0],0),0),pp=pastD.reduce((s,d)=>s+list.reduce((t,p)=>t+planVal(p,d),0),0);
+    body=`<h2 class="ph">Last 7 days: ${n0(ap)} t to the packhouse against a plan of ${n0(pp)} t</h2><div class="psub">${sgn(ap-pp)} t (${pp?sgn((ap-pp)/pp*100,n1):'–'}%) · daily actual vs plan by variety and farm, with the plan ahead</div>
+    <div class="pest">${viewEst('sum')}</div>`;
+  } else {
+    body=`<div class="pest">${viewEst('grid')}</div>`;
+  }
+  return bar+`<div class="pbody">${body}</div><div class="pnav"><span>← → to move between slides · Esc to exit</span><span>${sl+1} / ${SLIDES.length}</span></div>`;
+}
+function setPresent(on){S.present=on;S.slide=0;document.body.classList.toggle('present',on);setSide(false);
+  if(on){try{document.documentElement.requestFullscreen?.().catch(()=>{})}catch(e){}}else if(document.fullscreenElement){document.exitFullscreen?.().catch(()=>{})}
+  render();scrollTo(0,0)}
+$('#presentBtn').onclick=()=>setPresent(true);
+document.addEventListener('click',e=>{const x=e.target.closest('[data-pexp]');if(x){const k=x.dataset.pexp;S.pexp[k]=!S.pexp[k];keepScroll(render)}
+  if(e.target.closest('#pexpAll')){const vs=[...document.querySelectorAll('[data-pexp]')].map(b=>b.dataset.pexp);const open=!vs.every(k=>S.pexp[k]);vs.forEach(k=>S.pexp[k]=open);keepScroll(render)}
+  const s=e.target.closest('[data-slide]');if(s){S.slide=+s.dataset.slide;render()}
+  if(e.target.closest('#exitPresent'))setPresent(false)});
+document.addEventListener('keydown',e=>{if(!S.present||root.innerHTML||e.defaultPrevented)return;
+  if(e.key==='ArrowRight'){S.slide=Math.min(SLIDES.length-1,(S.slide||0)+1);render()}
+  else if(e.key==='ArrowLeft'){S.slide=Math.max(0,(S.slide||0)-1);render()}
+  else if(e.key==='Escape')setPresent(false)});
+document.addEventListener('fullscreenchange',()=>{if(!document.fullscreenElement&&S.present)setPresent(false)});
+function render(){if(S.present){$('#page').innerHTML=presentView();return}chrome();const pg=$('#page');
+  if(S.tab==='plan')S.tab='est';
+  pg.innerHTML=S.tab==='est'?viewEst():S.tab==='sum'?viewSum():viewChg();}
+render();
+}
+boot();
+</script>

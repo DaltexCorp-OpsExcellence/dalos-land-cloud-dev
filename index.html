@@ -451,7 +451,7 @@ thead .stickyc{background:var(--card)}
 <!-- SheetJS for Bulk Import client-side parsing (§11d sanctioned) -->
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <!-- shared Land Cloud shell (sidebar) — single source with harvest-planner.html -->
-<script src="shell.js?cb=4"></script>
+<script src="shell.js?cb=5"></script>
 <!-- Leaflet for the Farm Map (§11d sanctioned) -->
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
@@ -4081,7 +4081,7 @@ function App(){
       var slot = window.LCShell.render(el, {
         active: screen,
         account: {name:auth.name, role:auth.role}, role: auth.role,
-        onNav: function(it){ if(it.k==='planner'){ window.location.href=it.to; return; } setScreen(it.k); setMenu(false); },
+        onNav: function(it){ if(it.k==='planner'||it.k==='plannerv2'){ window.location.href=it.to; return; } setScreen(it.k); setMenu(false); },
         onSignOut: function(){ supabase.auth.signOut(); },
         onWorkspace: function(){ window.location.href='https://daltexcorp-opsexcellence.github.io/dalos-workspace-dev/'; }
       });

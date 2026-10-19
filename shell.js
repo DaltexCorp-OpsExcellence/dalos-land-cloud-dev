@@ -18,6 +18,7 @@
     bench:    ['M4 20V10','M10 20V4','M16 20v-7','M22 20H2'],
     map:      ['M9 3 3 6v15l6-3 6 3 6-3V3l-6 3-6-3z','M9 3v15','M15 6v15'],
     planner:  ['M4 5h16v15H4z','M4 9h16','M8 3v4','M16 3v4','M9 14l2 2 4-4'],
+    plannerv2:['M4 5h16v15H4z','M4 9h16','M8 3v4','M16 3v4','M8 14h3','M8 17h6'],
     entry:    ['M4 4h16v16H4z','M4 9h16','M9 4v16'],
     import:   ['M12 3v12','M8 11l4 4 4-4','M4 21h16'],
     recon:    ['M3 6h18','M3 12h12','M3 18h7','M18 5v6','M15 8h6'],
@@ -35,6 +36,7 @@
       {k:'map',       label:'Farm Map',           to:'index.html#map'}]},
     {sec:'Manage', items:[
       {k:'planner',   label:'Harvest Planner',    to:'harvest-planner.html'},
+      {k:'plannerv2', label:'Harvest Planner v2', to:'harvest-planner-v2.html', need:'pu'},
       {k:'entry',     label:'Season Entry',       to:'index.html#entry'},
       {k:'import',    label:'Bulk Import',        to:'index.html#import'},
       {k:'recon',     label:'Reconciliation',     to:'index.html#recon'},
@@ -43,6 +45,7 @@
   ];
 
   function visible(it, role){
+    if(it.need==='pu') return ['admin','power_user'].indexOf(role)>=0;
     if(it.need==='admin') return ['admin','power_user','agronomy_admin','agronomy_viewer'].indexOf(role)>=0;
     return true;
   }
