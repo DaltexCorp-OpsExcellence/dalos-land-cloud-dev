@@ -660,7 +660,7 @@ function modal(html,sm){root.innerHTML=`<div class="ovl" id="ovl"><div class="mo
 function chart(p){
   const W=700,H=170,L=46,R=12,T=12,B=26;
   const pts=p.ev.map(e=>({t:+new Date(e.d),v:e.v}));const t1=+new Date(TODAY);
-  const t0=Math.min(pts[0].t,t1-30*864e5);   // at least a 30-day window so same-day changes still drawconst vs=[...pts.map(x=>x.v),total(p)];const vmax=Math.max(...vs)*1.12||1;
+  const t0=Math.min(pts[0].t,t1-30*864e5); /* at least a 30-day window so same-day changes still draw */const vs=[...pts.map(x=>x.v),total(p)];const vmax=Math.max(...vs)*1.12||1;
   const X=t=>L+(t-t0)/(t1-t0)*(W-L-R),Y=v=>T+(1-v/vmax)*(H-T-B);
   let d=`M${X(pts[0].t)},${Y(pts[0].v)}`;pts.forEach((q,i)=>{if(i)d+=`H${X(q.t)}V${Y(q.v)}`});d+=`H${X(t1)}`;
   const ticks=[0,.5,1].map(f=>Math.round(vmax*f/1.12));
