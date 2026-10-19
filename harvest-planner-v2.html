@@ -221,7 +221,13 @@ th.lh{border-bottom:3px solid var(--c)}
 .estcell{display:flex;align-items:center;justify-content:space-between;gap:6px}
 .estcell .bslot{min-width:0;display:flex}.estcell .bslot .chg{margin-left:0}
 .estcell .estbtn{margin-left:auto}
-.harv{display:flex;flex-direction:row;align-items:center;justify-content:flex-end;gap:6px}
+.harv{display:flex;flex-direction:row-reverse;align-items:center;justify-content:flex-start;gap:6px}
+/* alignment: text left, numbers right (header follows), pills / entry boxes / band headers centred */
+th{text-align:left}th.num{text-align:right}th.c,td.c,th.grpcol,th.lh{text-align:center}
+.pct{display:inline-block;min-width:3.2em;text-align:right}
+.budbtn{margin-right:-6px}
+.estcell .estbtn{padding-right:2px}
+.dayin,.ain,.budbtn,.estbtn{font-variant-numeric:tabular-nums}
 /* review fixes */
 .mg thead tr:first-child th{height:28px;padding-top:0;padding-bottom:0;box-sizing:border-box}
 .mg thead tr:nth-child(2) th{top:var(--h1,28px)}
@@ -574,13 +580,13 @@ function viewEst(part){
     GROUPS[g]=ps;const a=agg(ps,S.since);const dv=sumDays(ps);const per=dv.reduce((s,v)=>s+v,0);
     rows+=`<tr class="grp"><td class="stk gname">${esc(g)} <span class="calc" style="text-transform:none;letter-spacing:0;font-weight:500">· ${ps.length}</span>${gbadge(g,ps)}</td>
       <td class="stk2 num">${n0(a.est)}</td><td class="num">${n1(a.est/a.area)}</td><td class="num">${n0(a.budget)}</td><td class="num ${a.est-a.budget>0.5?'pos':a.est-a.budget<-0.5?'neg':''}">${a.budget&&a.est?sgn(a.est-a.budget):'<span class="calc">–</span>'}</td><td class="num">${tfAgg(ps)}</td>
-      <td class="num">${n0(a.tot)} <span class="calc">${n0(a.tot/a.est*100)}%</span></td><td class="num">${n0(a.rem)}</td>${dayCells(dv,true,ps)}${tail(a.rem,dv,ps)}</tr>`;
+      <td class="num">${n0(a.tot)} <span class="calc pct">${a.est?n0(a.tot/a.est*100)+'%':'–'}</span></td><td class="num">${n0(a.rem)}</td>${dayCells(dv,true,ps)}${tail(a.rem,dv,ps)}</tr>`;
     for(const p of ps){
       const e=est(p),d=e-p.budget,t=total(p),rem=e-t,pct=e?t/e*100:0;
       const dvals=days.map(dd=>planVal(p,dd));const per=dvals.reduce((s,v)=>s+v,0);
       rows+=`<tr><td class="stk"><span class="plot">${p.sector}-${p.plot}</span> <span class="vname">${S.group==='farm'?esc(p.variety):esc(p.farm)}</span> <span class="pill ${productive(p)?'p':'np'}" title="${productive(p)?'EXP: export-bearing':'WIP: not yet bearing'}">${productive(p)?'EXP':'WIP'}</span>
           <div class="pl2">${esc(p.root)} · ${p.planted} · ${n1(p.area)} fed</div></td>
-        <td class="stk2"><div class="estcell"><span class="bslot">${badge(p)}</span><button class="estbtn" data-edit="${p.id}" aria-label="Update estimate">${p.ev.length?n0(e):'<span class="calc">+ add</span>'} <span class="pen">✎</span></button></div></td>
+        <td class="stk2"><div class="estcell"><span class="bslot">${badge(p)}</span><button class="estbtn" data-edit="${p.id}" aria-label="Update estimate"><span class="pen">✎</span> ${p.ev.length?n0(e):'<span class="calc">+ add</span>'}</button></div></td>
         <td class="num calc">${p.ev.length?n1(e/p.area):'–'}</td><td class="num calc"><button class="budbtn" data-budget="${p.id}" aria-label="Set budget">${p.budget?n0(p.budget):'+ budget'}</button></td><td class="num ${d>0.5?'pos':d<-0.5?'neg':''}">${p.budget&&p.ev.length?sgn(d):'<span class="calc">–</span>'}</td><td class="num">${tfCell(p)}</td>
         <td class="num" data-tip="h:${p.id}"><div class="harv">${n0(t)}<span class="bar"><i style="width:${Math.min(100,pct)}%"></i></span></div></td>
         <td class="num ${rem<-0.5?'neg':''}">${n0(rem)}</td>
@@ -604,7 +610,7 @@ function viewEst(part){
           :`<td class="num ${i===0?'daystart':''} ${wkCls(days[i])}">${v?n0(v):'<span class="calc">–</span>'}<div class="pln">${days[i]===TODAY&&actDay?'':''}</div></td>`).join('')}</tr>`};
     const ent=Object.entries(g).sort((a,b)=>a[0].localeCompare(b[0]));
     return `<div class="card"><h2>Summary by ${label.toLowerCase()}</h2><div class="sub">Same columns as the old plan sheet. Past days (shaded) show the actual with the plan under it (green = above plan, red = below); today on shows the plan.</div>
-     <div class="table-wrap"><table class="sg"><thead><tr><th style="text-align:left">${label}</th><th>Total area</th><th>EXP area</th><th>EXP area qty<span class="f">latest, EXP plots</span></th><th>Yield/area EXP<span class="f">= qty ÷ EXP area</span></th><th>Yield/area<span class="f">= latest ÷ total area</span></th>
+     <div class="table-wrap"><table class="sg"><thead><tr><th>${label}</th><th>Total area</th><th>EXP area</th><th>EXP area qty<span class="f">latest, EXP plots</span></th><th>Yield/area EXP<span class="f">= qty ÷ EXP area</span></th><th>Yield/area<span class="f">= latest ÷ total area</span></th>
       <th>Budget qty</th><th>${monthSel()}</th><th>Latest update</th><th>Raw PK actual</th><th>Sales<span class="f">sorting + local, not counted</span></th><th>Waste<span class="f">not counted</span></th><th>Remaining<span class="f">= latest − Raw PK actual</span></th><th class="daystart">Actual so far<span class="f">past days · vs plan</span></th><th>Plan ahead<span class="f">today on</span></th>
       ${days.map((d,i)=>{const t=new Date(d+'T00:00:00Z');return `<th class="${i===0?'daystart':''} ${wkCls(d)}">${t.toLocaleDateString('en-GB',{weekday:'short',timeZone:'UTC'})}<span class="f">${fmtD(d)}</span></th>`}).join('')}</tr></thead>
       <tbody>${ent.map(([k,ps])=>row(esc(k),ps)).join('')}${row('Total',list,'tot')}</tbody></table></div></div>`};
@@ -655,10 +661,10 @@ function rollTable(keyFn,label,list,extraCol){
   const body=ent.map(([k,ps])=>{GROUPS[k]=ps;const a=agg(ps,S.since);const d=a.est-a.budget;
     return `<tr><td class="vname">${esc(k)}${extraCol?` <span class="calc" style="font-weight:400">${esc(extraCol(ps))}</span><br>${winChip(k)}`:''}</td><td class="num">${n0(a.budget)}</td><td class="num calc mcell" data-mk="rt|${label}|${esc(k)}" data-mv="${ps.reduce((t,p)=>t+estAt(p,monthEnd(S.month)),0)}"><span class="mval">${n0(ps.reduce((t,p)=>t+estAt(p,monthEnd(S.month)),0))}</span></td>
       <td class="num"><div class="estcell"><span class="bslot">${gbadge(k,ps)}</span><b style="color:var(--text)">${n0(a.est)}</b></div></td>${a.budget&&a.est?`<td class="num ${d>0.5?'pos':d<-0.5?'neg':''}">${sgn(d)}</td>
-      <td><span class="pill ${d>0.5?'p':'np'}" style="${d<-0.5?'background:var(--red-bg);color:var(--red)':''}">${d>0.5?'Surplus':d<-0.5?'Deficit':'On budget'}</span></td>`:'<td class="num calc">–</td><td></td>'}
+      <td class="c"><span class="pill ${d>0.5?'p':'np'}" style="${d<-0.5?'background:var(--red-bg);color:var(--red)':''}">${d>0.5?'Surplus':d<-0.5?'Deficit':'On budget'}</span></td>`:'<td class="num calc">–</td><td class="c"></td>'}
       <td class="num">${n0(a.tot)}</td><td class="num">${n0(a.tot/a.est*100)}%</td></tr>`}).join('');
   const A=agg(list,S.since);
-  return `<div class="table-wrap"><table><thead><tr><th style="text-align:left">${label}</th><th>Budget</th><th>${monthSel()}</th><th>Latest</th><th>vs budget</th><th></th><th>Raw PK actual</th><th>% of est.</th></tr></thead>
+  return `<div class="table-wrap"><table><thead><tr><th>${label}</th><th>Budget</th><th>${monthSel()}</th><th>Latest</th><th>vs budget</th><th class="c">Status</th><th>Raw PK actual</th><th>% of est.</th></tr></thead>
    <tbody>${body}<tr class="tot"><td>Total</td><td class="num">${n0(A.budget)}</td><td class="num mcell" data-mk="rt|${label}|Total" data-mv="${list.reduce((t,p)=>t+estAt(p,monthEnd(S.month)),0)}"><span class="mval">${n0(list.reduce((t,p)=>t+estAt(p,monthEnd(S.month)),0))}</span></td><td class="num">${n0(A.est)}</td><td class="num">${sgn(A.est-A.budget)}</td><td></td><td class="num">${n0(A.tot)}</td><td class="num">${n0(A.tot/A.est*100)}%</td></tr></tbody></table></div>`;
 }
 
@@ -677,7 +683,7 @@ function viewSum(){
    <div class="card"><h2>By farm</h2><div class="sub">Same totals, rolled up by farm.</div>${rollTable(p=>p.farm,'Farm',list)}</div>
   </div>
   <div class="card"><h2>Estimate snapshots</h2><div class="sub">Estimate per variety as it stood each week, taken from the change history. This replaces copying the totals into dated columns by hand. Shaded cells changed that week.</div>
-   <div class="table-wrap"><table><thead><tr><th style="text-align:left">Variety</th><th>Budget</th>${snaps.map(d=>`<th>${d===TODAY?'Today':fmtD(d)}</th>`).join('')}</tr></thead><tbody>${snapRows}</tbody></table></div></div>`;
+   <div class="table-wrap"><table><thead><tr><th>Variety</th><th>Budget</th>${snaps.map(d=>`<th>${d===TODAY?'Today':fmtD(d)}</th>`).join('')}</tr></thead><tbody>${snapRows}</tbody></table></div></div>`;
 }
 
 function allChanges(list,from,to=TODAY){
@@ -699,7 +705,7 @@ function viewChg(){
   const budget=list.reduce((s,p)=>s+p.budget,0);
   const bridge2=sa.map(([k,v])=>`<div class="brow"><span>${esc(k)}</span><span class="track"><i style="left:${v<0?50-Math.abs(v)/mx2*50:50}%;width:${Math.abs(v)/mx2*50}%;background:${v<0?'var(--red)':'var(--green)'}"></i><i style="left:50%;width:1px;background:var(--border2)"></i></span><span class="num ${v<0?'neg':'pos'}">${sgn(v)} t</span></div>`).join('');
   const shown=ch.filter(c=>S.reason==='All'||(c.e.reason||'No reason given')===S.reason);
-  const feed=shown.map(c=>`<tr><td class="num calc">${fmtD(c.e.d)}</td><td>${esc(c.p.farm)}</td><td><button class="chg" style="margin:0" data-hist="${c.p.id}"><span class="plot">${c.p.sector}-${c.p.plot}</span></button></td><td class="vname">${esc(c.p.variety)}</td>
+  const feed=shown.map(c=>`<tr><td class="calc">${fmtD(c.e.d)}</td><td>${esc(c.p.farm)}</td><td><button class="chg" style="margin:0" data-hist="${c.p.id}"><span class="plot">${c.p.sector}-${c.p.plot}</span></button></td><td class="vname">${esc(c.p.variety)}</td>
      <td class="num calc">${n0(c.prev)}</td><td class="num" style="color:var(--text)">${n0(c.e.v)}</td><td class="num ${c.d>0?'pos':'neg'}">${sgn(c.d)}</td><td class="num calc">${n1(c.prev/c.p.area)} → ${n1(c.e.v/c.p.area)}</td>
      <td>${c.e.reason?`<span class="rchip">${esc(c.e.reason)}</span>`:'<span class="rchip none">No reason</span>'}</td><td style="white-space:normal;min-width:180px;font-size:12px">${esc(c.e.note||'')}</td><td class="calc">${esc(c.e.by)}</td></tr>`).join('');
   return `<div class="kpis">
@@ -714,7 +720,7 @@ function viewChg(){
   </div>
   <div class="card"><h2>Change log</h2><div class="sub" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center"><span class="lbl">Reason</span>
     ${['All',...rs.map(r=>r[0])].map(r=>`<button class="chip ${S.reason===r?'on':''}" data-reasonf="${esc(r)}">${esc(r)}</button>`).join('')}</div>
-    <div class="table-wrap"><table><thead><tr><th>Date</th><th>Farm</th><th>Plot</th><th>Variety</th><th>Was t</th><th>Now t</th><th>Δ t</th><th>t/fed</th><th>Reason</th><th style="text-align:left">Note</th><th>By</th></tr></thead>
+    <div class="table-wrap"><table><thead><tr><th>Date</th><th>Farm</th><th>Plot</th><th>Variety</th><th>Was t</th><th>Now t</th><th>Δ t</th><th>t/fed</th><th>Reason</th><th>Note</th><th>By</th></tr></thead>
     <tbody>${feed||'<tr><td colspan="11" class="calc">No changes match.</td></tr>'}</tbody></table></div></div>`;
 }
 
@@ -724,7 +730,7 @@ const root=$('#modalRoot');
 const modalDirty=()=>[...root.querySelectorAll('input:not([data-nd]),textarea')].some(i=>i.type!=='checkbox'&&i.value!==i.defaultValue);
 function closeModal(force){if(!force&&root.innerHTML&&modalDirty()&&!confirm('Discard the entries you typed? They are not saved.'))return false;root.innerHTML='';return true}
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&root.innerHTML){closeModal();e.preventDefault()}});
-function modal(html,sm){root.innerHTML=`<div class="ovl" id="ovl"><div class="modal ${sm?'sm':''}" role="dialog" aria-modal="true">${html}</div></div>`;
+function modal(html,sm){root.innerHTML=`<div class="ovl" id="ovl"><div class="modal ${sm?'sm':''}" role="dialog" aria-modal="true">${html}</div></div>`;alignHeads(root);
   $('#ovl').addEventListener('click',e=>{if(e.target.id==='ovl'||e.target.closest('.x,[data-close]'))closeModal()});}
 
 function chart(p){
@@ -764,7 +770,7 @@ function openGroupHistory(key){
   const list=GROUPS[key]||[];const ch=allChanges(list,S.since);const net=ch.reduce((s,c)=>s+c.d,0);
   modal(`<div class="mh"><div><h3>${esc(key)}</h3><div class="meta">${ch.length} changes since the ${fmtDY(S.since)} meeting · net <span class="${net>=0?'pos':'neg'}">${sgn(net)} t</span></div></div><button class="x" aria-label="Close">×</button></div>
    <div class="mb"><div class="table-wrap" style="max-height:55vh"><table><thead><tr><th>Date</th><th>Plot</th><th>Farm</th><th>Was</th><th>Now</th><th>Δ t</th><th>Reason</th><th>By</th></tr></thead><tbody>
-   ${ch.map(c=>`<tr><td class="num calc">${fmtD(c.e.d)}</td><td><button class="chg" style="margin:0" data-hist="${c.p.id}"><span class="plot">${c.p.sector}-${c.p.plot}</span></button></td><td>${esc(c.p.farm)}</td><td class="num calc">${n0(c.prev)}</td><td class="num">${n0(c.e.v)}</td><td class="num ${c.d>0?'pos':'neg'}">${sgn(c.d)}</td><td>${c.e.reason?`<span class="rchip">${esc(c.e.reason)}</span>`:'<span class="rchip none">—</span>'}</td><td class="calc">${esc(c.e.by)}</td></tr>`).join('')}
+   ${ch.map(c=>`<tr><td class="calc">${fmtD(c.e.d)}</td><td><button class="chg" style="margin:0" data-hist="${c.p.id}"><span class="plot">${c.p.sector}-${c.p.plot}</span></button></td><td>${esc(c.p.farm)}</td><td class="num calc">${n0(c.prev)}</td><td class="num">${n0(c.e.v)}</td><td class="num ${c.d>0?'pos':'neg'}">${sgn(c.d)}</td><td>${c.e.reason?`<span class="rchip">${esc(c.e.reason)}</span>`:'<span class="rchip none">—</span>'}</td><td class="calc">${esc(c.e.by)}</td></tr>`).join('')}
    </tbody></table></div></div><div class="mf"><button class="btn" data-close>Close</button></div>`);
 }
 function openEdit(id,kindIn){
@@ -845,7 +851,7 @@ function openActual(id,d){
 function openLog(){
   let date=TODAY,farm=S.farm==='All'?FARMS[1]:S.farm,onlyOpen=true;
   const body=()=>{const ps=PLOTS.filter(p=>p.farm===farm&&(!onlyOpen||!(p.ev.length&&est(p)-total(p)<=1)||planVal(p,date)>0||p.daily[date]));
-    return `<table><thead><tr><th style="text-align:left">Plot</th><th>Remaining</th><th>Planned</th>${ACOLS.map(c=>`<th class="lh" style="--c:${c[3]}">${colHead(c)}</th>`).join('')}<th>All picked<span class="f">= sum</span></th><th>Raw PK vs plan</th></tr></thead><tbody>
+    return `<table><thead><tr><th>Plot</th><th>Remaining</th><th>Planned</th>${ACOLS.map(c=>`<th class="lh" style="--c:${c[3]}">${colHead(c)}</th>`).join('')}<th>All picked<span class="f">= sum</span></th><th>Raw PK vs plan</th></tr></thead><tbody>
     ${ps.map(p=>{const a=actRow(p,date);return `<tr data-lrow="${p.id}"><td><span class="plot">${p.sector}-${p.plot}</span> <span class="vname" style="font-size:12px">${esc(p.variety)}</span></td><td class="num calc">${n0(est(p)-total(p))}</td>
       <td class="num calc">${n0(planVal(p,date))}</td>${a.map((v,j)=>`<td style="padding:4px 5px"><input class="ain" style="--c:${ACOLS[j][3]}" data-ai="${j}" value="${v||''}" placeholder="—" inputmode="decimal" aria-label="${p.sector}-${p.plot} ${ACOLS[j][1]}"></td>`).join('')}<td class="num lt">${aDay(a)?n1(aDay(a)):'0'}</td><td class="lv" data-pl="${planVal(p,date)}">${vsPlan(a,planVal(p,date))}</td></tr>`}).join('')||`<tr><td colspan="9" class="calc" style="white-space:normal;padding:14px">${onlyOpen?'Every plot on this farm is fully harvested against its estimate. Untick \'Hide fully harvested plots\' to see them.':'No plots on this farm.'}</td></tr>`}</tbody></table>`};
   modal(`<div class="mh"><div><h3>Log harvest</h3><div class="meta">One row per plot. Leave a row empty if nothing was picked. Only To packhouse (Raw PK) counts against the estimate and the plan; the other three are recorded for reference.</div></div><button class="x" aria-label="Close">×</button></div>
@@ -857,7 +863,7 @@ function openLog(){
    <div class="mf"><button class="btn" data-close>Cancel</button><button class="btn pri" id="saveLog">Save day</button></div>`);
   document.querySelector('.modal').style.width='min(1000px,100%)';
   const sum=()=>{let t=0,n=0;document.querySelectorAll('#lgrid [data-lrow]').forEach(r=>{const a=softAin(r);r.querySelectorAll('[data-ai]').forEach(i=>i.classList.toggle('bad',isNaN(parseT(i.value))));const v=aDay(a);r.querySelector('.lt').textContent=v?n1(v):'0';r.querySelector('.lv').innerHTML=vsPlan(a,+r.querySelector('.lv').dataset.pl);if(v){t+=v;n++}});$('#lsum').textContent=`${n} plots · ${n1(t)} t total on ${fmtDY(date)}`};
-  const redraw=()=>{$('#lgrid').innerHTML=body();sum()};
+  const redraw=()=>{$('#lgrid').innerHTML=body();alignHeads($('#lgrid'));sum()};
   $('#lgrid').oninput=sum;sum();
   const keep=()=>!modalDirty()||confirm('Discard the entries you typed?');
   $('#ldate').onchange=e=>{if(!keep()){e.target.value=date;return}date=e.target.value||TODAY;redraw()};$('#lfarm').onchange=e=>{if(!keep()){e.target.value=farm;return}farm=e.target.value;redraw()};$('#lopen').onchange=e=>{if(!keep()){e.target.checked=onlyOpen;return}onlyOpen=e.target.checked;redraw()};
@@ -881,7 +887,7 @@ const winChip=v=>WIN[v]&&WIN[v].start?`<button class="winchip" data-win="${esc(v
 function openWindows(focus){
   const vs=Object.keys(WIN).sort();
   modal(`<div class="mh"><div><h3>Harvest windows</h3><div class="meta">One window per variety. Days outside it are shaded in the daily plan. Every change is kept with who, when and why. Empty both dates to clear a window.</div></div><button class="x" aria-label="Close">×</button></div>
-   <div class="mb"><div class="table-wrap" style="max-height:58vh"><table><thead><tr><th style="text-align:left">Variety</th><th>Start</th><th>End</th><th>Days</th><th style="text-align:left">Why (optional)</th><th style="text-align:left">Last change</th></tr></thead><tbody>
+   <div class="mb"><div class="table-wrap" style="max-height:58vh"><table><thead><tr><th>Variety</th><th>Start</th><th>End</th><th>Days</th><th>Why (optional)</th><th>Last change</th></tr></thead><tbody>
    ${vs.map(v=>{const w=WIN[v],l=w.log[w.log.length-1];return `<tr data-wrow="${esc(v)}" ${v===focus?'class="grp"':''}><td class="vname">${esc(v)}</td>
      <td><input type="date" class="wdate" data-w="start" value="${w.start||''}" aria-label="${esc(v)} start"></td><td><input type="date" class="wdate" data-w="end" value="${w.end||''}" aria-label="${esc(v)} end"></td>
      <td class="num calc wdays">${w.start&&w.end?Math.round((new Date(w.end)-new Date(w.start))/864e5)+1:'–'}</td>
@@ -963,11 +969,11 @@ function presentView(){
       <div class="kpi"><div class="k">Raw PK harvested</div><div class="v">${n0(A.tot)} t</div><div class="s">+ ${n0(A.local)} sorting &amp; local, ${n0(A.culls)} waste (not counted)</div></div>
       <div class="kpi"><div class="k">Remaining</div><div class="v">${n0(A.rem)} t</div><div class="s">estimate − Raw PK harvested</div></div>
     </div>
-    <div class="table-wrap pt" style="max-height:none"><table><thead><tr><th style="text-align:left">Variety</th><th>Harvest window</th><th>TrueFruit</th><th>Budget</th><th>${monthSel()}</th><th>Latest</th><th>vs budget</th><th>Moved since ${fmtD(S.since)}</th><th>Raw PK actual</th><th>Remaining</th><th>Last 7 d<span class="f">actual · vs plan</span></th><th>Planned next 7 d</th></tr></thead><tbody>
+    <div class="table-wrap pt" style="max-height:none"><table><thead><tr><th>Variety</th><th>Harvest window</th><th>TrueFruit</th><th>Budget</th><th>${monthSel()}</th><th>Latest</th><th>vs budget</th><th>Moved since ${fmtD(S.since)}</th><th>Raw PK actual</th><th>Remaining</th><th>Last 7 d<span class="f">actual · vs plan</span></th><th>Planned next 7 d</th></tr></thead><tbody>
     ${vents.map(([k,ps,a])=>{const mv=a.est-a.prev;const p7=next.slice(0,7).reduce((s,dd)=>s+ps.reduce((t,p)=>t+planVal(p,dd),0),0);
       const mvv=ps.reduce((t,p)=>t+estAt(p,monthEnd(S.month)),0);const l7=last7(ps);
       return `<tr><td class="vname">${esc(k)}</td><td>${winChip(k)}</td><td class="num">${tfAgg(ps)}</td><td class="num calc">${n0(a.budget)}</td><td class="num calc mcell" data-mk="p1|${esc(k)}" data-mv="${mvv}"><span class="mval">${n0(mvv)}</span></td><td class="num" style="color:var(--text);font-weight:700">${n0(a.est)}</td><td class="num ${a.est-a.budget>0.5?'pos':a.est-a.budget<-0.5?'neg':''}">${a.budget&&a.est?sgn(a.est-a.budget):'<span class="calc">–</span>'}</td>
-      <td class="num ${mv>0.5?'pos':mv<-0.5?'neg':'calc'}">${Math.abs(mv)>0.5?sgn(mv):'–'}${gbadge(k,ps)}</td><td class="num">${n0(a.tot)} <span class="calc">${n0(a.tot/a.est*100)}%</span></td><td class="num">${n0(a.rem)}</td><td class="num">${l7}</td><td class="num">${p7?n0(p7):'–'}</td></tr>`}).join('')}
+      <td class="num"><div class="estcell"><span class="bslot">${gbadge(k,ps)}</span><span class="${mv>0.5?'pos':mv<-0.5?'neg':'calc'}">${Math.abs(mv)>0.5?sgn(mv):'–'}</span></div></td><td class="num">${n0(a.tot)} <span class="calc pct">${a.est?n0(a.tot/a.est*100)+'%':'–'}</span></td><td class="num">${n0(a.rem)}</td><td class="num">${l7}</td><td class="num">${p7?n0(p7):'–'}</td></tr>`}).join('')}
     <tr class="tot"><td>Total</td><td></td><td class="num">${tfAgg(list)}</td><td class="num">${n0(A.budget)}</td><td class="num mcell" data-mk="p1|Total" data-mv="${list.reduce((t,p)=>t+estAt(p,monthEnd(S.month)),0)}"><span class="mval">${n0(list.reduce((t,p)=>t+estAt(p,monthEnd(S.month)),0))}</span></td><td class="num">${n0(A.est)}</td><td class="num">${sgn(A.est-A.budget)}</td><td class="num">${sgn(A.est-A.prev)}</td><td class="num">${n0(A.tot)}</td><td class="num">${n0(A.rem)}</td><td class="num">${last7(list)}</td><td class="num">${n0(next.slice(0,7).reduce((s,dd)=>s+list.reduce((t,p)=>t+planVal(p,dd),0),0))}</td></tr>
     </tbody></table></div>`;
   } else if(sl===1){
@@ -976,7 +982,7 @@ function presentView(){
     const top=[...ch].sort((a,b)=>Math.abs(b.d)-Math.abs(a.d)).slice(0,10);
     body=`<h2 class="ph">Estimate moved ${sgn(net)} t since the ${fmtD(S.since)} meeting</h2><div class="psub">${ch.length} changes on ${new Set(ch.map(c=>c.p.id)).size} plots · ${ch.filter(c=>!c.e.reason).length} without a reason</div>
     <div class="grid2"><div class="card bridge"><h2>By reason</h2><div class="sub">Net tonnes, grouped by the reason the agronomist gave.</div>${bridgeRows(Object.entries(byR).sort((a,b)=>Math.abs(b[1])-Math.abs(a[1])))||'<div class="sub">No changes.</div>'}<div style="height:12px"></div></div>
-    <div class="card"><h2>Biggest moves</h2><div class="sub">Click a plot for its full history.</div><div class="table-wrap pt"><table><thead><tr><th>Plot</th><th style="text-align:left">Variety</th><th>Was → now</th><th>Δ t</th><th style="text-align:left">Reason</th></tr></thead><tbody>
+    <div class="card"><h2>Biggest moves</h2><div class="sub">Click a plot for its full history.</div><div class="table-wrap pt"><table><thead><tr><th>Plot</th><th>Variety</th><th>Was → now</th><th>Δ t</th><th>Reason</th></tr></thead><tbody>
     ${top.map(c=>`<tr><td><button class="chg" style="margin:0" data-hist="${c.p.id}">${esc(c.p.farm)} <span class="plot">${c.p.sector}-${c.p.plot}</span></button></td><td class="vname">${esc(c.p.variety)}</td><td class="num calc">${n0(c.prev)} → <b style="color:var(--text)">${n0(c.e.v)}</b></td><td class="num ${c.d>0?'pos':'neg'}">${sgn(c.d)}</td><td>${c.e.reason?`<span class="rchip">${esc(c.e.reason)}</span>`:'<span class="rchip none">No reason</span>'}</td></tr>`).join('')||'<tr><td colspan="5" class="calc">No changes.</td></tr>'}
     </tbody></table></div></div></div>`;
   } else if(sl===2){
@@ -1005,9 +1011,14 @@ document.addEventListener('keydown',e=>{if(!S.present||root.innerHTML||e.default
 /* sum rows stick under the grid header until the next sum row scrolls up: needs the header's real height */
 function setHH(){document.querySelectorAll('.mg').forEach(m=>{const th=m.querySelector('thead');if(!th)return;const r1=th.rows[0]?.getBoundingClientRect().height||28;m.style.setProperty('--h1',r1+'px');m.style.setProperty('--hh',th.getBoundingClientRect().height+'px')})}
 addEventListener('resize',setHH);document.addEventListener('toggle',()=>setTimeout(setHH,0),true);
-function render(){if(S.present){$('#page').innerHTML=presentView();setHH();return}chrome();const pg=$('#page');
+/* header alignment follows the column: a header over number cells is right-aligned (left otherwise) */
+function alignHeads(scope){(scope||document).querySelectorAll('table').forEach(t=>{const head=t.tHead;if(!head)return;const hr=head.rows[head.rows.length-1];
+  const body=[...t.tBodies[0]?.rows||[]].find(r=>!r.classList.contains('grp')&&!r.classList.contains('tot')&&r.cells.length===hr.cells.length);if(!body)return;
+  [...hr.cells].forEach((th,i)=>{const td=body.cells[i];if(!td||th.classList.contains('lh')||th.classList.contains('c'))return;
+    const isNum=td.classList.contains('num')||td.classList.contains('day')||td.classList.contains('dsum')||td.classList.contains('stk2')||!!td.querySelector('.dayin,.mval');th.classList.toggle('num',isNum)})})}
+function render(){if(S.present){$('#page').innerHTML=presentView();setHH();alignHeads();return}chrome();const pg=$('#page');
   if(S.tab==='plan')S.tab='est';
-  pg.innerHTML=S.tab==='est'?viewEst():S.tab==='sum'?viewSum():viewChg();setHH();}
+  pg.innerHTML=S.tab==='est'?viewEst():S.tab==='sum'?viewSum():viewChg();alignHeads();setHH();}
 render();
 }
 boot();
