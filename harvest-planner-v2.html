@@ -482,7 +482,7 @@ PLOTS.forEach(recalc);
 
 // ---------- formulas (mirror of the sheet) ----------
 const productive=p=>p.lifecycle==='EXP';                                     // productive = Land Cloud lifecycle EXP
-const estAt=(p,d)=>{let v=null;for(const e of p.ev) if(e.d<=d) v=e.v;return v??0};
+const estAt=(p,d)=>{let v=null;for(const e of p.ev) if(e.d<=d) v=e.v;if(v==null){const b=p.ev.find(e=>e.round);return b?b.v:0}return v};   /* before any entry, the estimate is the budget (a budget loaded later is the baseline, not a move) */
 const est=p=>p.ev.length?p.ev[p.ev.length-1].v:0;                                          // Q: latest estimate (input)
 const total=p=>p.act;   /* Raw PK basis (Ibrahim): only fruit to the packhouse counts against budget, estimate and plan; sorting, local sales and waste are recorded for reference */
 const changes=(p,from,to=TODAY)=>p.ev.filter(e=>!e.round&&e.d>from&&e.d<=to);
