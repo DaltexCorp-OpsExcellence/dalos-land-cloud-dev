@@ -3688,25 +3688,57 @@ function NewBlockModal(p){
 }
 
 /* ── History log ──────────────────────────────────────────────────────── */
+var AUD_LBL={planted_area_fed:'Planted area (fed)',total_area_fed:'Total area (fed)',aerobotics_area_ha:'Aerobotics area (ha)',variety_code:'Variety',rootstock_code:'Rootstock',planting_year:'Planting year',lifecycle:'Lifecycle',tree_count_planted:'Trees planted',tree_count_actual:'Trees (actual)',sector_code:'Sector',plot_code:'Plot',block_add:'Block letter',aydi_block_number:'Aydi block',jde_cost_center_id:'Cost centre (JDE)',comments:'Notes',active:'Active',geom:'Plot boundary',legacy_old_plot:'Old plot',last_producing_season:'Last producing season'};
+var AUD_SKIP={updated_at:1,created_at:1,variety_id:1,rootstock_id:1,farm_id:1,id:1,block_code:1,financial_block_id:1,operational_block_id:1,geom_source:1,geom_captured_on:1};
+function audDiff(o,n){ o=o||{}; n=n||{}; var out=[];
+  Object.keys(Object.assign({},o,n)).forEach(function(k){ if(AUD_SKIP[k]) return;
+    var a=o[k],b=n[k]; if(JSON.stringify(a)===JSON.stringify(b)) return;
+    if(k!=='geom' && a!=null && b!=null && !isNaN(a) && !isNaN(b) && Number(a)===Number(b)) return;
+    out.push({k:k,label:AUD_LBL[k]||k,a:a,b:b}); });
+  return out; }
+function audVal(k,v){ if(k==='geom') return v?'set':'none'; if(v==null||v==='') return '—'; return String(v); }
 function HistoryLogModal(p){
   var b=p.block;
-  var st=useState({loading:true,rows:[]}); var s=st[0],set=st[1];
+  var st=useState({loading:true,rows:[],edits:[],names:{}}); var s=st[0],set=st[1];
   useEffect(function(){
-    supabase.from('farm_block_lineage').select('event_type,effective_date,ratio,inherits_history,parent_block_id,child_block_id,note,created_at').or('parent_block_id.eq.'+b.id+',child_block_id.eq.'+b.id).order('effective_date',{ascending:false}).then(function(r){
-      set({loading:false,rows:r.data||[]}); });
+    var lin=supabase.from('farm_block_lineage').select('event_type,effective_date,ratio,inherits_history,parent_block_id,child_block_id,note,created_at').or('parent_block_id.eq.'+b.id+',child_block_id.eq.'+b.id).order('effective_date',{ascending:false});
+    var aud=supabase.from('audit_log').select('user_id,action,old_value,new_value,created_at').eq('entity_type','farm_blocks').eq('entity_id',b.id).order('created_at',{ascending:false}).limit(200);
+    Promise.all([lin,aud]).then(function(rs){
+      var edits=(rs[1].data||[]).map(function(e){ return Object.assign({},e,{diff:e.action==='INSERT'?[]:audDiff(e.old_value,e.new_value)}); })
+        .filter(function(e){ return e.action!=='UPDATE' || e.diff.length; });
+      var uids=Array.from(new Set(edits.map(function(e){return e.user_id;}).filter(Boolean)));
+      var done=function(names){ set({loading:false,rows:rs[0].data||[],edits:edits,names:names||{}}); };
+      if(!uids.length) return done({});
+      supabase.from('users').select('id,full_name,email').in('id',uids).then(function(u){ var m={}; (u.data||[]).forEach(function(x){m[x.id]=x.full_name||x.email;}); done(m); },function(){done({});});
+    },function(){ set({loading:false,rows:[],edits:[],names:{}}); });
   },[b.id]);
   var LB={split:['Split','var(--accent2)'],replant:['Replant','var(--amber)'],regraft:['Regraft','var(--green)']};
-  return ce(Modal,{title:'Lineage & history',sub:b.aydi_block_number,onClose:p.onClose,
-    footer:ce('button',{className:'btn btn-secondary btn-sm',onClick:p.onClose},'Close')},
-    s.loading?ce('div',{className:'skel',style:{height:90}}) :
-    s.rows.length===0?ce('div',{style:{fontSize:13,color:'var(--text3)',padding:'8px 0'}},'No split or replant events on record for this block.') :
+  var fmt=function(t){ try{ return new Date(t).toLocaleString('en-GB',{day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit',timeZone:'Africa/Cairo'}); }catch(e){ return t; } };
+  var sec=function(t){ return ce('div',{className:'section-title',style:{marginTop:14}},ce('span',{className:'section-title-bar'}),t); };
+  var lineage = s.rows.length===0?ce('div',{style:{fontSize:13,color:'var(--text3)',padding:'8px 0'}},'No split or replant events on record for this block.') :
     ce('div',null, s.rows.map(function(e,i){ var lb=LB[e.event_type]||[e.event_type,'var(--text3)']; var isParent=e.parent_block_id===b.id;
       return ce('div',{key:i,style:{display:'flex',gap:11,padding:'10px 0',borderBottom:i<s.rows.length-1?'1px solid var(--border)':'none'}},
         ce('span',{style:{width:9,height:9,borderRadius:'50%',background:lb[1],marginTop:5,flex:'none'}}),
         ce('div',null,
           ce('div',{style:{fontSize:13,fontWeight:600}}, lb[0]+' · '+(e.effective_date||'—')),
           ce('div',{style:{fontSize:11.5,color:'var(--text3)',marginTop:2}}, (isParent?'this block → successor':'predecessor → this block')+(e.ratio!=null?(' · '+Math.round(e.ratio*100)+'% area share'):'')+(e.inherits_history?'':' · no history carried')),
-          e.note?ce('div',{style:{fontSize:11.5,color:'var(--text2)',marginTop:3}}, e.note):null)); })));
+          e.note?ce('div',{style:{fontSize:11.5,color:'var(--text2)',marginTop:3}}, e.note):null)); }));
+  var edits = s.edits.length===0?ce('div',{style:{fontSize:13,color:'var(--text3)',padding:'8px 0'}},'No edits recorded for this block in the last 60 days.') :
+    ce('div',null, s.edits.map(function(e,i){
+      var who=s.names[e.user_id]||(e.user_id?'Unknown user':'System');
+      var head=e.action==='INSERT'?'Created':e.action==='DELETE'?'Deleted':null;
+      return ce('div',{key:i,style:{padding:'10px 0',borderBottom:i<s.edits.length-1?'1px solid var(--border)':'none'}},
+        ce('div',{style:{fontSize:12,color:'var(--text3)'}}, fmt(e.created_at)+' · ', ce('b',{style:{color:'var(--text)'}},who)),
+        head?ce('div',{style:{fontSize:13,marginTop:3}},head):
+        e.diff.map(function(d,j){ return ce('div',{key:j,style:{fontSize:13,marginTop:3,display:'flex',gap:6,flexWrap:'wrap'}},
+          ce('span',{style:{color:'var(--text2)'}},d.label+':'),
+          ce('span',{style:{color:'var(--text3)',textDecoration:'line-through'}},audVal(d.k,d.a)),
+          ce('span',null,'→'),
+          ce('b',null,audVal(d.k,d.b))); })); }));
+  return ce(Modal,{title:'Lineage & history',sub:b.aydi_block_number,onClose:p.onClose,
+    footer:ce('button',{className:'btn btn-secondary btn-sm',onClick:p.onClose},'Close')},
+    s.loading?ce('div',{className:'skel',style:{height:90}}) :
+    ce('div',null, sec('Edits'), edits, sec('Splits & replants'), lineage));
 }
 
 /* ── Assign a hand-drawn polygon to a plot (Farm Map draw flow) ────────── */
