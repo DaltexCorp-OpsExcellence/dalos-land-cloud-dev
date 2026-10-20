@@ -316,8 +316,9 @@ body.present .page{padding:0 0 32px;gap:0}
 .pest .pl2{display:none}
 .pest .mg td{font-size:13px;padding-top:2px;padding-bottom:2px}.pest .num,.pest .estbtn{font-size:12.5px}.pest .dayin{font-size:12.5px;width:46px}
 .pest .mg tr.grp td{height:28px}
-.pest td.today{position:relative}.pest .todayact{position:absolute;top:1px;right:2px;font-size:9px;line-height:1;padding:0}
-.pest .mg{max-height:calc(100vh - 170px)}
+.pest td.today{position:relative}.pest .todayact{position:absolute;left:3px;top:50%;transform:translateY(-50%);font-size:0;line-height:1;padding:2px}
+.pest .todayact::before{content:'+';font-size:13px;font-weight:700}
+.pest .mg{max-height:calc(100vh - 190px)}
 .pest .legendrow{font-size:10.5px;gap:10px}
 .pnav{display:flex;justify-content:space-between;padding:0 28px;color:var(--text3);font-size:12px}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
