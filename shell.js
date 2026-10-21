@@ -36,7 +36,7 @@
       {k:'map',       label:'Farm Map',           to:'index.html#map'}]},
     {sec:'Manage', items:[
       {k:'planner',   label:'Harvest Planner',    to:'harvest-planner.html'},
-      {k:'plannerv2', label:'Harvest Planner v2', to:'harvest-planner-v2.html', need:'pu'},
+      {k:'plannerv2', label:'Harvest Planner v2', to:'harvest-planner-v2.html', need:'hp2'},
       {k:'entry',     label:'Season Entry',       to:'index.html#entry'},
       {k:'import',    label:'Bulk Import',        to:'index.html#import'},
       {k:'recon',     label:'Reconciliation',     to:'index.html#recon'},
@@ -46,6 +46,7 @@
 
   function visible(it, role){
     if(it.need==='pu') return ['admin','power_user'].indexOf(role)>=0;
+    if(it.need==='hp2') return ['admin','power_user','agronomy_admin'].indexOf(role)>=0;
     if(it.need==='admin') return ['admin','power_user','agronomy_admin','agronomy_viewer'].indexOf(role)>=0;
     return true;
   }

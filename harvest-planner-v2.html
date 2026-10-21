@@ -5,7 +5,7 @@
 <title>Harvest Planner v2</title>
 <script>try{var t=localStorage.getItem('hp2-theme');if(t==='dark'||t==='light')document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.110.8/dist/umd/supabase.js"></script>
-<script src="shell.js?cb=5"></script>
+<script src="shell.js?cb=6"></script>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Mono:wght@400;500&family=Instrument+Sans:wght@400;500;600&family=Space+Grotesk:wght@400;500;600;700&family=Noto+Sans+Arabic:wght@400;500;600&display=swap">
 <style>
 /* Layout: Land Cloud shell — dark teal sidebar, sticky topbar + filter bar, dense plot tables. Tokens copied from dalos-land-cloud. */
@@ -412,7 +412,7 @@ async function boot(){
   if(!session){gate('Harvest Planner v2','This page shows live Land Cloud data, so it needs your Land Cloud sign-in. Open Land Cloud, sign in, then reopen this page.',true);return}
   const acct=window.LCShell?await LCShell.loadAccount(SBC,session.user.id):{name:'',role:null};
   if(window.LCShell)LCShell.render(document.getElementById('lcshell'),{active:'plannerv2',account:acct,onSignOut:()=>SBC.auth.signOut().then(()=>location.reload())});
-  if(!['admin','power_user'].includes(acct.role)){gate('Harvest Planner v2','v2 is in testing and open to admins and power users only for now. Use the Harvest Planner in the menu.',false);return}
+  if(!['admin','power_user','agronomy_admin'].includes(acct.role)){gate('Harvest Planner v2','v2 is in testing and open to admins, power users and agronomy admins only for now. Use the Harvest Planner in the menu.',false);return}
   try{
     const ss=(await SBC.from('seasons').select('id,name,active').order('name')).data||[];
     let pick=null;try{pick=localStorage.getItem('hp2_season')}catch(e){}
