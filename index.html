@@ -451,7 +451,7 @@ thead .stickyc{background:var(--card)}
 <!-- SheetJS for Bulk Import client-side parsing (§11d sanctioned) -->
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <!-- shared Land Cloud shell (sidebar) — single source with harvest-planner.html -->
-<script src="shell.js?cb=6"></script>
+<script src="shell.js?cb=7"></script>
 <!-- Leaflet for the Farm Map (§11d sanctioned) -->
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
@@ -2804,9 +2804,16 @@ function aeroBlockSummary(blockIds){
       supabase.from('aero_size_forecasts').select('orchard_id,processed_date,forecast_date,size_ranges,avg_size_mm').in('orchard_id',oids).not('size_ranges','is',null).order('processed_date',{ascending:false}).limit(2000),
       supabase.from('hp_plan').select('block_id,harvest_start,harvest_end,seasons(name)').in('block_id',Object.keys(byBlock)).not('harvest_start','is',null),
       plPaged(function(){ return supabase.from('aero_fruit_measurements').select('orchard_id,measurement_date,colour_dist,blemish_dist').in('orchard_id',oids).not('size_dist','is',null).order('orchard_id').order('measurement_date',{ascending:false}); }).then(function(d){ return {data:d}; })
+,
+      // Harvest Planner v2 windows (per variety) — preferred over the v1 hp_plan window for the same season
+      supabase.from('hp2_windows').select('variety_id,start_date,end_date,seasons(name)'),
+      plPaged(function(){ return supabase.from('farm_blocks').select('id,variety_id').eq('product_id','citrus').order('id'); }).then(function(d){ return {data:d}; })
     ]).then(function(rr){
       var grade={}; ((rr[3]&&rr[3].data)||[]).forEach(function(g){ if(!grade[g.orchard_id]) grade[g.orchard_id]=g; });
       var plans={}; ((rr[2]&&rr[2].data)||[]).forEach(function(x){ (plans[x.block_id]=plans[x.block_id]||[]).push(x); });
+      var bv={}; ((rr[5]&&rr[5].data)||[]).forEach(function(x){ bv[x.id]=x.variety_id; });
+      ((rr[4]&&rr[4].data)||[]).forEach(function(w){ var sn=w.seasons&&w.seasons.name; Object.keys(bv).forEach(function(b){ if(bv[b]!==w.variety_id) return;
+        plans[b]=(plans[b]||[]).filter(function(p){ return !(p.seasons&&p.seasons.name===sn); }).concat([{block_id:b,harvest_start:w.start_date,harvest_end:w.end_date,seasons:w.seasons}]); }); });
       var meas={}, split={};
       (rr[0].data||[]).forEach(function(m){ if(!meas[m.orchard_id]) meas[m.orchard_id]=m; });
       (rr[1].data||[]).forEach(function(f){ if(!split[f.orchard_id]) split[f.orchard_id]=f; });

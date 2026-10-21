@@ -35,8 +35,7 @@
       {k:'bench',     label:'Benchmark',          to:'index.html#bench'},
       {k:'map',       label:'Farm Map',           to:'index.html#map'}]},
     {sec:'Manage', items:[
-      {k:'planner',   label:'Harvest Planner',    to:'harvest-planner.html'},
-      {k:'plannerv2', label:'Harvest Planner v2', to:'harvest-planner-v2.html', need:'hp2'},
+      {k:'planner',   label:'Harvest Planner',    to:'harvest-planner.html', need:'hp2'},
       {k:'entry',     label:'Season Entry',       to:'index.html#entry'},
       {k:'import',    label:'Bulk Import',        to:'index.html#import'},
       {k:'recon',     label:'Reconciliation',     to:'index.html#recon'},
