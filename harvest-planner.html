@@ -128,8 +128,9 @@ tr.tot td{background:var(--subtot);color:var(--subtot-text);font-weight:700;bord
 .mf{display:flex;gap:8px;justify-content:flex-end;padding:12px 18px;border-top:1px solid var(--border)}
 @media (max-width:700px){.modal{max-height:calc(100dvh - 24px);display:flex;flex-direction:column}.modal .mb{overflow:auto;flex:1;min-height:0}.modal .mb .table-wrap{max-height:none!important}.modal .mf{flex:none;background:var(--card);border-radius:0 0 14px 14px}}
 .live{display:inline-flex;align-items:center;gap:5px;font-size:11px;color:var(--text3);padding:0 4px}.live i{width:8px;height:8px;border-radius:50%;background:var(--amber,#c98a1b)}
+.live.off span{color:var(--red,#b42318);font-weight:600}.live:not(.on):not(.off) span{color:var(--amber,#c98a1b)}
 .live.on i{background:var(--green,#2e9e5b);box-shadow:0 0 0 3px color-mix(in srgb,var(--green,#2e9e5b) 25%,transparent)}.live.off i{background:var(--red,#b42318)}
-@media (max-width:700px){.live span{display:none}}
+@media (max-width:700px){.live.on span{display:none}}
 .rflash{animation:rflash 2.6s ease-out}@keyframes rflash{0%,35%{box-shadow:inset 0 0 0 2px var(--amber,#c98a1b);background:color-mix(in srgb,var(--amber,#c98a1b) 22%,transparent)}100%{box-shadow:none}}
 .remote-mark{outline:2px dashed var(--amber,#c98a1b)!important;outline-offset:-2px}
 .toast.live-n{bottom:auto;top:62px;left:auto;right:16px;transform:none;font-size:12.5px;max-width:360px}
@@ -360,7 +361,7 @@ body.present .page{padding:0 0 32px;gap:0}
         <button data-t="chg">Changes</button>
       </div>
       <button class="menubtn" id="themeBtn" aria-label="Switch to dark mode" title="Dark / light mode"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path id="themeIco" d=""/></svg></button>
-      <span class="live" id="liveDot" title="Live updates: connecting…"><i></i><span>Live</span></span>
+      <span class="live" id="liveDot" title="Live updates: connecting…" role="status" aria-live="polite"><i></i><span>Connecting…</span></span>
       <button class="btn sm pri" id="presentBtn">▶ Present</button>
       <select class="sel" id="season" aria-label="Season"></select>
     </div>
@@ -1177,6 +1178,7 @@ new MutationObserver(()=>{if(!modalOpen())setTimeout(flushDefer,50)}).observe(ro
 // connection + recovery
 let wasLive=false,hiddenAt=0,chan=null;
 function liveState(st){const d=$('#liveDot');if(!d)return;d.classList.toggle('on',st==='on');d.classList.toggle('off',st==='off');
+  const lb=d.querySelector('span');if(lb)lb.textContent=st==='on'?'Live':st==='off'?(wasLive?'Reconnecting…':'Offline'):(wasLive?'Reconnecting…':'Connecting…');
   d.title=st==='on'?'Live: colleagues’ saves appear here within seconds':st==='off'?'Live updates disconnected — reconnecting… Reload if this stays red.':'Live updates: connecting…'}
 function resyncNeeded(){if(PENDING>0||modalOpen()||document.activeElement?.matches?.('.dayin[data-plan]')){errToast('Live updates were interrupted, so this page may be missing colleagues’ changes. Reload when you finish what you are typing.');return}location.reload()}
 function connect(){chan=SB.channel('hp2-'+DB.seasonId);
@@ -1184,6 +1186,7 @@ function connect(){chan=SB.channel('hp2-'+DB.seasonId);
   chan.subscribe(st=>{if(st==='SUBSCRIBED'){liveState('on');if(wasLive==='lost')resyncNeeded();wasLive=true}
     else if(st==='CHANNEL_ERROR'||st==='TIMED_OUT'||st==='CLOSED'){liveState('off');if(wasLive===true)wasLive='lost'}})}
 connect();
+addEventListener('offline',()=>{liveState('off');if(wasLive===true)wasLive='lost'});
 /* backup: back on the tab after 2+ min away while the connection was down → reload the data */
 document.addEventListener('visibilitychange',()=>{if(document.hidden){hiddenAt=Date.now();return}
   if(hiddenAt&&Date.now()-hiddenAt>120000&&!$('#liveDot')?.classList.contains('on'))resyncNeeded()});
