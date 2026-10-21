@@ -85,7 +85,7 @@ table{border-collapse:collapse;width:100%}
 th{font-size:10px;text-transform:uppercase;letter-spacing:.04em;color:var(--text3);text-align:center;padding:8px 9px;border-bottom:2px solid var(--border2);white-space:nowrap;font-weight:600;background:var(--card);position:sticky;top:0;z-index:2}
 .table-wrap:has(> table.sg){max-height:calc(100vh - 120px)}
 .sg thead th{position:sticky;top:0;z-index:3;background:var(--bg2)}
-@media (min-width:1900px){.table-wrap:has(> table.sg){overflow:visible;max-height:none}.sg thead th{top:52px}}  /* wide screens: table fits, so the header sticks under the top bar while the page scrolls */
+.table-wrap.pagestick:has(> table.sg){overflow:visible;max-height:none}.table-wrap.pagestick .sg thead th{top:52px}   /* only when the table fits the width (set in setHH); otherwise it scrolls inside its box */  /* wide screens: table fits, so the header sticks under the top bar while the page scrolls */
 .sg td.num,.sg th:not(:first-child),.sg tr.tot td:not(:first-child){text-align:center!important}
 th.dcol{text-align:center!important;padding-left:4px!important;padding-right:4px!important}
 th .dd{display:block;font-size:10px;font-weight:500;color:var(--text3);text-transform:none;letter-spacing:0;white-space:nowrap}
@@ -1115,7 +1115,7 @@ document.addEventListener('keydown',e=>{if(!S.present||root.innerHTML||e.default
   else if(e.key==='Escape')setPresent(false)});
 /* leaving fullscreen keeps Present mode; Exit or Esc leaves it */
 /* sum rows stick under the grid header until the next sum row scrolls up: needs the header's real height */
-function setHH(){document.querySelectorAll('.mg').forEach(m=>{const th=m.querySelector('thead');if(!th)return;const r1=th.rows[0]?.getBoundingClientRect().height||28;m.style.setProperty('--h1',Math.floor(r1)+'px');/* use the frozen header cell's real bottom edge (sticky cells report their stuck position, so this is right at any scroll); 1px overlap hides any seam */
+function setHH(){document.querySelectorAll('.table-wrap > table.sg').forEach(t=>{const w=t.parentElement;w.classList.remove('pagestick');w.classList.toggle('pagestick',innerWidth>=1100&&t.scrollWidth<=w.clientWidth+1)});document.querySelectorAll('.mg').forEach(m=>{const th=m.querySelector('thead');if(!th)return;const r1=th.rows[0]?.getBoundingClientRect().height||28;m.style.setProperty('--h1',Math.floor(r1)+'px');/* use the frozen header cell's real bottom edge (sticky cells report their stuck position, so this is right at any scroll); 1px overlap hides any seam */
   const lr=th.rows[th.rows.length-1],c=lr&&[...lr.cells].find(x=>!x.classList.contains('stk')&&!x.classList.contains('stk2'))||lr?.cells[0];
   const hb=c?c.getBoundingClientRect().bottom:th.getBoundingClientRect().bottom;m.style.setProperty('--hh',Math.max(0,Math.floor(hb-m.getBoundingClientRect().top-(m.clientTop||0))-2)+'px')   /* whole pixels: half-pixel offsets left a 1px seam on 1x (non-retina) screens */})}
 addEventListener('resize',setHH);document.addEventListener('scroll',e=>{if(e.target.classList&&e.target.classList.contains('mg')&&!e.target.dataset.hhOk){e.target.dataset.hhOk=1;setHH()}},true);document.addEventListener('toggle',()=>setTimeout(setHH,0),true);
