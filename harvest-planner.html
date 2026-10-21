@@ -272,6 +272,7 @@ th{text-align:left}th.num{text-align:right}th.c,td.c,th.grpcol,th.lh{text-align:
 /* review fixes */
 .mg thead tr:first-child th{height:28px;padding-top:0;padding-bottom:0;box-sizing:border-box}
 .mg thead tr:nth-child(2) th{top:calc(var(--h1,28px) - 1px)}
+.mg thead tr:last-child th::after{content:'';position:absolute;left:0;right:0;top:100%;height:3px;background:inherit;pointer-events:none}   /* opaque lip under the frozen header so nothing shows through at any zoom */
 .mg thead th{box-shadow:0 -2px 0 var(--card),0 1px 0 var(--border2)}   /* cover the collapsed-border gap between the 2 frozen header rows */
 .bad,.ain.bad,.dayin.bad,input.bad{outline:2px solid var(--red)!important;outline-offset:-1px;background:var(--red-bg)!important}
 .dayin.ok{background:var(--green-bg)!important;transition:background .4s}
@@ -1114,9 +1115,9 @@ document.addEventListener('keydown',e=>{if(!S.present||root.innerHTML||e.default
   else if(e.key==='Escape')setPresent(false)});
 /* leaving fullscreen keeps Present mode; Exit or Esc leaves it */
 /* sum rows stick under the grid header until the next sum row scrolls up: needs the header's real height */
-function setHH(){document.querySelectorAll('.mg').forEach(m=>{const th=m.querySelector('thead');if(!th)return;const r1=th.rows[0]?.getBoundingClientRect().height||28;m.style.setProperty('--h1',r1+'px');/* use the frozen header cell's real bottom edge (sticky cells report their stuck position, so this is right at any scroll); 1px overlap hides any seam */
+function setHH(){document.querySelectorAll('.mg').forEach(m=>{const th=m.querySelector('thead');if(!th)return;const r1=th.rows[0]?.getBoundingClientRect().height||28;m.style.setProperty('--h1',Math.floor(r1)+'px');/* use the frozen header cell's real bottom edge (sticky cells report their stuck position, so this is right at any scroll); 1px overlap hides any seam */
   const lr=th.rows[th.rows.length-1],c=lr&&[...lr.cells].find(x=>!x.classList.contains('stk')&&!x.classList.contains('stk2'))||lr?.cells[0];
-  const hb=c?c.getBoundingClientRect().bottom:th.getBoundingClientRect().bottom;m.style.setProperty('--hh',Math.max(0,hb-m.getBoundingClientRect().top-(m.clientTop||0)-1)+'px')})}
+  const hb=c?c.getBoundingClientRect().bottom:th.getBoundingClientRect().bottom;m.style.setProperty('--hh',Math.max(0,Math.floor(hb-m.getBoundingClientRect().top-(m.clientTop||0))-2)+'px')   /* whole pixels: half-pixel offsets left a 1px seam on 1x (non-retina) screens */})}
 addEventListener('resize',setHH);document.addEventListener('scroll',e=>{if(e.target.classList&&e.target.classList.contains('mg')&&!e.target.dataset.hhOk){e.target.dataset.hhOk=1;setHH()}},true);document.addEventListener('toggle',()=>setTimeout(setHH,0),true);
 /* header alignment follows the column: a header over number cells is right-aligned (left otherwise) */
 function alignHeads(scope){(scope||document).querySelectorAll('table').forEach(t=>{const head=t.tHead;if(!head)return;const hr=head.rows[head.rows.length-1];
