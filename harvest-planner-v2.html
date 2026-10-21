@@ -127,6 +127,12 @@ tr.tot td{background:var(--subtot);color:var(--subtot-text);font-weight:700;bord
 .mb{padding:14px 18px;display:flex;flex-direction:column;gap:12px}
 .mf{display:flex;gap:8px;justify-content:flex-end;padding:12px 18px;border-top:1px solid var(--border)}
 @media (max-width:700px){.modal{max-height:calc(100dvh - 24px);display:flex;flex-direction:column}.modal .mb{overflow:auto;flex:1;min-height:0}.modal .mb .table-wrap{max-height:none!important}.modal .mf{flex:none;background:var(--card);border-radius:0 0 14px 14px}}
+.live{display:inline-flex;align-items:center;gap:5px;font-size:11px;color:var(--text3);padding:0 4px}.live i{width:8px;height:8px;border-radius:50%;background:var(--amber,#c98a1b)}
+.live.on i{background:var(--green,#2e9e5b);box-shadow:0 0 0 3px color-mix(in srgb,var(--green,#2e9e5b) 25%,transparent)}.live.off i{background:var(--red,#b42318)}
+@media (max-width:700px){.live span{display:none}}
+.rflash{animation:rflash 2.6s ease-out}@keyframes rflash{0%,35%{box-shadow:inset 0 0 0 2px var(--amber,#c98a1b);background:color-mix(in srgb,var(--amber,#c98a1b) 22%,transparent)}100%{box-shadow:none}}
+.remote-mark{outline:2px dashed var(--amber,#c98a1b)!important;outline-offset:-2px}
+.toast.live-n{bottom:auto;top:62px;left:auto;right:16px;transform:none;font-size:12.5px;max-width:360px}
 .toast.err{top:16px;bottom:auto;background:var(--red,#b42318);display:flex;gap:12px;align-items:center;max-width:min(640px,92vw);z-index:80}
 .toast.err button{all:unset;cursor:pointer;font-size:18px;line-height:1;padding:0 4px}
 .toast.err+.toast.err{top:70px}
@@ -350,6 +356,7 @@ body.present .page{padding:0 0 32px;gap:0}
         <button data-t="chg">Changes</button>
       </div>
       <button class="menubtn" id="themeBtn" aria-label="Switch to dark mode" title="Dark / light mode"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path id="themeIco" d=""/></svg></button>
+      <span class="live" id="liveDot" title="Live updates: connecting…"><i></i><span>Live</span></span>
       <button class="btn sm pri" id="presentBtn">▶ Present</button>
       <select class="sel" id="season" aria-label="Season"></select>
     </div>
@@ -431,7 +438,7 @@ async function boot(){
       planted:b.planting_year||'',lifecycle:b.lifecycle,area:Number(b.planted_area_fed||b.total_area_fed||0)||0.0001,budget:0,ev:[],daily:{},ameta:{},aat:{}}))
       .sort((a,b)=>a.farm.localeCompare(b.farm)||a.sector.localeCompare(b.sector)||a.plot.localeCompare(b.plot));
     const byId=Object.fromEntries(plots.map(p=>[p.id,p]));
-    events.forEach(e=>{const p=byId[e.block_id];if(!p)return;p.ev.push({d:cairoDate(e.created_at),at:e.created_at,v:Number(e.value_t),by:who(e.created_by),mode:e.entered_as==='t_fed'?'yield':'volume',
+    events.forEach(e=>{const p=byId[e.block_id];if(!p)return;p.ev.push({id:e.id,d:cairoDate(e.created_at),at:e.created_at,v:Number(e.value_t),by:who(e.created_by),mode:e.entered_as==='t_fed'?'yield':'volume',
       reason:e.kind==='budget'?'Budget':(rlabel[e.reason_code]||null),note:e.note||'',round:e.kind==='budget',kind:e.kind,code:e.reason_code||null});if(e.kind==='budget')p.budget=Number(e.value_t)});
     acts.forEach(a=>{const p=byId[a.block_id];if(!p)return;p.daily[a.day]=[+a.to_packhouse_t,+a.field_sorting_t,+a.local_sales_t,+a.waste_t];p.aat[a.day]=a.entered_at;p.ameta[a.day]={by:who(a.entered_by),at:new Date(a.entered_at).toLocaleString('en-GB',{timeZone:'Africa/Cairo',dateStyle:'short',timeStyle:'short'})}});
     const PLAN={},PLAN_AT={};plan.forEach(r=>{PLAN[r.block_id+'|'+r.day]=Number(r.planned_t);PLAN_AT[r.block_id+'|'+r.day]=r.updated_at});
@@ -455,7 +462,7 @@ async function boot(){
     const today=cairoDate(Date.now());
     /* "changes since week N": options are ISO weeks (Mon–Sun); each value is the day before that week's Monday */
     const meetings=[];{const t=new Date(today+'T00:00:00Z');t.setUTCDate(t.getUTCDate()-((t.getUTCDay()+6)%7)-1);for(let k=0;k<10;k++){meetings.push(t.toISOString().slice(0,10));t.setUTCDate(t.getUTCDate()-7)}}
-    startApp({sb:SBC,season,seasonId:S_ID,y1,today,plots,plan:PLAN,planAt:PLAN_AT,windows,tf,reasons,meetings,me:{id:session.user.id,name:acct.name||'Me'}});
+    startApp({sb:SBC,season,seasonId:S_ID,y1,today,plots,plan:PLAN,planAt:PLAN_AT,windows,tf,reasons,meetings,me:{id:session.user.id,name:acct.name||'Me'},names,rlabel});
   }catch(err){gate('Could not load','Live-data load error: '+esc0((err&&err.message)||String(err))+'. Refresh if you just signed in.',false);console.error(err)}
 }
 function esc0(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
@@ -866,9 +873,9 @@ function openEdit(id,kindIn){
   $('#saveEst').onclick=async()=>{if(!ok()){inp.focus();inp.classList.add('bad');return}const v=tv;
     const btn=$('#saveEst');if(btn.disabled&&btn.textContent==='Saving…')return;btn.textContent='Saving…';btn.disabled=true;
     const row={season_id:DB.seasonId,block_id:p.id,kind,value_t:r2(v),entered_as:mode==='yield'?'t_fed':'t',reason_code:kind==='budget'?null:(REASON_CODE[reason]||null),note:$('#note').value.trim()||null,created_by:DB.me.id};
-    const {data,error}=await SB.from('hp2_estimate_events').insert(row).select('created_at').single();
+    const {data,error}=await SB.from('hp2_estimate_events').insert(row).select('id,created_at').single();
     if(error){btn.textContent=kind==='budget'?'Save budget':'Save estimate';btn.disabled=false;errToast('Not saved: '+error.message);return}
-    p.ev.push({d:cairoDate0(data.created_at),at:data.created_at,v:r2(v),by:DB.me.name,mode,reason:kind==='budget'?'Budget':reason,note:row.note||'',round:kind==='budget',kind,code:row.reason_code});
+    p.ev.push({id:data.id,d:cairoDate0(data.created_at),at:data.created_at,v:r2(v),by:DB.me.name,mode,reason:kind==='budget'?'Budget':reason,note:row.note||'',round:kind==='budget',kind,code:row.reason_code});
     if(row.reason_code==='correction'){const u=upds(p);if(u.length>1)u[u.length-2].superseded=true}
     if(kind==='budget')p.budget=r2(v);
     closeModal(true);keepScroll(render);toast(`Saved · ${p.sector}-${p.plot} ${kind==='budget'?'budget':'estimate'} ${cur?n0(cur)+' → ':''}${n0(v)} t`)};
@@ -1101,6 +1108,66 @@ function alignHeads(scope){(scope||document).querySelectorAll('table').forEach(t
 function render(){if(S.present){$('#page').innerHTML=presentView();setHH();alignHeads();return}chrome();const pg=$('#page');
   if(S.tab==='plan')S.tab='est';
   pg.innerHTML=S.tab==='est'?viewEst():S.tab==='sum'?viewSum():viewChg();alignHeads();setHH();}
+
+/* ---------- live updates (Supabase Realtime) ----------
+   Other users' saves arrive within a second: numbers, totals and cards update in place, the changed cell flashes, a note says who.
+   Never overwrites what you are typing: a change to the plan cell you are in, or to plots in an open harvest form, waits until you
+   leave it — so the save-time conflict check (CONFLICT prompt) still protects you. */
+const NAMES=DB.names||{};const nm=id=>NAMES[id]||'Someone';
+async function ensureName(id){if(!id||NAMES[id])return;try{const r=await SB.from('users').select('full_name,email').eq('id',id).maybeSingle();if(r.data)NAMES[id]=r.data.full_name||r.data.email}catch(e){}}
+const plotById=id=>PLOTS.find(p=>p.id===id);const pl=p=>p?`${p.farm} ${p.sector}-${p.plot}`:'a plot';
+let FLASH=[];const DEFER=[];let rT=null,nT=null,NOTES=[];
+function liveRender(){clearTimeout(rT);rT=setTimeout(()=>{rerenderKeep();const now=Date.now();FLASH=FLASH.filter(f=>now-f.t<3000);
+  FLASH.forEach(f=>document.querySelectorAll(f.sel).forEach(el=>{const c=el.closest('td')||el;c.classList.remove('rflash');void c.offsetWidth;c.classList.add('rflash')}))},250)}
+function note(m){NOTES.push(m);clearTimeout(nT);nT=setTimeout(()=>{const t=document.createElement('div');t.className='toast live-n';
+  t.textContent=NOTES.length>3?`${NOTES.length} changes from colleagues · ${NOTES.slice(-1)[0]}`:NOTES.join(' · ');NOTES=[];document.body.appendChild(t);setTimeout(()=>t.remove(),4200)},400)}
+const busyPlan=k=>document.activeElement?.dataset?.plan===k;
+const modalOpen=()=>!!document.querySelector('#ovl');
+function applyRemote(ch){const t=ch.table,n=ch.new||{},o=ch.old||{},del=ch.eventType==='DELETE';const row=del?o:n;
+  if(row.season_id&&row.season_id!==DB.seasonId)return;
+  if(t==='hp2_plan_days'){const k=row.block_id+'|'+row.day;
+    if(busyPlan(k)){DEFER.push(ch);document.querySelector(`[data-plan="${k}"]`)?.classList.add('remote-mark');return}
+    const before=PLAN[k]||0;if(del){delete PLAN[k];delete PLAN_AT[k]}else{PLAN[k]=Number(n.planned_t);PLAN_AT[k]=n.updated_at}
+    if((PLAN[k]||0)!==before&&(del||n.updated_by!==DB.me.id)){FLASH.push({sel:`[data-plan="${k}"]`,t:Date.now()});note(`${del?'Plan cleared':nm(n.updated_by)+': plan '+n1(PLAN[k])+' t'} · ${pl(plotById(row.block_id))} ${fmtD(row.day)}`)}
+    liveRender();return}
+  if(t==='hp2_actual_days'){const p=plotById(row.block_id);if(!p)return;
+    if(modalOpen()){DEFER.push(ch);const r=document.querySelector(`[data-lrow="${p.id}"]`);if(r)r.classList.add('remote-mark');return}
+    const had=!!p.daily[row.day];p.aat=p.aat||{};
+    if(del){delete p.daily[row.day];delete p.aat[row.day];delete p.ameta[row.day]}
+    else{p.daily[row.day]=[+n.to_packhouse_t,+n.field_sorting_t,+n.local_sales_t,+n.waste_t];p.aat[row.day]=n.entered_at;
+      p.ameta[row.day]={by:nm(n.entered_by),at:new Date(n.entered_at).toLocaleString('en-GB',{timeZone:'Africa/Cairo',dateStyle:'short',timeStyle:'short'})}}
+    recalc(p);if(del?had:n.entered_by!==DB.me.id){FLASH.push({sel:`[data-act="${p.id}|${row.day}"]`,t:Date.now()});note(`${del?'Harvest cleared':nm(n.entered_by)+': '+n1(+n.to_packhouse_t)+' t Raw PK'} · ${pl(p)} ${fmtD(row.day)}`)}
+    liveRender();return}
+  if(t==='hp2_estimate_events'&&!del){const p=plotById(n.block_id);if(!p||p.ev.some(e=>e.id===n.id))return;
+    const e={id:n.id,d:cairoDate0(n.created_at),at:n.created_at,v:Number(n.value_t),by:nm(n.created_by),mode:n.entered_as==='t_fed'?'yield':'volume',
+      reason:n.kind==='budget'?'Budget':((DB.rlabel||{})[n.reason_code]||null),note:n.note||'',round:n.kind==='budget',kind:n.kind,code:n.reason_code||null};
+    p.ev.push(e);p.ev.sort((a,b)=>a.at<b.at?-1:a.at>b.at?1:(a.id||0)-(b.id||0));if(n.kind==='budget')p.budget=Number(n.value_t);
+    if(e.code==='correction'){const u=upds(p);const i=u.indexOf(e);if(i>0)u[i-1].superseded=true}
+    if(n.created_by!==DB.me.id){FLASH.push({sel:`[data-edit="${p.id}"],[data-budget="${p.id}"]`,t:Date.now()});note(`${nm(n.created_by)}: ${n.kind==='budget'?'budget':'estimate'} ${n0(e.v)} t · ${pl(p)}`)}
+    liveRender();return}
+  if(t==='hp2_windows'){const v=Object.keys(WIN).find(k=>WIN[k].varietyId===row.variety_id);if(!v)return;
+    if(del){WIN[v].start=null;WIN[v].end=null}else{WIN[v].start=n.start_date;WIN[v].end=n.end_date}liveRender();return}
+  if(t==='hp2_window_events'&&!del){const v=Object.keys(WIN).find(k=>WIN[k].varietyId===n.variety_id);if(!v||n.created_by===DB.me.id)return;
+    WIN[v].log.push({d:cairoDate0(n.created_at),start:n.start_date,end:n.end_date,by:nm(n.created_by),note:n.note||''});note(`${nm(n.created_by)}: harvest window ${esc(v)} ${n.start_date?fmtD(n.start_date)+'→'+fmtD(n.end_date):'cleared'}`)}
+}
+async function onChange(ch){const r=ch.new||{};await ensureName(r.updated_by||r.entered_by||r.created_by);applyRemote(ch)}
+/* deferred changes are applied once you leave the cell / close the form */
+function flushDefer(){if(!DEFER.length)return;const q=DEFER.splice(0);q.forEach(ch=>applyRemote(ch));document.querySelectorAll('.remote-mark').forEach(x=>x.classList.remove('remote-mark'))}
+document.addEventListener('focusout',e=>{if(e.target.matches?.('.dayin[data-plan]'))setTimeout(()=>{if(!document.activeElement?.matches?.('.dayin[data-plan]')||DEFER.some(c=>c.table!=='hp2_plan_days'))flushDefer()},1200)});
+new MutationObserver(()=>{if(!modalOpen())setTimeout(flushDefer,50)}).observe(root,{childList:true});
+// connection + recovery
+let wasLive=false,hiddenAt=0,chan=null;
+function liveState(st){const d=$('#liveDot');if(!d)return;d.classList.toggle('on',st==='on');d.classList.toggle('off',st==='off');
+  d.title=st==='on'?'Live: colleagues’ saves appear here within seconds':st==='off'?'Live updates disconnected — reconnecting… Reload if this stays red.':'Live updates: connecting…'}
+function resyncNeeded(){if(PENDING>0||modalOpen()||document.activeElement?.matches?.('.dayin[data-plan]')){errToast('Live updates were interrupted, so this page may be missing colleagues’ changes. Reload when you finish what you are typing.');return}location.reload()}
+function connect(){chan=SB.channel('hp2-'+DB.seasonId);
+  ['hp2_plan_days','hp2_actual_days','hp2_estimate_events','hp2_windows','hp2_window_events'].forEach(t=>chan.on('postgres_changes',{event:'*',schema:'public',table:t,filter:'season_id=eq.'+DB.seasonId},onChange));
+  chan.subscribe(st=>{if(st==='SUBSCRIBED'){liveState('on');if(wasLive==='lost')resyncNeeded();wasLive=true}
+    else if(st==='CHANNEL_ERROR'||st==='TIMED_OUT'||st==='CLOSED'){liveState('off');if(wasLive===true)wasLive='lost'}})}
+connect();
+/* backup: back on the tab after 2+ min away while the connection was down → reload the data */
+document.addEventListener('visibilitychange',()=>{if(document.hidden){hiddenAt=Date.now();return}
+  if(hiddenAt&&Date.now()-hiddenAt>120000&&!$('#liveDot')?.classList.contains('on'))resyncNeeded()});
 render();
 }
 boot();
