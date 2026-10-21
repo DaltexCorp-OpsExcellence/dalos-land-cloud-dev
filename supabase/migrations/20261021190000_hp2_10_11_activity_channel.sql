@@ -1,0 +1,6 @@
+-- hp2_10_readable_activity_channel + hp2_11_activity_number_format (applied 2026-10-21)
+-- Readable activity messages on PRIVATE Realtime channel 'hp2-activity' (Supabase → Realtime → Inspector).
+-- Triggers: hp2_plan_days / hp2_actual_days (insert/update/delete), hp2_estimate_events / hp2_window_events (insert) → hp2_activity_trg() → realtime.send(payload,'insert|update|delete','hp2-activity',private=true)
+-- Payload: {message, table, action, by, season_id, at (Cairo)}. Errors inside the trigger are swallowed so saves never fail.
+-- Listen policy: create policy hp2_activity_listen on realtime.messages for select to authenticated using (realtime.topic()='hp2-activity' and (select public.hp2_can_use()));
+-- Full function bodies: see pg_get_functiondef('hp2_activity_trg'::regproc) and hp2_fmt(numeric).
