@@ -133,6 +133,9 @@ tr.tot td{background:var(--subtot);color:var(--subtot-text);font-weight:700;bord
 .rflash{animation:rflash 2.6s ease-out}@keyframes rflash{0%,35%{box-shadow:inset 0 0 0 2px var(--amber,#c98a1b);background:color-mix(in srgb,var(--amber,#c98a1b) 22%,transparent)}100%{box-shadow:none}}
 .remote-mark{outline:2px dashed var(--amber,#c98a1b)!important;outline-offset:-2px}
 .toast.live-n{bottom:auto;top:62px;left:auto;right:16px;transform:none;font-size:12.5px;max-width:360px}
+.mg .bdc{background:color-mix(in srgb,var(--amber,#c98a1b) 6%,var(--card))}.mg th.bdc{background:color-mix(in srgb,var(--amber,#c98a1b) 10%,var(--card))}.mg .bdstart{border-left:2px solid color-mix(in srgb,var(--amber,#c98a1b) 45%,var(--border))}
+.mg tr.grp td.bdc{background:var(--grp-bg)!important}
+.btn.sm.on{border-color:var(--accent);color:var(--accent);background:var(--accent-bg)}
 .toast.err{top:16px;bottom:auto;background:var(--red,#b42318);display:flex;gap:12px;align-items:center;max-width:min(640px,92vw);z-index:80}
 .toast.err button{all:unset;cursor:pointer;font-size:18px;line-height:1;padding:0 4px}
 .toast.err+.toast.err{top:70px}
@@ -419,14 +422,15 @@ async function boot(){
     sel.onchange=()=>{try{localStorage.setItem('hp2_season',sel.value)}catch(e){}location.reload()};
     const m=(season.name||'').match(/(\d{4})\s*\/\s*(\d{2})/);const y1=m?+m[1]:new Date().getFullYear();
     const S_ID=season.id;
-    const [blocks,events,plan,acts,wins,winEv,reasons]=await Promise.all([
+    const [blocks,events,plan,acts,wins,winEv,reasons,bdet]=await Promise.all([
       paged(()=>SBC.from('farm_blocks').select('id,farm_id,sector_code,plot_code,block_add,planting_year,total_area_fed,planted_area_fed,lifecycle,variety_id,varieties(name,categories(name)),farms(name),farm_rootstocks(name)').eq('product_id','citrus').eq('active',true).in('lifecycle',['EXP','WIP']).not('variety_id','is',null).not('farm_id','is',null).order('id')),
       paged(()=>SBC.from('hp2_estimate_events').select('id,block_id,kind,value_t,entered_as,reason_code,note,created_by,created_at').eq('season_id',S_ID).order('created_at').order('id')),
       paged(()=>SBC.from('hp2_plan_days').select('block_id,day,planned_t,updated_at').eq('season_id',S_ID).order('day').order('block_id')),
       paged(()=>SBC.from('hp2_actual_days').select('block_id,day,to_packhouse_t,field_sorting_t,local_sales_t,waste_t,entered_by,entered_at').eq('season_id',S_ID).order('day').order('block_id')),
       SBC.from('hp2_windows').select('variety_id,start_date,end_date').eq('season_id',S_ID).then(r=>{if(r.error)throw r.error;return r.data||[]}),
       SBC.from('hp2_window_events').select('variety_id,start_date,end_date,note,created_by,created_at').eq('season_id',S_ID).order('created_at').then(r=>{if(r.error)throw r.error;return r.data||[]}),
-      SBC.from('hp2_reasons').select('code,label,sort').eq('active',true).order('sort').then(r=>{if(r.error)throw r.error;return r.data||[]})]);
+      SBC.from('hp2_reasons').select('code,label,sort').eq('active',true).order('sort').then(r=>{if(r.error)throw r.error;return r.data||[]}),
+      paged(()=>SBC.from('hp2_budget_detail').select('block_id,trees,total_plan_t,export_plan_t,export_pct,local_sales_plan_t,field_sort_pct,plan_yield_t_fed').eq('season_id',S_ID).order('block_id')).catch(()=>[])]);
     // user names for "by"
     const uids=[...new Set([...events.map(e=>e.created_by),...acts.map(a=>a.entered_by),...winEv.map(w=>w.created_by)])].filter(Boolean);
     const names={};names[session.user.id]=acct.name||'Me';
@@ -462,7 +466,7 @@ async function boot(){
     const today=cairoDate(Date.now());
     /* "changes since week N": options are ISO weeks (Mon–Sun); each value is the day before that week's Monday */
     const meetings=[];{const t=new Date(today+'T00:00:00Z');t.setUTCDate(t.getUTCDate()-((t.getUTCDay()+6)%7)-1);for(let k=0;k<10;k++){meetings.push(t.toISOString().slice(0,10));t.setUTCDate(t.getUTCDate()-7)}}
-    startApp({sb:SBC,season,seasonId:S_ID,y1,today,plots,plan:PLAN,planAt:PLAN_AT,windows,tf,reasons,meetings,me:{id:session.user.id,name:acct.name||'Me'},names,rlabel});
+    startApp({sb:SBC,season,seasonId:S_ID,y1,today,plots,plan:PLAN,planAt:PLAN_AT,bd:Object.fromEntries((bdet||[]).map(r=>[r.block_id,r])),windows,tf,reasons,meetings,me:{id:session.user.id,name:acct.name||'Me'},names,rlabel});
   }catch(err){gate('Could not load','Live-data load error: '+esc0((err&&err.message)||String(err))+'. Refresh if you just signed in.',false);console.error(err)}
 }
 function esc0(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
@@ -520,8 +524,8 @@ function agg(list,since){
 // ---------- state ----------
 const S={tab:'est',farm:'All',type:'All',q:'',since:(addDays(MEETINGS[0],1)===TODAY?MEETINGS[1]:MEETINGS[0]),group:'farm',reason:'All'};
 try{const u=JSON.parse(localStorage.getItem('hp2-ui')||'{}');S.tab=u.tab||S.tab;S.group=u.group||S.group;if(MEETINGS.includes(u.since))S.since=u.since;
-  S.farm=u.farm||'All';S.type=u.type||'All';S.days=u.days||7;S.wk=0;S.howto=!!u.howto}catch(e){}
-const saveUI=()=>{try{localStorage.setItem('hp2-ui',JSON.stringify({tab:S.tab,group:S.group,since:S.since,farm:S.farm,type:S.type,days:S.days,wk:S.wk,howto:S.howto}))}catch(e){}};
+  S.farm=u.farm||'All';S.type=u.type||'All';S.days=u.days||7;S.wk=0;S.bd=!!u.bd;S.howto=!!u.howto}catch(e){}
+const saveUI=()=>{try{localStorage.setItem('hp2-ui',JSON.stringify({tab:S.tab,group:S.group,since:S.since,farm:S.farm,type:S.type,days:S.days,wk:S.wk,howto:S.howto,bd:S.bd}))}catch(e){}};
 const FARMS=['All',...new Set(PLOTS.map(p=>p.farm))];
 const TYPES=['All',...new Set(PLOTS.map(p=>p.type))];
 if(!FARMS.includes(S.farm))S.farm='All';if(!TYPES.includes(S.type))S.type='All';
@@ -632,6 +636,16 @@ async function savePlan(k,v,old,force){const i=k.lastIndexOf('|'),bid=k.slice(0,
 function rerenderKeep(){const a=document.activeElement,k=a&&a.dataset&&a.dataset.plan,val=a&&a.value,ss=a&&a.selectionStart;keepScroll(render);
   if(k){const n=document.querySelector(`[data-plan="${k}"]`);if(n){n.value=val;n.focus();try{n.setSelectionRange(ss,ss)}catch(e){}}}}
 const planDays=()=>{const n=S.days||7;const s=addDays(TODAY,(S.wk||0)*7-3);return [...Array(n)].map((_,i)=>addDays(s,i))};
+/* optional budget-sheet columns (hidden by default; 'Budget details' button) — read-only, from hp2_budget_detail */
+const BD=DB.bd||{};
+const BDH=[['Trees','عدد الأشجار'],['Total plan t','اجمالى مخطط انتاج'],['Export plan t','مخطط صادر'],['Export %','of Raw PK budget'],['Local sales plan t','مخطط مبيعات محلى'],['Field sorting %','of total plan'],['Plan yield t/fed','معدل الفدان']];
+function bdCells(ps){if(!S.bd)return '';const r=ps.map(p=>BD[p.id]).filter(Boolean);const cl='num bdc';
+  if(!r.length)return BDH.map((_,i)=>`<td class="${cl}${i===0?' bdstart':''}"><span class="calc">–</span></td>`).join('');
+  const sm=k=>r.reduce((t,x)=>t+(Number(x[k])||0),0);const tr=sm('trees'),tot=sm('total_plan_t'),ex=sm('export_plan_t'),lo=sm('local_sales_plan_t');
+  const raw=ps.filter(p=>BD[p.id]).reduce((t,p)=>t+(p.budget||0),0),area=ps.filter(p=>BD[p.id]).reduce((t,p)=>t+p.area,0);
+  const one=r.length===1&&ps.length===1?r[0]:null;const pc=v=>v==null||isNaN(v)?'<span class="calc">–</span>':n0(v*100)+'%';
+  const vals=[n0(tr),n1(tot),n1(ex),pc(one?Number(one.export_pct):raw?ex/raw:NaN),n1(lo),pc(one?Number(one.field_sort_pct):tot?lo/tot:NaN),n1(one?Number(one.plan_yield_t_fed):area?tot/area:NaN)];
+  return vals.map((v,i)=>`<td class="${cl}${i===0?' bdstart':''}">${v}</td>`).join('')}
 function viewEst(part){
   const list=filtered();const days=planDays();
   const key=S.group==='farm'?(p=>p.farm):(p=>p.variety);
@@ -651,7 +665,7 @@ function viewEst(part){
   for(const [g,ps] of Object.entries(groups)){
     GROUPS[g]=ps;const a=agg(ps,S.since);const dv=sumDays(ps);const per=dv.reduce((s,v)=>s+v,0);
     rows+=`<tr class="grp"><td class="stk gname">${esc(g)} <span class="calc" style="text-transform:none;letter-spacing:0;font-weight:500">· ${ps.length}</span>${gbadge(g,ps)}</td>
-      <td class="stk2 num">${n0(a.est)}</td><td class="num">${n1(a.est/a.area)}</td><td class="num">${n0(a.budget)}</td><td class="num ${a.est-a.budget>0.5?'pos':a.est-a.budget<-0.5?'neg':''}">${a.budget&&a.est?sgn(a.est-a.budget):'<span class="calc">–</span>'}</td><td class="num">${tfAgg(ps)}</td>
+      <td class="stk2 num">${n0(a.est)}</td><td class="num">${n1(a.est/a.area)}</td><td class="num">${n0(a.budget)}</td><td class="num ${a.est-a.budget>0.5?'pos':a.est-a.budget<-0.5?'neg':''}">${a.budget&&a.est?sgn(a.est-a.budget):'<span class="calc">–</span>'}</td>${bdCells(ps)}<td class="num">${tfAgg(ps)}</td>
       <td class="num">${n0(a.tot)} <span class="calc pct">${a.est?n0(a.tot/a.est*100)+'%':'–'}</span></td><td class="num">${n0(a.rem)}</td>${dayCells(dv,true,ps)}${tail(a.rem,dv,ps)}</tr>`;
     for(const p of ps){
       const e=est(p),d=e-p.budget,t=total(p),rem=e-t,pct=e?t/e*100:0;
@@ -659,7 +673,7 @@ function viewEst(part){
       rows+=`<tr><td class="stk"><span class="plot">${p.sector}-${p.plot}</span> <span class="vname">${S.group==='farm'?esc(p.variety):esc(p.farm)}</span> <span class="pill ${productive(p)?'p':'np'}" title="${productive(p)?'EXP: export-bearing':'WIP: not yet bearing'}">${productive(p)?'EXP':'WIP'}</span>
           <div class="pl2">${esc(p.root)} · ${p.planted} · ${n1(p.area)} fed</div></td>
         <td class="stk2"><div class="estcell"><span class="bslot">${badge(p)}</span><button class="estbtn" data-edit="${p.id}" aria-label="Update estimate"><span class="pen">✎</span> ${p.ev.length?n0(e):'<span class="calc">+ add</span>'}</button></div></td>
-        <td class="num calc">${p.ev.length?n1(e/p.area):'–'}</td><td class="num calc"><button class="budbtn" data-budget="${p.id}" aria-label="Set budget">${p.budget?n0(p.budget):'+ budget'}</button></td><td class="num ${d>0.5?'pos':d<-0.5?'neg':''}">${p.budget&&p.ev.length?sgn(d):'<span class="calc">–</span>'}</td><td class="num">${tfCell(p)}</td>
+        <td class="num calc">${p.ev.length?n1(e/p.area):'–'}</td><td class="num calc"><button class="budbtn" data-budget="${p.id}" aria-label="Set budget">${p.budget?n0(p.budget):'+ budget'}</button></td><td class="num ${d>0.5?'pos':d<-0.5?'neg':''}">${p.budget&&p.ev.length?sgn(d):'<span class="calc">–</span>'}</td>${bdCells([p])}<td class="num">${tfCell(p)}</td>
         <td class="num" data-tip="h:${p.id}"><div class="harv">${n0(t)}<span class="bar"><i style="width:${Math.min(100,pct)}%"></i></span></div></td>
         <td class="num ${rem<-0.5?'neg':''}">${n0(rem)}</td>
         ${dvals.map((v,i)=>days[i]<TODAY?pastCell(actDay(p,days[i]),v,i,false,p.id):`<td class="day ${i===0?'daystart':''} ${wkCls(days[i])} ${inWin(p.variety,days[i])?'':'offwin'}" ${inWin(p.variety,days[i])?'':'title="Outside the '+esc(p.variety)+' harvest window"'}><input class="dayin ${v?'':'z'}" data-plan="${p.id}|${days[i]}" value="${v||''}" placeholder="–" inputmode="decimal" aria-label="Plan ${p.sector}-${p.plot} ${days[i]}">${days[i]===TODAY?`<button class="todayact" data-act="${p.id}|${TODAY}">${actDay(p,TODAY)?'act '+n0(actDay(p,TODAY)):'+ actual'}</button>`:''}</td>`).join('')}
@@ -667,7 +681,7 @@ function viewEst(part){
     }
   }
   const A=agg(list,S.since);const dv=sumDays(list);const per=dv.reduce((s,v)=>s+v,0);
-  rows+=`<tr class="tot"><td class="stk">Total · ${list.length} plots</td><td class="stk2 num">${n0(A.est)}</td><td class="num">${n1(A.est/A.area)}</td><td class="num">${n0(A.budget)}</td><td class="num">${sgn(A.est-A.budget)}</td><td class="num">${tfAgg(list)}</td><td class="num">${n0(A.tot)}</td><td class="num">${n0(A.rem)}</td>${dayCells(dv,true,list)}${tail(A.rem,dv,list)}</tr>`;
+  rows+=`<tr class="tot"><td class="stk">Total · ${list.length} plots</td><td class="stk2 num">${n0(A.est)}</td><td class="num">${n1(A.est/A.area)}</td><td class="num">${n0(A.budget)}</td><td class="num">${sgn(A.est-A.budget)}</td>${bdCells(list)}<td class="num">${tfAgg(list)}</td><td class="num">${n0(A.tot)}</td><td class="num">${n0(A.rem)}</td>${dayCells(dv,true,list)}${tail(A.rem,dv,list)}</tr>`;
   const s0=days[0],s1=days[days.length-1];
   // the two roll-up tables from the old Plan tab (by variety, by farm), same day window as the grid above
   const sumGrid=(keyFn,label)=>{const g={};list.forEach(p=>(g[keyFn(p)]=g[keyFn(p)]||[]).push(p));
@@ -702,12 +716,13 @@ function viewEst(part){
     <span class="lbl" style="margin-left:6px">Plan days</span>
     <div class="seg"><button data-wk="-1" aria-label="Previous week" title="Previous week">‹ Week</button><span class="segtxt">Wk ${isoWeek(s0)}${isoWeek(s1)!==isoWeek(s0)?'–'+isoWeek(s1):''} · ${fmtD(s0)} – ${fmtD(s1)}</span><button data-wk="1" aria-label="Next week" title="Next week">Week ›</button></div><button class="btn sm" data-wk="0" ${(S.wk||0)===0?'disabled':''}>Today</button>
     <div class="seg"><button data-days="7" class="${(S.days||7)===7?'on':''}">7 d</button><button data-days="14" class="${S.days===14?'on':''}">14 d</button></div>
+    <button class="btn sm ${S.bd?'on':''}" data-bdtoggle aria-pressed="${S.bd?'true':'false'}" title="Show or hide the extra budget-sheet columns (trees, total plan, export plan, local sales, sorting %, plan yield)">Budget details ${S.bd?'▾':'▸'}</button>
     <span class="spacer"></span><span class="btnpair"><button class="btn sm" data-windows>Harvest windows</button><button class="btn sm pri" data-logharvest>+ Log harvest</button></span>
     <details class="howto" ${S.howto?'open':''}><summary>How this works</summary><p class="hint">Left: the estimate per plot. Click it to update by tonnes or t/fed; every change is saved with who, when and why (<b style="color:var(--amber)">● updates</b> = since the selected week). Right: Raw PK tonnes per day. Past days show the <b>actual</b> from the harvest log with the plan under it (green = above plan, red = below). Click a past day to enter or correct a plot's harvest, use <b>+ actual</b> under today, or <b>Log harvest</b> to enter a whole farm's day at once. Today and later are plan inputs. <b>Left after plan</b> = remaining − plan ahead; red means the plan is more than the estimate. Hover Raw PK actual for everything picked by category.</p></details>
   </div>
   <div class="table-wrap mg"><table>
-    <thead><tr><th class="grpcol stk">Plot</th><th class="grpcol stk2">Estimate</th><th class="grpcol" colspan="4">Yield, budget &amp; size</th><th class="grpcol" colspan="2">Actual (harvest log)</th><th class="grpcol daystart" colspan="${days.length}">Raw PK t per day · actual (past) · plan (today on)</th><th class="grpcol daystart" colspan="3">Plan check</th></tr>
-    <tr><th class="stk" style="text-align:left">${S.group==='farm'?'Plot · variety':'Plot · farm'}</th><th class="stk2">Latest t<span class="f">Raw PK</span></th><th>t/fed<span class="f">= est ÷ area</span></th><th>Budget t<span class="f">Raw PK</span></th><th>vs budget</th><th>TrueFruit<span class="f">latest scan · peak count</span></th>
+    <thead><tr><th class="grpcol stk">Plot</th><th class="grpcol stk2">Estimate</th><th class="grpcol" colspan="${4+(S.bd?7:0)}">Yield, budget &amp; size</th><th class="grpcol" colspan="2">Actual (harvest log)</th><th class="grpcol daystart" colspan="${days.length}">Raw PK t per day · actual (past) · plan (today on)</th><th class="grpcol daystart" colspan="3">Plan check</th></tr>
+    <tr><th class="stk" style="text-align:left">${S.group==='farm'?'Plot · variety':'Plot · farm'}</th><th class="stk2">Latest t<span class="f">Raw PK</span></th><th>t/fed<span class="f">= est ÷ area</span></th><th>Budget t<span class="f">Raw PK</span></th><th>vs budget</th>${S.bd?BDH.map((h,i)=>`<th class="bdc${i===0?' bdstart':''}">${h[0]}<span class="f" ${/[\u0600-\u06FF]/.test(h[1])?'lang="ar"':''}>${h[1]}</span></th>`).join(''):''}<th>TrueFruit<span class="f">latest scan · peak count</span></th>
     <th>Raw PK actual<span class="f">to packhouse</span></th><th>Remaining<span class="f">= est − Raw PK actual</span></th>
     ${days.map((d,i)=>{const t=new Date(d+'T00:00:00Z');return `<th class="day dcol ${i===0?'daystart':''} ${wkCls(d)}">${t.toLocaleDateString('en-GB',{weekday:'short',timeZone:'UTC'})}<span class="dd">${fmtD(d)}</span></th>`}).join('')}
     <th class="daystart">Actual so far<span class="f">past days in view</span></th><th>Plan ahead<span class="f">today on, not yet harvested</span></th><th>Left after plan<span class="f">= remaining − plan ahead</span></th></tr></thead>
@@ -715,6 +730,7 @@ function viewEst(part){
   <div class="legendrow"><span><b class="av">12</b> Actual (Raw PK): upright, bold</span><span><b class="pc">10</b> Plan: italic, dashed underline</span><span><span class="vm up">▲</span><span class="vm dn">▼</span> above / below plan</span><span><i class="lg past"></i>Past day</span><span><i class="lg today"></i>Today</span><span><i class="lg fri"></i>Friday (weekend)</span><span><i class="lg off"></i>Outside the variety's harvest window</span><span><i class="lg ok"></i>Plan saved</span></div>
   ${part==='grid'?'':sumGrid(p=>p.variety,'Variety')+sumGrid(p=>p.farm,'Farm')}`;
 }
+document.addEventListener('click',e=>{if(e.target.closest('[data-bdtoggle]')){S.bd=!S.bd;saveUI();keepScroll(render);return}});
 document.addEventListener('click',e=>{const w=e.target.closest('[data-wk]');if(w){const v=+w.dataset.wk;const nw=v?(S.wk||0)+v:0,s0=addDays(TODAY,nw*7-3);if(v&&(s0<DB.y1+'-07-01'||s0>(DB.y1+1)+'-06-30')){toast('That is outside the '+DB.y1+'/'+String(DB.y1+1).slice(2)+' season');return}S.wk=nw;render()}
   const d=e.target.closest('[data-days]');if(d){S.days=+d.dataset.days;render()}});
 // Enter in a plan cell or a Log harvest box moves to the same column one row down
