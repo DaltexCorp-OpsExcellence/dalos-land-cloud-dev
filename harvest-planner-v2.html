@@ -85,7 +85,7 @@ table{border-collapse:collapse;width:100%}
 th{font-size:10px;text-transform:uppercase;letter-spacing:.04em;color:var(--text3);text-align:center;padding:8px 9px;border-bottom:2px solid var(--border2);white-space:nowrap;font-weight:600;background:var(--card);position:sticky;top:0;z-index:2}
 .table-wrap:has(> table.sg){max-height:calc(100vh - 120px)}
 .sg thead th{position:sticky;top:0;z-index:3;background:var(--bg2)}
-@media (min-width:1500px){.table-wrap:has(> table.sg){overflow:visible;max-height:none}.sg thead th{top:52px}}  /* wide screens: table fits, so the header sticks under the top bar while the page scrolls */
+@media (min-width:1900px){.table-wrap:has(> table.sg){overflow:visible;max-height:none}.sg thead th{top:52px}}  /* wide screens: table fits, so the header sticks under the top bar while the page scrolls */
 .sg td.num,.sg th:not(:first-child),.sg tr.tot td:not(:first-child){text-align:center!important}
 th.dcol{text-align:center!important;padding-left:4px!important;padding-right:4px!important}
 th .dd{display:block;font-size:10px;font-weight:500;color:var(--text3);text-transform:none;letter-spacing:0;white-space:nowrap}
@@ -126,6 +126,10 @@ tr.tot td{background:var(--subtot);color:var(--subtot-text);font-weight:700;bord
 .mh .meta{font-size:12px;color:var(--text3)}
 .mb{padding:14px 18px;display:flex;flex-direction:column;gap:12px}
 .mf{display:flex;gap:8px;justify-content:flex-end;padding:12px 18px;border-top:1px solid var(--border)}
+@media (max-width:700px){.modal{max-height:calc(100dvh - 24px);display:flex;flex-direction:column}.modal .mb{overflow:auto;flex:1;min-height:0}.modal .mb .table-wrap{max-height:none!important}.modal .mf{flex:none;background:var(--card);border-radius:0 0 14px 14px}}
+.toast.err{top:16px;bottom:auto;background:var(--red,#b42318);display:flex;gap:12px;align-items:center;max-width:min(640px,92vw);z-index:80}
+.toast.err button{all:unset;cursor:pointer;font-size:18px;line-height:1;padding:0 4px}
+.toast.err+.toast.err{top:70px}
 .x{all:unset;cursor:pointer;margin-left:auto;font-size:20px;color:var(--text3);line-height:1;padding:2px 6px}
 .btn{all:unset;cursor:pointer;border-radius:var(--r);font-size:13px;font-weight:500;padding:7px 14px;border:1px solid var(--border2);background:var(--card);color:var(--text2)}
 .btn.pri{background:var(--accent);color:#fff;border-color:var(--accent)}
@@ -171,7 +175,7 @@ th.today,td.today{background:var(--accent-bg)}
 .mg th.day{min-width:52px}
 .mg th.daystart,.mg td.daystart{border-left:2px solid var(--border2)}
 .mg td.day{padding:1px 2px;text-align:right}
-.mg th.wk,.mg td.wk{background:color-mix(in srgb,var(--bg2) 55%,transparent)}
+.mg th.wk,.mg td.wk{background:color-mix(in srgb,var(--bg2) 55%,var(--card))}
 .mg thead th.wk{background:color-mix(in srgb,var(--bg2) 55%,var(--card))}   /* header cells must be opaque: rows scroll under them */
 .mg .dsum{font-family:var(--font-num);font-size:11.5px;font-variant-numeric:tabular-nums;padding-right:6px}
 .mg .dayin{width:48px}
@@ -179,7 +183,7 @@ th.today,td.today{background:var(--accent-bg)}
 .kpi{padding:7px 12px}.kpi .v{font-size:18px}
 .mg{max-height:calc(100vh - 230px);min-height:360px}
 @media (max-width:700px){.mg .stk{min-width:130px;max-width:130px}.mg .stk2{left:130px;min-width:96px}.mg .pl2{display:none}}
-.mg td.past{background:color-mix(in srgb,var(--green-bg) 45%,transparent);text-align:right;line-height:1.15}
+.mg td.past{background:color-mix(in srgb,var(--green-bg) 45%,var(--card));text-align:right;line-height:1.15}
 .mg .act{color:var(--text);font-family:var(--font-num);font-size:12px}
 .pln{font-size:10.5px;color:var(--plan-c);font-family:var(--font-num);opacity:.9}
 .sinceln{font-size:10.5px;font-family:var(--font-num)}
@@ -258,7 +262,8 @@ th{text-align:left}th.num{text-align:right}th.c,td.c,th.grpcol,th.lh{text-align:
 .dayin,.ain,.budbtn,.estbtn{font-variant-numeric:tabular-nums}
 /* review fixes */
 .mg thead tr:first-child th{height:28px;padding-top:0;padding-bottom:0;box-sizing:border-box}
-.mg thead tr:nth-child(2) th{top:var(--h1,28px)}
+.mg thead tr:nth-child(2) th{top:calc(var(--h1,28px) - 1px)}
+.mg thead th{box-shadow:0 -2px 0 var(--card),0 1px 0 var(--border2)}   /* cover the collapsed-border gap between the 2 frozen header rows */
 .bad,.ain.bad,.dayin.bad,input.bad{outline:2px solid var(--red)!important;outline-offset:-1px;background:var(--red-bg)!important}
 .dayin.ok{background:var(--green-bg)!important;transition:background .4s}
 .btn:disabled{opacity:.45;pointer-events:none}
@@ -272,7 +277,7 @@ body:not(.showf) .mg th .f,body:not(.showf) .sg th .f{display:none}
 .pest .hint,.pest .howto,.pest th .f{display:none}.pest th{font-size:11.5px}.pest th .dd{font-size:11px}
 .pbar{flex-wrap:nowrap;overflow-x:auto}.pbar .pf,.pbar .pslides{flex-wrap:nowrap}.pbar #exitPresent{margin-left:auto;flex-shrink:0}
 .skel{background:linear-gradient(90deg,var(--skel-a) 25%,var(--skel-b) 37%,var(--skel-a) 63%);background-size:400% 100%}
-.mg td.past{background:color-mix(in srgb,var(--green-bg) var(--past-mix),transparent)}
+.mg td.past{background:color-mix(in srgb,var(--green-bg) var(--past-mix),var(--card))}
 .ain{background:var(--card)}.ain:not(:placeholder-shown){background:var(--amber-bg)}
 .x{width:32px;height:32px;display:grid;place-items:center;padding:0}
 @media (max-width:900px){.topbar .mock{display:none}.topbar h1{font-size:16px}.topbar{gap:8px}#season{max-width:150px}}
@@ -410,8 +415,8 @@ async function boot(){
     const [blocks,events,plan,acts,wins,winEv,reasons]=await Promise.all([
       paged(()=>SBC.from('farm_blocks').select('id,farm_id,sector_code,plot_code,block_add,planting_year,total_area_fed,planted_area_fed,lifecycle,variety_id,varieties(name,categories(name)),farms(name),farm_rootstocks(name)').eq('product_id','citrus').eq('active',true).in('lifecycle',['EXP','WIP']).not('variety_id','is',null).not('farm_id','is',null).order('id')),
       paged(()=>SBC.from('hp2_estimate_events').select('id,block_id,kind,value_t,entered_as,reason_code,note,created_by,created_at').eq('season_id',S_ID).order('created_at').order('id')),
-      paged(()=>SBC.from('hp2_plan_days').select('block_id,day,planned_t').eq('season_id',S_ID).order('day')),
-      paged(()=>SBC.from('hp2_actual_days').select('block_id,day,to_packhouse_t,field_sorting_t,local_sales_t,waste_t,entered_by,entered_at').eq('season_id',S_ID).order('day')),
+      paged(()=>SBC.from('hp2_plan_days').select('block_id,day,planned_t,updated_at').eq('season_id',S_ID).order('day').order('block_id')),
+      paged(()=>SBC.from('hp2_actual_days').select('block_id,day,to_packhouse_t,field_sorting_t,local_sales_t,waste_t,entered_by,entered_at').eq('season_id',S_ID).order('day').order('block_id')),
       SBC.from('hp2_windows').select('variety_id,start_date,end_date').eq('season_id',S_ID).then(r=>{if(r.error)throw r.error;return r.data||[]}),
       SBC.from('hp2_window_events').select('variety_id,start_date,end_date,note,created_by,created_at').eq('season_id',S_ID).order('created_at').then(r=>{if(r.error)throw r.error;return r.data||[]}),
       SBC.from('hp2_reasons').select('code,label,sort').eq('active',true).order('sort').then(r=>{if(r.error)throw r.error;return r.data||[]})]);
@@ -423,13 +428,14 @@ async function boot(){
     const rlabel=Object.fromEntries(reasons.map(r=>[r.code,r.label]));
     const plots=blocks.map(b=>({id:b.id,farmId:b.farm_id,farm:(b.farms&&b.farms.name)||'—',sector:b.sector_code||'',plot:(b.plot_code||'')+(b.block_add||''),
       type:(b.varieties&&b.varieties.categories&&b.varieties.categories.name)||'',root:(b.farm_rootstocks&&b.farm_rootstocks.name)||'—',variety:(b.varieties&&b.varieties.name)||'—',varietyId:b.variety_id,
-      planted:b.planting_year||'',lifecycle:b.lifecycle,area:Number(b.planted_area_fed||b.total_area_fed||0)||0.0001,budget:0,ev:[],daily:{},ameta:{}}))
+      planted:b.planting_year||'',lifecycle:b.lifecycle,area:Number(b.planted_area_fed||b.total_area_fed||0)||0.0001,budget:0,ev:[],daily:{},ameta:{},aat:{}}))
       .sort((a,b)=>a.farm.localeCompare(b.farm)||a.sector.localeCompare(b.sector)||a.plot.localeCompare(b.plot));
     const byId=Object.fromEntries(plots.map(p=>[p.id,p]));
     events.forEach(e=>{const p=byId[e.block_id];if(!p)return;p.ev.push({d:cairoDate(e.created_at),at:e.created_at,v:Number(e.value_t),by:who(e.created_by),mode:e.entered_as==='t_fed'?'yield':'volume',
-      reason:e.kind==='budget'?'Budget':(rlabel[e.reason_code]||null),note:e.note||'',round:e.kind==='budget',kind:e.kind});if(e.kind==='budget')p.budget=Number(e.value_t)});
-    acts.forEach(a=>{const p=byId[a.block_id];if(!p)return;p.daily[a.day]=[+a.to_packhouse_t,+a.field_sorting_t,+a.local_sales_t,+a.waste_t];p.ameta[a.day]={by:who(a.entered_by),at:new Date(a.entered_at).toLocaleString('en-GB',{timeZone:'Africa/Cairo',dateStyle:'short',timeStyle:'short'})}});
-    const PLAN={};plan.forEach(r=>PLAN[r.block_id+'|'+r.day]=Number(r.planned_t));
+      reason:e.kind==='budget'?'Budget':(rlabel[e.reason_code]||null),note:e.note||'',round:e.kind==='budget',kind:e.kind,code:e.reason_code||null});if(e.kind==='budget')p.budget=Number(e.value_t)});
+    acts.forEach(a=>{const p=byId[a.block_id];if(!p)return;p.daily[a.day]=[+a.to_packhouse_t,+a.field_sorting_t,+a.local_sales_t,+a.waste_t];p.aat[a.day]=a.entered_at;p.ameta[a.day]={by:who(a.entered_by),at:new Date(a.entered_at).toLocaleString('en-GB',{timeZone:'Africa/Cairo',dateStyle:'short',timeStyle:'short'})}});
+    const PLAN={},PLAN_AT={};plan.forEach(r=>{PLAN[r.block_id+'|'+r.day]=Number(r.planned_t);PLAN_AT[r.block_id+'|'+r.day]=r.updated_at});
+    plots.forEach(p=>{const u=p.ev.filter(e=>!e.round);u.forEach((e,i)=>{if(u[i+1]&&u[i+1].code==='correction')e.superseded=true})});
     const vname={};plots.forEach(p=>vname[p.varietyId]=p.variety);
     const windows={};plots.forEach(p=>{if(!windows[p.variety])windows[p.variety]={varietyId:p.varietyId,start:null,end:null,log:[]}});
     wins.forEach(w=>{const k=vname[w.variety_id];if(k){windows[k].start=w.start_date;windows[k].end=w.end_date}});
@@ -449,7 +455,7 @@ async function boot(){
     const today=cairoDate(Date.now());
     /* "changes since week N": options are ISO weeks (Mon–Sun); each value is the day before that week's Monday */
     const meetings=[];{const t=new Date(today+'T00:00:00Z');t.setUTCDate(t.getUTCDate()-((t.getUTCDay()+6)%7)-1);for(let k=0;k<10;k++){meetings.push(t.toISOString().slice(0,10));t.setUTCDate(t.getUTCDate()-7)}}
-    startApp({sb:SBC,season,seasonId:S_ID,y1,today,plots,plan:PLAN,windows,tf,reasons,meetings,me:{id:session.user.id,name:acct.name||'Me'}});
+    startApp({sb:SBC,season,seasonId:S_ID,y1,today,plots,plan:PLAN,planAt:PLAN_AT,windows,tf,reasons,meetings,me:{id:session.user.id,name:acct.name||'Me'}});
   }catch(err){gate('Could not load','Live-data load error: '+esc0((err&&err.message)||String(err))+'. Refresh if you just signed in.',false);console.error(err)}
 }
 function esc0(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
@@ -476,7 +482,9 @@ const n0=x=>x==null||isNaN(x)?'–':(Math.abs(x-Math.round(x))<0.05?Math.round(x
 const n1=x=>x==null||isNaN(x)||!isFinite(x)?'–':x.toLocaleString('en-US',{minimumFractionDigits:1,maximumFractionDigits:1});
 const sgn=(x,f=n0)=>x>0.5?'+'+f(x):x<-0.5?'−'+f(-x):'0';
 // tonnes typed by people: Arabic digits and comma decimals accepted; '' = 0; anything else (text, negatives) = NaN
-const parseT=v=>{let t=String(v??'').trim().replace(/[\u0660-\u0669]/g,c=>c.charCodeAt(0)-0x660).replace(/[\u066B,]/g,'.');if(t==='')return 0;return /^(\d+\.?\d*|\.\d+)$/.test(t)?+t:NaN};
+const parseT=v=>{let t=String(v??'').trim().replace(/[\u0660-\u0669]/g,c=>c.charCodeAt(0)-0x660).replace(/[\u06F0-\u06F9]/g,c=>c.charCodeAt(0)-0x6F0).replace(/[\u066C\s]/g,'');
+  if(/^\d{1,3}(,\d{3})+(\.\d+)?$/.test(t))t=t.replace(/,/g,'');   /* 1,200 / 12,500.5 = thousands */
+  t=t.replace(/[\u066B,]/g,'.');if(t==='')return 0;return /^(\d+\.?\d*|\.\d+)$/.test(t)?+t:NaN};
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 
 // ---------- plots (from farm_blocks + hp2_* tables, built by the loader) ----------
@@ -486,11 +494,15 @@ PLOTS.forEach(recalc);
 
 // ---------- formulas (mirror of the sheet) ----------
 const productive=p=>p.lifecycle==='EXP';                                     // productive = Land Cloud lifecycle EXP
-const estAt=(p,d)=>{let v=null;for(const e of p.ev) if(e.d<=d) v=e.v;if(v==null){const b=p.ev.find(e=>e.round);return b?b.v:0}return v};   /* before any entry, the estimate is the budget (a budget loaded later is the baseline, not a move) */
-const est=p=>p.ev.length?p.ev[p.ev.length-1].v:0;                                          // Q: latest estimate (input)
+/* estimate = latest estimate UPDATE; before any update it is the budget. Budget entries (incl. corrections of the budget) never count as an estimate or a move. */
+const upds=p=>p.ev.filter(e=>!e.round);
+const estAt=(p,d)=>{let v=null;for(const e of upds(p)) if(e.d<=d) v=e.v;return v??p.budget};
+const est=p=>{const u=upds(p);return u.length?u[u.length-1].v:p.budget};                   // Q: latest estimate (input)
+/* value before an update: the previous non-superseded update, else the budget (a 'correction' replaces the mistyped entry it follows) */
+const prevOf=(p,e)=>{const u=upds(p);let v=p.budget;for(const x of u){if(x===e)break;if(!x.superseded)v=x.v}return v};
 const total=p=>p.act;   /* Raw PK basis (Ibrahim): only fruit to the packhouse counts against budget, estimate and plan; sorting, local sales and waste are recorded for reference */
-const changes=(p,from,to=TODAY)=>p.ev.filter(e=>!e.round&&e.d>from&&e.d<=to);
-const inSeason=p=>p.ev.filter(e=>!e.round);
+const changes=(p,from,to=TODAY)=>p.ev.filter(e=>!e.round&&!e.superseded&&e.d>from&&e.d<=to);
+const inSeason=p=>p.ev.filter(e=>!e.round&&!e.superseded);
 function agg(list,since){
   const o={area:0,parea:0,budget:0,jul:0,nov:0,est:0,act:0,local:0,culls:0,tot:0,prev:0,n:0,nNew:0,plots:list.length};
   for(const p of list){o.area+=p.area;if(productive(p))o.parea+=p.area;o.budget+=p.budget;o.jul+=estAt(p,JUL_END);o.est+=est(p);
@@ -501,7 +513,7 @@ function agg(list,since){
 // ---------- state ----------
 const S={tab:'est',farm:'All',type:'All',q:'',since:(addDays(MEETINGS[0],1)===TODAY?MEETINGS[1]:MEETINGS[0]),group:'farm',reason:'All'};
 try{const u=JSON.parse(localStorage.getItem('hp2-ui')||'{}');S.tab=u.tab||S.tab;S.group=u.group||S.group;if(MEETINGS.includes(u.since))S.since=u.since;
-  S.farm=u.farm||'All';S.type=u.type||'All';S.days=u.days||7;S.wk=u.wk||0;S.howto=!!u.howto}catch(e){}
+  S.farm=u.farm||'All';S.type=u.type||'All';S.days=u.days||7;S.wk=0;S.howto=!!u.howto}catch(e){}
 const saveUI=()=>{try{localStorage.setItem('hp2-ui',JSON.stringify({tab:S.tab,group:S.group,since:S.since,farm:S.farm,type:S.type,days:S.days,wk:S.wk,howto:S.howto}))}catch(e){}};
 const FARMS=['All',...new Set(PLOTS.map(p=>p.farm))];
 const TYPES=['All',...new Set(PLOTS.map(p=>p.type))];
@@ -567,7 +579,7 @@ document.addEventListener('mouseover',e=>{
       `<div class="foot">Click for full history</div>`;
   } else {
     const list=GROUPS[id]||[];const evs=[];
-    list.forEach(p=>changes(p,S.since).forEach(e=>{const i=p.ev.indexOf(e);evs.push({p,e,d:e.v-(i?p.ev[i-1].v:0)})}));
+    list.forEach(p=>changes(p,S.since).forEach(e=>evs.push({p,e,d:e.v-prevOf(p,e)})));
     evs.sort((a,b)=>Math.abs(b.d)-Math.abs(a.d));
     const net=evs.reduce((s,x)=>s+x.d,0);
     html=`<div class="h">${esc(id)} · ${evs.length} changes since ${sinceLbl()} · net <span class="${net>0?'pos':'neg'}">${sgn(net)} t</span></div>`+
@@ -588,20 +600,30 @@ function kpis(list){
    <div class="kpi"><div class="k">Budget</div><div class="v">${a.budget?n0(a.budget)+' t':'–'}</div><div class="s">${a.budget?n1(a.budget/a.area)+' t/fed':'not set yet'}</div></div>
    <div class="kpi hl"><div class="k">Latest estimate</div><div class="v">${a.est?n0(a.est)+' t':'–'}</div><div class="s">${a.est&&a.budget?`<span class="${d>=0?'pos':'neg'}">${sgn(d)} t vs budget (${sgn(d/a.budget*100,n1)}%)</span>`:a.est?'no budget yet':'no estimates yet'}</div></div>
    <div class="kpi"><div class="k">Moved since ${sinceLbl()}</div><div class="v ${a.est-a.prev>=0?'pos':'neg'}">${sgn(a.est-a.prev)} t</div><div class="s">${a.nNew} plot changes</div></div>
-   <div class="kpi"><div class="k">Raw PK harvested</div><div class="v">${n0(a.tot)} t</div><div class="s">+ ${n0(a.local)} sorting &amp; local farm sales, ${n0(a.culls)} farm waste (not counted)</div></div>
+   <div class="kpi"><div class="k">Raw PK harvested</div><div class="v">${n0(a.tot)} t</div><div class="s">+ ${n0(a.local)} field sorting &amp; local farm sales, ${n0(a.culls)} farm waste (not counted)</div></div>
    <div class="kpi"><div class="k">Remaining</div><div class="v">${n0(a.rem)} t</div><div class="s">${a.est?n0(a.tot/a.est*100)+'% of estimate harvested':'needs an estimate'}</div></div>
   </div>`;
 }
 
 // Daily plan values: planned Raw PK t/day per plot (input). Seeded for the mockup.
-const PLAN=DB.plan;
+const PLAN=DB.plan,PLAN_AT=DB.planAt||{};
 function planVal(p,d){return PLAN[p.id+'|'+d]||0}
-async function savePlan(k,v,old){const i=k.lastIndexOf('|'),bid=k.slice(0,i),day=k.slice(i+1);
-  const r=v>0?await SB.from('hp2_plan_days').upsert({season_id:DB.seasonId,block_id:bid,day,planned_t:v,updated_by:DB.me.id},{onConflict:'season_id,block_id,day'})
-             :await SB.from('hp2_plan_days').delete().eq('season_id',DB.seasonId).eq('block_id',bid).eq('day',day);
+/* one RPC per cell: refuses if someone else changed the cell since this page loaded it (CONFLICT), and only reports success when the DB really saved/cleared it */
+let PENDING=0;
+async function savePlan(k,v,old,force){const i=k.lastIndexOf('|'),bid=k.slice(0,i),day=k.slice(i+1);PENDING++;
+  const r=await SB.rpc('hp2_save_plan_cell',{p_season:DB.seasonId,p_block:bid,p_day:day,p_value:v>0?v:null,p_expect_at:PLAN_AT[k]||null,p_check:!force});PENDING--;
   const cell=()=>document.querySelector(`[data-plan="${k}"]`);
-  if(r.error){PLAN[k]=old;keepScroll(render);toast('Plan not saved: '+r.error.message);cell()?.classList.add('bad');return}
+  if(r.error||!r.data){PLAN[k]=old;rerenderKeep();cell()?.classList.add('bad');
+    const msg=(r.error&&r.error.message)||'no reply from the database';
+    if(/CONFLICT/.test(msg)){const now=(msg.match(/now ([^)]+)\)/)||[])[1];
+      if(confirm(`Someone else changed this plan cell after you opened the page (it is now ${now}).\n\nOK = overwrite with your ${n1(v)} t\nCancel = keep theirs (the page will reload)`)){PLAN[k]=v;savePlan(k,v,old,true);rerenderKeep();return}
+      location.reload();return}
+    errToast('Plan not saved: '+msg);return}
+  if(r.data.cleared){delete PLAN_AT[k]}else PLAN_AT[k]=r.data.updated_at;
   const c=cell();if(c){c.classList.add('ok');setTimeout(()=>c.classList.remove('ok'),1400)}}
+/* redraw but keep whatever the user is typing in another cell */
+function rerenderKeep(){const a=document.activeElement,k=a&&a.dataset&&a.dataset.plan,val=a&&a.value,ss=a&&a.selectionStart;keepScroll(render);
+  if(k){const n=document.querySelector(`[data-plan="${k}"]`);if(n){n.value=val;n.focus();try{n.setSelectionRange(ss,ss)}catch(e){}}}}
 const planDays=()=>{const n=S.days||7;const s=addDays(TODAY,(S.wk||0)*7-3);return [...Array(n)].map((_,i)=>addDays(s,i))};
 function viewEst(part){
   const list=filtered();const days=planDays();
@@ -654,7 +676,7 @@ function viewEst(part){
     const ent=Object.entries(g).sort((a,b)=>a[0].localeCompare(b[0]));
     return `<div class="card"><h2>Summary by ${label.toLowerCase()}</h2><div class="sub">Same columns as the old plan sheet. Past days (shaded) show the actual with the plan under it (green = above plan, red = below); today on shows the plan.</div>
      <div class="table-wrap"><table class="sg"><thead><tr><th>${label}</th><th>Total area</th><th>EXP area</th><th>EXP area qty<span class="f">latest, EXP plots</span></th><th>Yield/area EXP<span class="f">= qty ÷ EXP area</span></th><th>Yield/area<span class="f">= latest ÷ total area</span></th>
-      <th>Budget qty</th><th>${monthSel()}</th><th>Latest update</th><th>Raw PK actual</th><th>Local farm sales<span class="f">sorting + local, not counted</span></th><th>Farm waste<span class="f">not counted</span></th><th>Remaining<span class="f">= latest − Raw PK actual</span></th><th class="daystart">Actual so far<span class="f">past days · vs plan</span></th><th>Plan ahead<span class="f">today on</span></th>
+      <th>Budget qty</th><th>${monthSel()}</th><th>Latest update</th><th>Raw PK actual</th><th>Local farm sales<span class="f">incl. field sorting · not counted</span></th><th>Farm waste<span class="f">not counted</span></th><th>Remaining<span class="f">= latest − Raw PK actual</span></th><th class="daystart">Actual so far<span class="f">past days · vs plan</span></th><th>Plan ahead<span class="f">today on</span></th>
       ${days.map((d,i)=>{const t=new Date(d+'T00:00:00Z');return `<th class="dcol ${i===0?'daystart':''} ${wkCls(d)}">${t.toLocaleDateString('en-GB',{weekday:'short',timeZone:'UTC'})}<span class="dd">${fmtD(d)}</span></th>`}).join('')}</tr></thead>
       <tbody>${ent.map(([k,ps])=>row(esc(k),ps)).join('')}${row('Total',list,'tot')}</tbody></table></div></div>`};
   const dayNav=`<span class="lbl">Days</span><div class="seg"><button data-wk="-1" aria-label="Previous week" title="Previous week">‹ Week</button><span class="segtxt">Wk ${isoWeek(s0)}${isoWeek(s1)!==isoWeek(s0)?'–'+isoWeek(s1):''} · ${fmtD(s0)} – ${fmtD(s1)}</span><button data-wk="1" aria-label="Next week" title="Next week">Week ›</button></div><button class="btn sm" data-wk="0" ${(S.wk||0)===0?'disabled':''}>Today</button>
@@ -686,15 +708,14 @@ function viewEst(part){
   <div class="legendrow"><span><b class="av">12</b> Actual (Raw PK): upright, bold</span><span><b class="pc">10</b> Plan: italic, dashed underline</span><span><span class="vm up">▲</span><span class="vm dn">▼</span> above / below plan</span><span><i class="lg past"></i>Past day</span><span><i class="lg today"></i>Today</span><span><i class="lg fri"></i>Friday (weekend)</span><span><i class="lg off"></i>Outside the variety's harvest window</span><span><i class="lg ok"></i>Plan saved</span></div>
   ${part==='grid'?'':sumGrid(p=>p.variety,'Variety')+sumGrid(p=>p.farm,'Farm')}`;
 }
-document.addEventListener('click',e=>{const w=e.target.closest('[data-wk]');if(w){const v=+w.dataset.wk;S.wk=v?(S.wk||0)+v:0;render()}
+document.addEventListener('click',e=>{const w=e.target.closest('[data-wk]');if(w){const v=+w.dataset.wk;const nw=v?(S.wk||0)+v:0,s0=addDays(TODAY,nw*7-3);if(v&&(s0<DB.y1+'-07-01'||s0>(DB.y1+1)+'-06-30')){toast('That is outside the '+DB.y1+'/'+String(DB.y1+1).slice(2)+' season');return}S.wk=nw;render()}
   const d=e.target.closest('[data-days]');if(d){S.days=+d.dataset.days;render()}});
 // Enter in a plan cell or a Log harvest box moves to the same column one row down
 document.addEventListener('keydown',e=>{if(e.key!=='Enter'||e.shiftKey)return;const i=e.target;if(!i.matches||!i.matches('.dayin[data-plan],#lgrid .ain'))return;e.preventDefault();
   const td=i.closest('td'),tr=td.parentElement,col=[...tr.children].indexOf(td);let n=tr.nextElementSibling;
   while(n){const c=n.children[col]?.querySelector('input');if(c){i.blur&&i.dispatchEvent(new Event('change',{bubbles:true}));const sel=c.dataset.plan?`[data-plan="${c.dataset.plan}"]`:null;setTimeout(()=>{(sel?document.querySelector(sel):c)?.focus();(sel?document.querySelector(sel):c)?.select?.()},0);return}n=n.nextElementSibling}});
 document.addEventListener('change',e=>{const i=e.target.closest('[data-plan]');if(!i)return;const k=i.dataset.plan,x=parseT(i.value);if(isNaN(x)){i.classList.add('bad');toast('Plan not saved: type a number, 0 or more');return}const v=r2(x),old=PLAN[k]||0;if(v===old){i.classList.remove('bad');return}PLAN[k]=v;savePlan(k,v,old);
-  const nxt=i.closest('td')?.nextElementSibling?.querySelector('input')?.dataset.plan;keepScroll(render);
-  if(nxt)document.querySelector(`[data-plan="${nxt}"]`)?.focus();});
+  rerenderKeep();});
 function keepScroll(fn){const w=document.querySelector('.mg,#pgrid');const y=scrollY,sx=w?.scrollLeft,sy=w?.scrollTop;fn();scrollTo(0,y);
   const w2=document.querySelector('.mg,#pgrid');if(w2){w2.scrollLeft=sx||0;w2.scrollTop=sy||0}}
 
@@ -730,7 +751,7 @@ function viewSum(){
 }
 
 function allChanges(list,from,to=TODAY){
-  const out=[];list.forEach(p=>p.ev.forEach((e,i)=>{if(!e.round&&e.d>from&&e.d<=to){const prev=i?p.ev[i-1].v:0;out.push({p,e,prev,d:e.v-prev})}}));
+  const out=[];list.forEach(p=>changes(p,from,to).forEach(e=>{const prev=prevOf(p,e);out.push({p,e,prev,d:e.v-prev})}));
   return out.sort((a,b)=>b.e.d.localeCompare(a.e.d)||Math.abs(b.d)-Math.abs(a.d));
 }
 function viewChg(){
@@ -834,7 +855,7 @@ function openEdit(id,kindIn){
   const ok=()=>tv!=null&&!isNaN(tv)&&(!hasPrev||Math.abs(r2(tv)-r2(cur))>=0.01);
   inp.addEventListener('input',()=>{const x=parseT(inp.value);tv=inp.value.trim()===''?null:isNaN(x)?NaN:(mode==='yield'?x*p.area:x);inp.classList.toggle('bad',isNaN(tv)&&tv!==null)});
   const upd=()=>{$('#saveEst').disabled=!ok();const v=tv==null||isNaN(tv)?null:tv;const d=v==null?0:v-cur;$('#rsWrap').hidden=kind==='budget';
-    $('#cmp').innerHTML=`<div><span>Current ${kind==='budget'?'budget':'estimate'}</span><b>${cur?n0(cur)+' t':'–'}</b><span>${cur?n1(cur/p.area)+' t/fed':'not set'}</span></div><div><span>New</span><b>${v==null?'–':n0(v)+' t'}</b><span>${v==null?'':n1(v/p.area)+' t/fed'}</span></div><div><span>Change</span><b class="${d>0?'pos':d<0?'neg':''}">${sgn(d)} t</b><span>${cur?sgn(d/cur*100,n1)+'%':''}</span></div>`};
+    $('#cmp').innerHTML=`<div><span>Current ${kind==='budget'?'budget':'estimate'}</span><b>${cur?n0(cur)+' t':'–'}</b><span>${cur?n1(cur/p.area)+' t/fed':'not set'}</span></div><div><span>New</span><b>${v==null?'–':n0(v)+' t'}</b><span>${v==null?'':n1(v/p.area)+' t/fed'}</span></div><div><span>Change</span><b class="${d>0?'pos':d<0?'neg':''}">${sgn(d)} t</b><span>${cur?sgn(d/cur*100,n1)+'%':''}</span></div>${kind!=='budget'&&v!=null&&v<total(p)?`<div style="grid-column:1/-1;color:var(--red);font-size:12.5px">Below the ${n1(total(p))} t Raw PK already harvested: Remaining will show ${n1(v-total(p))} t.</div>`:''}`};
   inp.oninput=upd;upd();inp.focus();inp.select();
   $('#modeSeg').onclick=e=>{const b=e.target.closest('[data-m]');if(!b)return;const v=tv==null||isNaN(tv)?null:tv;mode=b.dataset.m;
     document.querySelectorAll('#modeSeg button').forEach(x=>x.classList.toggle('on',x===b));
@@ -843,15 +864,20 @@ function openEdit(id,kindIn){
   $('#rs').onclick=e=>{const b=e.target.closest('[data-r]');if(!b)return;reason=reason===b.dataset.r?null:b.dataset.r;
     document.querySelectorAll('#rs .chip').forEach(x=>x.classList.toggle('on',x.dataset.r===reason))};
   $('#saveEst').onclick=async()=>{if(!ok()){inp.focus();inp.classList.add('bad');return}const v=tv;
-    const btn=$('#saveEst');btn.textContent='Saving…';btn.style.pointerEvents='none';
+    const btn=$('#saveEst');if(btn.disabled&&btn.textContent==='Saving…')return;btn.textContent='Saving…';btn.disabled=true;
     const row={season_id:DB.seasonId,block_id:p.id,kind,value_t:r2(v),entered_as:mode==='yield'?'t_fed':'t',reason_code:kind==='budget'?null:(REASON_CODE[reason]||null),note:$('#note').value.trim()||null,created_by:DB.me.id};
     const {data,error}=await SB.from('hp2_estimate_events').insert(row).select('created_at').single();
-    if(error){btn.textContent=kind==='budget'?'Save budget':'Save estimate';btn.style.pointerEvents='';toast('Not saved: '+error.message);return}
-    p.ev.push({d:cairoDate0(data.created_at),at:data.created_at,v:r2(v),by:DB.me.name,mode,reason:kind==='budget'?'Budget':reason,note:row.note||'',round:kind==='budget',kind});
+    if(error){btn.textContent=kind==='budget'?'Save budget':'Save estimate';btn.disabled=false;errToast('Not saved: '+error.message);return}
+    p.ev.push({d:cairoDate0(data.created_at),at:data.created_at,v:r2(v),by:DB.me.name,mode,reason:kind==='budget'?'Budget':reason,note:row.note||'',round:kind==='budget',kind,code:row.reason_code});
+    if(row.reason_code==='correction'){const u=upds(p);if(u.length>1)u[u.length-2].superseded=true}
     if(kind==='budget')p.budget=r2(v);
     closeModal(true);keepScroll(render);toast(`Saved · ${p.sector}-${p.plot} ${kind==='budget'?'budget':'estimate'} ${cur?n0(cur)+' → ':''}${n0(v)} t`)};
 }
 function toast(m){const t=document.createElement('div');t.className='toast';t.textContent=m;document.body.appendChild(t);setTimeout(()=>t.remove(),2600)}
+/* errors stay until dismissed; expired login gets a sign-in hint */
+function errToast(m,long){if(/JWT|jwt|expired|401|not allowed/.test(m))m+=' — your sign-in may have expired: reload the page and sign in again.';
+  const t=document.createElement('div');t.className='toast err';t.setAttribute('role','alert');t.innerHTML=`<span>${esc(m)}</span><button aria-label="Dismiss">×</button>`;t.querySelector('button').onclick=()=>t.remove();document.body.appendChild(t)}
+addEventListener('beforeunload',e=>{if(PENDING>0||(document.querySelector('.modal')&&modalDirty())||document.activeElement?.matches?.('.dayin[data-plan]')&&document.activeElement.value!==document.activeElement.defaultValue){e.preventDefault();e.returnValue=''}});
 
 function setSide(open){document.body.classList.toggle('side-open',open);$('#sideOv').hidden=!open;$('#menuBtn').setAttribute('aria-expanded',open)}
 $('#menuBtn').onclick=()=>setSide(!document.body.classList.contains('side-open'));
@@ -869,11 +895,19 @@ const softAin=box=>[...box.querySelectorAll('[data-ai]')].map(i=>{const x=parseT
 // rows = [{p, a:[pack,sort,local,waste]}] for ONE day → one atomic RPC
 async function saveActs(d,rows){
   if(!rows.length)return true;
-  const {error}=await SB.rpc('hp2_save_actuals_day',{p_season:DB.seasonId,p_day:d,p_rows:rows.map(({p,a})=>({block_id:p.id,to_packhouse_t:a[0],field_sorting_t:a[1],local_sales_t:a[2],waste_t:a[3]}))});
-  if(error){toast('Not saved: '+error.message);return false}
+  const {error}=await SB.rpc('hp2_save_actuals_day',{p_season:DB.seasonId,p_day:d,p_rows:rows.map(({p,a})=>({block_id:p.id,expect_at:(p.aat&&p.aat[d])||null,to_packhouse_t:r3(a[0]),field_sorting_t:r3(a[1]),local_sales_t:r3(a[2]),waste_t:r3(a[3])}))});
+  if(error){if(/CONFLICT/.test(error.message)){const id=(error.message.match(/CONFLICT: ([0-9a-f-]{36})/)||[])[1],pp=PLOTS.find(x=>x.id===id);
+      errToast(`Not saved: ${pp?pp.sector+'-'+pp.plot+' ':''}was changed by someone else on ${fmtD(d)} after you opened it. Nothing was saved. Reload the page to see their entry, then enter yours again.`,true)}
+    else errToast('Not saved: '+error.message);return false}
+  await refreshActDay(d,rows.map(r=>r.p));
   const m={by:DB.me.name,at:new Date().toLocaleString('en-GB',{timeZone:'Africa/Cairo',dateStyle:'short',timeStyle:'short'})};
-  rows.forEach(({p,a})=>applyAct(p,d,a,m));return true;
+  rows.forEach(({p,a})=>applyAct(p,d,a.map(r3),m));return true;
 }
+const r3=x=>Math.round(x*1000)/1000;
+/* re-read one day's actuals for some plots from the DB (fresh versions for conflict checks; shows colleagues' entries) */
+async function refreshActDay(d,ps){const ids=ps.map(p=>p.id);const got={};
+  for(let i=0;i<ids.length;i+=150){const r=await SB.from('hp2_actual_days').select('block_id,to_packhouse_t,field_sorting_t,local_sales_t,waste_t,entered_at').eq('season_id',DB.seasonId).eq('day',d).in('block_id',ids.slice(i,i+150));if(r.error)return false;(r.data||[]).forEach(x=>got[x.block_id]=x)}
+  ps.forEach(p=>{const x=got[p.id];p.aat=p.aat||{};if(x){p.daily[d]=[+x.to_packhouse_t,+x.field_sorting_t,+x.local_sales_t,+x.waste_t];p.aat[d]=x.entered_at}else{delete p.daily[d];delete p.aat[d]}recalc(p)});return true}
 const actRow=(p,d)=>(p.daily[d]||[0,0,0,0]).slice();
 const colHead=([k,l,ar,c])=>`<span class="ch">${l}<span class="ar" lang="ar">${ar}</span></span>`;
 function actFields(arr,pre){return ACOLS.map((c,j)=>`<div class="field"><label class="lbl" for="${pre}${j}">${colHead(c)}</label><input class="ain" style="--c:${c[3]}" id="${pre}${j}" data-ai="${j}" inputmode="decimal" value="${arr[j]||''}" placeholder="—"></div>`).join('')}
@@ -887,13 +921,16 @@ function openActual(id,d){
   const read=()=>softAin($('#aflds'));
   const upd=()=>{const a=read(),pl=planVal(p,date);$('#acmp').innerHTML=`<div><span>Raw PK</span><b>${n1(a[0])}</b><span>all picked ${n1(aDay(a))} t</span></div><div><span>Planned</span><b>${n0(pl)}</b><span>${fmtD(date)}</span></div><div><span>Vs plan</span><b style="font-size:13px;padding-top:4px">${vsPlan(a,pl)}</b><span>±10% = on plan</span></div>`};
   $('#aflds').oninput=upd;upd();document.querySelector('#af0').focus();
-  $('#adate').onchange=e=>{if(modalDirty()&&!confirm('Discard the entries you typed for '+fmtD(date)+'?')){e.target.value=date;return}date=e.target.value||TODAY;$('#aflds').innerHTML=actFields(actRow(p,date),'af');$('#ameta').textContent=meta().replace(/&amp;/g,'&');$('#clrAct').hidden=!p.daily[date];upd()};
+  refreshActDay(date,[p]).then(()=>{if(!modalDirty()&&$('#aflds')){$('#aflds').innerHTML=actFields(actRow(p,date),'af');$('#ameta').textContent=meta().replace(/&amp;/g,'&');$('#clrAct').hidden=!p.daily[date];upd()}});
+  $('#adate').onchange=async e=>{if(modalDirty()&&!confirm('Discard the entries you typed for '+fmtD(date)+'?')){e.target.value=date;return}date=e.target.value||TODAY;await refreshActDay(date,[p]);$('#aflds').innerHTML=actFields(actRow(p,date),'af');$('#ameta').textContent=meta().replace(/&amp;/g,'&');$('#clrAct').hidden=!p.daily[date];upd()};
   $('#clrAct').onclick=async()=>{if(!confirm('Delete the harvest entry for '+fmtD(date)+'?'))return;if(!await saveActs(date,[{p,a:[0,0,0,0]}]))return;closeModal(true);keepScroll(render);toast(`Cleared · ${p.sector}-${p.plot} ${fmtD(date)}`)};
-  $('#saveAct').onclick=async()=>{const a=readAin($('#aflds'));if(!a){toast('Fix the boxes in red: numbers only, 0 or more');return}if(!await saveActs(date,[{p,a}]))return;closeModal(true);keepScroll(render);toast(`Saved · ${p.sector}-${p.plot} ${fmtD(date)} · ${n1(aDay(a))} t`)};
+  $('#saveAct').onclick=async()=>{const sb=$('#saveAct');if(sb.disabled)return;const a=readAin($('#aflds'));if(!a){toast('Fix the boxes in red: numbers only, 0 or more');return}sb.disabled=true;if(!await saveActs(date,[{p,a}])){sb.disabled=false;return}closeModal(true);keepScroll(render);toast(`Saved · ${p.sector}-${p.plot} ${fmtD(date)} · ${n1(aDay(a))} t`)};
 }
 function openLog(){
   let date=TODAY,farm=S.farm==='All'?FARMS[1]:S.farm,onlyOpen=true;
-  const body=()=>{const ps=PLOTS.filter(p=>p.farm===farm&&(!onlyOpen||!(p.ev.length&&est(p)-total(p)<=1)||planVal(p,date)>0||p.daily[date]));
+  const recent=p=>[...Array(8)].some((_,i)=>{const d=addDays(date,-i);return p.daily[d]||planVal(p,d)>0});   /* never hide plots harvested or planned in the last 7 days */
+  const hidden=()=>PLOTS.filter(p=>p.farm===farm&&onlyOpen&&est(p)-total(p)<=1&&!recent(p)&&!planVal(p,date)&&!p.daily[date]).length;
+  const body=()=>{const ps=PLOTS.filter(p=>p.farm===farm&&(!onlyOpen||!(est(p)-total(p)<=1)||recent(p)||planVal(p,date)>0||p.daily[date]));
     return `<table><thead><tr><th>Plot</th><th>Remaining</th><th>Planned</th>${ACOLS.map(c=>`<th class="lh" style="--c:${c[3]}">${colHead(c)}</th>`).join('')}<th>All picked<span class="f">= sum</span></th><th>Raw PK vs plan</th></tr></thead><tbody>
     ${ps.map(p=>{const a=actRow(p,date);return `<tr data-lrow="${p.id}"><td class="lp"><span class="plot">${p.sector}-${p.plot}</span> <span class="vname" style="font-size:12px">${esc(p.variety)}</span></td><td class="num calc" data-label="Remaining">${n0(est(p)-total(p))}</td>
       <td class="num pc" data-label="Plan">${n0(planVal(p,date))}</td>${a.map((v,j)=>`<td class="la" data-label="${ACOLS[j][1]}" style="padding:4px 5px"><input class="ain" style="--c:${ACOLS[j][3]}" data-ai="${j}" value="${v||''}" placeholder="—" inputmode="decimal" aria-label="${p.sector}-${p.plot} ${ACOLS[j][1]}"></td>`).join('')}<td class="num lt" data-label="All picked">${aDay(a)?n1(aDay(a)):'0'}</td><td class="lv" data-label="Raw PK vs plan" data-pl="${planVal(p,date)}">${vsPlan(a,planVal(p,date))}</td></tr>`}).join('')||`<tr><td colspan="9" class="calc" style="white-space:normal;padding:14px">${onlyOpen?'Every plot on this farm is fully harvested against its estimate. Untick \'Hide fully harvested plots\' to see them.':'No plots on this farm.'}</td></tr>`}</tbody></table>`};
@@ -901,22 +938,23 @@ function openLog(){
    <div class="mb"><div style="display:flex;gap:10px;align-items:end;flex-wrap:wrap">
      <div class="field"><label class="lbl" for="ldate">Date</label><input type="date" id="ldate" data-nd max="${TODAY}" value="${date}" style="font-size:14px"></div>
      <div class="field"><label class="lbl" for="lfarm">Farm</label><select class="sel" id="lfarm" style="font-size:14px;padding:7px 10px">${FARMS.slice(1).map(f=>`<option ${f===farm?'selected':''}>${f}</option>`).join('')}</select></div>
-     <label style="font-size:12.5px;color:var(--text2);display:flex;gap:6px;align-items:center;padding-bottom:8px"><input type="checkbox" id="lopen" checked> Hide fully harvested plots</label></div>
+     <label style="font-size:12.5px;color:var(--text2);display:flex;gap:6px;align-items:center;padding-bottom:8px"><input type="checkbox" id="lopen" checked> Hide fully harvested plots <span id="lhid" class="calc"></span></label></div>
    <div class="table-wrap" id="lgrid" style="max-height:55vh">${body()}</div><div class="calc" id="lsum" style="font-size:12.5px"></div></div>
    <div class="mf"><button class="btn" data-close>Cancel</button><button class="btn pri" id="saveLog">Save day</button></div>`);
   document.querySelector('.modal').style.width='min(1000px,100%)';
   const sum=()=>{let t=0,n=0;document.querySelectorAll('#lgrid [data-lrow]').forEach(r=>{const a=softAin(r);r.querySelectorAll('[data-ai]').forEach(i=>i.classList.toggle('bad',isNaN(parseT(i.value))));const v=aDay(a);r.querySelector('.lt').textContent=v?n1(v):'0';r.querySelector('.lv').innerHTML=vsPlan(a,+r.querySelector('.lv').dataset.pl);if(v){t+=v;n++}});$('#lsum').textContent=`${n} plot${n===1?'':'s'} · ${n1(t)} t total on ${fmtDY(date)}`};
-  const redraw=()=>{$('#lgrid').innerHTML=body();alignHeads($('#lgrid'));sum()};
-  $('#lgrid').oninput=sum;sum();
+  const redraw=()=>{$('#lgrid').innerHTML=body();alignHeads($('#lgrid'));sum();const h=hidden();$('#lhid').textContent=h?`(${h} hidden)`:''};
+  const fresh=async()=>{const d0=date,f0=farm;$('#lgrid').style.opacity=.5;await refreshActDay(date,PLOTS.filter(p=>p.farm===farm));$('#lgrid').style.opacity='';if(d0===date&&f0===farm&&!modalDirty())redraw()};
+  $('#lgrid').oninput=sum;sum();fresh();
   const keep=()=>!modalDirty()||confirm('Discard the entries you typed?');
-  $('#ldate').onchange=e=>{if(!keep()){e.target.value=date;return}date=e.target.value||TODAY;redraw()};$('#lfarm').onchange=e=>{if(!keep()){e.target.value=farm;return}farm=e.target.value;redraw()};$('#lopen').onchange=e=>{if(!keep()){e.target.checked=onlyOpen;return}onlyOpen=e.target.checked;redraw()};
+  $('#ldate').onchange=e=>{if(!keep()){e.target.value=date;return}date=e.target.value||TODAY;redraw();fresh()};$('#lfarm').onchange=e=>{if(!keep()){e.target.value=farm;return}farm=e.target.value;redraw();fresh()};$('#lopen').onchange=e=>{if(!keep()){e.target.checked=onlyOpen;return}onlyOpen=e.target.checked;redraw()};
   $('#saveLog').onclick=async()=>{const rows=[];let bad=0;document.querySelectorAll('#lgrid [data-lrow]').forEach(r=>{const p=PLOTS.find(x=>x.id===r.dataset.lrow);
       const a=readAin(r);if(!a){bad++;return}const old=actRow(p,date);
       if(a.some((v,j)=>Math.abs(v-old[j])>0.0001))rows.push({p,a})});
     if(bad){toast(`Fix the boxes in red on ${bad} plot${bad>1?'s':''}: numbers only, 0 or more`);return}
     if(!rows.length){closeModal(true);toast('No changes to save');return}
-    const b=$('#saveLog');b.textContent='Saving…';b.style.pointerEvents='none';
-    if(!await saveActs(date,rows)){b.textContent='Save day';b.style.pointerEvents='';return}
+    const b=$('#saveLog');if(b.disabled)return;b.textContent='Saving…';b.disabled=true;
+    if(!await saveActs(date,rows)){b.textContent='Save day';b.disabled=false;return}
     closeModal(true);keepScroll(render);toast(`Saved ${rows.length} plot entries for ${fmtD(date)}`)};
 }
 document.addEventListener('click',e=>{const c=e.target.closest('[data-act]');if(c){const [i,d]=[c.dataset.act.slice(0,c.dataset.act.lastIndexOf('|')),c.dataset.act.slice(c.dataset.act.lastIndexOf('|')+1)];openActual(i,d)}
@@ -935,7 +973,7 @@ function openWindows(focus){
      <td><input type="date" class="wdate" data-w="start" value="${w.start||''}" aria-label="${esc(v)} start"></td><td><input type="date" class="wdate" data-w="end" value="${w.end||''}" aria-label="${esc(v)} end"></td>
      <td class="num calc wdays">${w.start&&w.end?Math.round((new Date(w.end)-new Date(w.start))/864e5)+1:'–'}</td>
      <td><input class="wnote" placeholder="e.g. colour break late" aria-label="${esc(v)} reason"></td>
-     <td class="calc" style="font-size:12px;white-space:normal">${l?`<details><summary>${fmtDY(l.d)} · ${esc(l.by)}${w.log.length>1?` · ${w.log.length} changes`:''}</summary>${w.log.slice().reverse().map(x=>`<div>${fmtDY(x.d)}: ${fmtD(x.start)} → ${fmtD(x.end)} · ${esc(x.by)}${x.note?' · '+esc(x.note):''}</div>`).join('')}</details>`:'Not set'}</td></tr>`}).join('')}
+     <td class="calc" style="font-size:12px;white-space:normal">${l?`<details><summary>${fmtDY(l.d)} · ${esc(l.by)}${w.log.length>1?` · ${w.log.length} changes`:''}</summary>${w.log.slice().reverse().map(x=>`<div>${fmtDY(x.d)}: ${x.start?fmtD(x.start)+' → '+fmtD(x.end):'cleared'} · ${esc(x.by)}${x.note?' · '+esc(x.note):''}</div>`).join('')}</details>`:'Not set'}</td></tr>`}).join('')}
    </tbody></table></div></div>
    <div class="mf"><button class="btn" data-close>Cancel</button><button class="btn pri" id="saveWin">Save windows</button></div>`);
   document.querySelector('.modal').style.width='min(900px,100%)';
@@ -947,13 +985,12 @@ function openWindows(focus){
       if(a&&b&&(a!==w.start||b!==w.end))rows.push({v,a,b,note:r.querySelector('.wnote').value.trim()})});
     if(bad){toast('Each window needs both dates, and the end on or after the start');return}
     if(!rows.length&&!clears.length){closeModal(true);toast('No changes to save');return}
-    for(const v of clears){const {error}=await SB.from('hp2_windows').delete().eq('season_id',DB.seasonId).eq('variety_id',WIN[v].varietyId);if(error){toast('Not cleared: '+error.message);return}
-      WIN[v].start=null;WIN[v].end=null;WIN[v].log.push({d:TODAY,start:null,end:null,by:DB.me.name,note:'Cleared'})}
-    if(!rows.length){closeModal(true);keepScroll(render);toast(`Cleared ${clears.length} window${clears.length>1?'s':''}`);return}
-    const {error}=await SB.rpc('hp2_save_windows',{p_season:DB.seasonId,p_rows:rows.map(x=>({variety_id:WIN[x.v].varietyId,start_date:x.a,end_date:x.b,note:x.note}))});
-    if(error){toast('Not saved: '+error.message);return}
+    const wb=$('#saveWin');if(wb.disabled)return;wb.disabled=true;
+    const {error}=await SB.rpc('hp2_save_windows',{p_season:DB.seasonId,p_rows:[...clears.map(v=>({variety_id:WIN[v].varietyId,start_date:null,end_date:null,note:'Cleared'})),...rows.map(x=>({variety_id:WIN[x.v].varietyId,start_date:x.a,end_date:x.b,note:x.note}))]});
+    if(error){wb.disabled=false;errToast('Not saved: '+error.message);return}
+    clears.forEach(v=>{WIN[v].start=null;WIN[v].end=null;WIN[v].log.push({d:TODAY,start:null,end:null,by:DB.me.name,note:'Cleared'})});
     rows.forEach(x=>{const w=WIN[x.v];w.start=x.a;w.end=x.b;w.log.push({d:TODAY,start:x.a,end:x.b,by:DB.me.name,note:x.note})});
-    closeModal(true);keepScroll(render);toast(`Saved ${rows.length} window${rows.length>1?'s':''}`)};
+    closeModal(true);keepScroll(render);toast(`Saved ${rows.length+clears.length} window change${rows.length+clears.length>1?'s':''}`)};
 }
 // ---------- TrueFruit (Aerobotics) latest scan per plot ----------
 const TF=DB.tf;
@@ -1011,7 +1048,7 @@ function presentView(){
       <div class="kpi"><div class="k">Budget</div><div class="v">${n0(A.budget)} t</div><div class="s">${n1(A.budget/A.area)} t/fed</div></div>
       <div class="kpi hl"><div class="k">Latest estimate</div><div class="v">${n0(A.est)} t</div><div class="s">${n1(A.est/A.area)} t/fed</div></div>
       <div class="kpi"><div class="k">Moved since ${sinceLbl()}</div><div class="v ${A.est-A.prev>=0?'pos':'neg'}">${sgn(A.est-A.prev)} t</div><div class="s">${A.nNew} plot changes</div></div>
-      <div class="kpi"><div class="k">Raw PK harvested</div><div class="v">${n0(A.tot)} t</div><div class="s">+ ${n0(A.local)} sorting &amp; local farm sales, ${n0(A.culls)} farm waste (not counted)</div></div>
+      <div class="kpi"><div class="k">Raw PK harvested</div><div class="v">${n0(A.tot)} t</div><div class="s">+ ${n0(A.local)} field sorting &amp; local farm sales, ${n0(A.culls)} farm waste (not counted)</div></div>
       <div class="kpi"><div class="k">Remaining</div><div class="v">${n0(A.rem)} t</div><div class="s">estimate − Raw PK harvested</div></div>
     </div>
     <div class="table-wrap pt" style="max-height:none"><table><thead><tr><th>Variety</th><th>Harvest window</th><th>TrueFruit</th><th>Budget</th><th>${monthSel()}</th><th>Latest</th><th>vs budget</th><th>Moved since ${sinceLbl()}</th><th>Raw PK actual</th><th>Remaining</th><th>Last 7 d<span class="f">actual · vs plan</span></th><th>Planned next 7 d</th></tr></thead><tbody>
@@ -1054,7 +1091,7 @@ document.addEventListener('keydown',e=>{if(!S.present||root.innerHTML||e.default
   else if(e.key==='Escape')setPresent(false)});
 /* leaving fullscreen keeps Present mode; Exit or Esc leaves it */
 /* sum rows stick under the grid header until the next sum row scrolls up: needs the header's real height */
-function setHH(){document.querySelectorAll('.mg').forEach(m=>{const th=m.querySelector('thead');if(!th)return;const r1=th.rows[0]?.getBoundingClientRect().height||28;m.style.setProperty('--h1',r1+'px');m.style.setProperty('--hh',th.getBoundingClientRect().height+'px')})}
+function setHH(){document.querySelectorAll('.mg').forEach(m=>{const th=m.querySelector('thead');if(!th)return;const r1=th.rows[0]?.getBoundingClientRect().height||28;m.style.setProperty('--h1',r1+'px');m.style.setProperty('--hh',(th.getBoundingClientRect().bottom-m.getBoundingClientRect().top+m.scrollTop-(m.clientTop||0)-0.5)+'px')})}
 addEventListener('resize',setHH);document.addEventListener('toggle',()=>setTimeout(setHH,0),true);
 /* header alignment follows the column: a header over number cells is right-aligned (left otherwise) */
 function alignHeads(scope){(scope||document).querySelectorAll('table').forEach(t=>{const head=t.tHead;if(!head)return;const hr=head.rows[head.rows.length-1];
