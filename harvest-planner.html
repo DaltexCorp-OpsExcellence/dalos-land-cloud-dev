@@ -1114,8 +1114,10 @@ document.addEventListener('keydown',e=>{if(!S.present||root.innerHTML||e.default
   else if(e.key==='Escape')setPresent(false)});
 /* leaving fullscreen keeps Present mode; Exit or Esc leaves it */
 /* sum rows stick under the grid header until the next sum row scrolls up: needs the header's real height */
-function setHH(){document.querySelectorAll('.mg').forEach(m=>{const th=m.querySelector('thead');if(!th)return;const r1=th.rows[0]?.getBoundingClientRect().height||28;m.style.setProperty('--h1',r1+'px');m.style.setProperty('--hh',(th.getBoundingClientRect().bottom-m.getBoundingClientRect().top+m.scrollTop-(m.clientTop||0)-0.5)+'px')})}
-addEventListener('resize',setHH);document.addEventListener('toggle',()=>setTimeout(setHH,0),true);
+function setHH(){document.querySelectorAll('.mg').forEach(m=>{const th=m.querySelector('thead');if(!th)return;const r1=th.rows[0]?.getBoundingClientRect().height||28;m.style.setProperty('--h1',r1+'px');/* use the frozen header cell's real bottom edge (sticky cells report their stuck position, so this is right at any scroll); 1px overlap hides any seam */
+  const lr=th.rows[th.rows.length-1],c=lr&&[...lr.cells].find(x=>!x.classList.contains('stk')&&!x.classList.contains('stk2'))||lr?.cells[0];
+  const hb=c?c.getBoundingClientRect().bottom:th.getBoundingClientRect().bottom;m.style.setProperty('--hh',Math.max(0,hb-m.getBoundingClientRect().top-(m.clientTop||0)-1)+'px')})}
+addEventListener('resize',setHH);document.addEventListener('scroll',e=>{if(e.target.classList&&e.target.classList.contains('mg')&&!e.target.dataset.hhOk){e.target.dataset.hhOk=1;setHH()}},true);document.addEventListener('toggle',()=>setTimeout(setHH,0),true);
 /* header alignment follows the column: a header over number cells is right-aligned (left otherwise) */
 function alignHeads(scope){(scope||document).querySelectorAll('table').forEach(t=>{const head=t.tHead;if(!head)return;const hr=head.rows[head.rows.length-1];
   const body=[...t.tBodies[0]?.rows||[]].find(r=>!r.classList.contains('grp')&&!r.classList.contains('tot')&&r.cells.length===hr.cells.length);if(!body)return;
