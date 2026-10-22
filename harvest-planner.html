@@ -5,7 +5,7 @@
 <title>Harvest Planner · Land Cloud</title>
 <script>try{var t=localStorage.getItem('hp2-theme');if(t==='dark'||t==='light')document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.110.8/dist/umd/supabase.js"></script>
-<script src="shell.js?cb=7"></script>
+<script src="shell.js?cb=8"></script>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Mono:wght@400;500&family=Instrument+Sans:wght@400;500;600&family=Space+Grotesk:wght@400;500;600;700&family=Noto+Sans+Arabic:wght@400;500;600&display=swap">
 <style>
 /* Layout: Land Cloud shell — dark teal sidebar, sticky topbar + filter bar, dense plot tables. Tokens copied from dalos-land-cloud. */
@@ -304,6 +304,32 @@ body.side-open .sidebar{transform:none;box-shadow:var(--shadow)}
 .menubtn svg{width:16px;height:16px}
 .side-close{all:unset;cursor:pointer;position:absolute;top:12px;right:12px;color:var(--sidebar-text);font-size:20px;line-height:1;padding:2px 6px}
 @media (max-width:860px){.topbar{position:static}}
+/* desktop: thin icon rail that opens over the page on hover / keyboard focus (phones keep the drawer) */
+@media (min-width:861px){
+  .main{margin-left:58px}
+  .sidebar{transform:none;width:58px;overflow:hidden;overflow-y:auto;scrollbar-width:none;transition:width .18s ease .12s,box-shadow .18s ease .12s;z-index:45}
+  .sidebar::-webkit-scrollbar{display:none}
+  .sidebar:hover,.sidebar:focus-within,body.side-open .sidebar{width:var(--sidebar-w,240px);box-shadow:var(--shadow)}
+  #menuBtn,.side-ov{display:none!important}
+  .sidebar:not(:hover):not(:focus-within) .lcsb-logo{padding:16px 13px 14px}
+  .sidebar:not(:hover):not(:focus-within) .lcsb-logo>div,
+  .sidebar:not(:hover):not(:focus-within) .lcsb-item>span,
+  .sidebar:not(:hover):not(:focus-within) .lcsb-ws>span,
+  .sidebar:not(:hover):not(:focus-within) .lcsb-user>div:last-child,
+  .sidebar:not(:hover):not(:focus-within) .lcsb-signout>span,
+  .sidebar:not(:hover):not(:focus-within) .lcsb-ver{display:none}
+  .sidebar:not(:hover):not(:focus-within) .lcsb-sec{font-size:0;padding:0;margin:10px 8px 6px;border-top:1px solid rgba(255,255,255,.1)}
+  .sidebar:not(:hover):not(:focus-within) .lcsb-nav{padding:6px 8px}
+  .sidebar:not(:hover):not(:focus-within) .lcsb-item{justify-content:center;padding:9px 0}
+  .sidebar:not(:hover):not(:focus-within) .lcsb-foot{padding:10px 8px 12px}
+  .sidebar:not(:hover):not(:focus-within) .lcsb-ws,.sidebar:not(:hover):not(:focus-within) .lcsb-signout{justify-content:center;padding:9px 0}
+  .sidebar:not(:hover):not(:focus-within) .lcsb-user{justify-content:center;padding:6px 0;background:none;border:0}
+  .sidebar:not(:hover):not(:focus-within) .lcsb-av{width:30px;height:30px}
+  .lcsb-item,.lcsb-ws,.lcsb-signout{white-space:nowrap}
+  body.present .main{margin-left:0}body.present .sidebar{display:none}
+}
+@media (prefers-reduced-motion:reduce){.sidebar{transition:none!important}}
+
 /* present mode: meeting-room view, read-only, large type */
 body.present .topbar,body.present .filterbar,body.present #menuBtn{display:none}
 body.present .page{padding:0 0 32px;gap:0}

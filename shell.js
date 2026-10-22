@@ -118,7 +118,7 @@
     var active=opts.active||'';
     var navHtml=NAV.map(function(g){
       var items=g.items.filter(function(it){return visible(it,role);}).map(function(it){
-        return '<button class="lcsb-item'+(active===it.k?' active':'')+'" data-k="'+it.k+'">'+svgIcon(ICP[it.k]||[])+'<span>'+esc(it.label)+'</span></button>';
+        return '<button class="lcsb-item'+(active===it.k?' active':'')+'" data-k="'+it.k+'" title="'+esc(it.label)+'">'+svgIcon(ICP[it.k]||[])+'<span>'+esc(it.label)+'</span></button>';
       }).join('');
       var sub = (g.sec==='Explore') ? '<div class="lcsb-navsub" id="lc-navsub"></div>' : '';
       return '<div><div class="lcsb-sec">'+esc(g.sec)+'</div>'+items+sub+'</div>';
