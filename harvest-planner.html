@@ -304,27 +304,35 @@ body.side-open .sidebar{transform:none;box-shadow:var(--shadow)}
 .menubtn svg{width:16px;height:16px}
 .side-close{all:unset;cursor:pointer;position:absolute;top:12px;right:12px;color:var(--sidebar-text);font-size:20px;line-height:1;padding:2px 6px}
 @media (max-width:860px){.topbar{position:static}}
-/* desktop: thin icon rail that opens over the page on hover / keyboard focus (phones keep the drawer) */
+/* desktop: thin icon rail, collapsed on every page load; the » button expands it (pushes the page), « collapses. Phones keep the drawer. */
+.railbtn{display:none}
 @media (min-width:861px){
-  .main{margin-left:58px}
-  .sidebar{transform:none;width:58px;overflow:hidden;overflow-y:auto;scrollbar-width:none;transition:width .18s ease .12s,box-shadow .18s ease .12s;z-index:45}
+  .main{margin-left:58px;transition:margin-left .18s ease}
+  body.rail-open .main{margin-left:var(--sidebar-w,240px)}
+  .sidebar{transform:none;width:58px;overflow:hidden;overflow-y:auto;scrollbar-width:none;transition:width .18s ease;z-index:45}
   .sidebar::-webkit-scrollbar{display:none}
-  .sidebar:hover,.sidebar:focus-within,body.side-open .sidebar{width:var(--sidebar-w,240px);box-shadow:var(--shadow)}
+  body.rail-open .sidebar{width:var(--sidebar-w,240px)}
   #menuBtn,.side-ov{display:none!important}
-  .sidebar:not(:hover):not(:focus-within) .lcsb-logo{padding:16px 13px 14px}
-  .sidebar:not(:hover):not(:focus-within) .lcsb-logo>div,
-  .sidebar:not(:hover):not(:focus-within) .lcsb-item>span,
-  .sidebar:not(:hover):not(:focus-within) .lcsb-ws>span,
-  .sidebar:not(:hover):not(:focus-within) .lcsb-user>div:last-child,
-  .sidebar:not(:hover):not(:focus-within) .lcsb-signout>span,
-  .sidebar:not(:hover):not(:focus-within) .lcsb-ver{display:none}
-  .sidebar:not(:hover):not(:focus-within) .lcsb-sec{font-size:0;padding:0;margin:10px 8px 6px;border-top:1px solid rgba(255,255,255,.1)}
-  .sidebar:not(:hover):not(:focus-within) .lcsb-nav{padding:6px 8px}
-  .sidebar:not(:hover):not(:focus-within) .lcsb-item{justify-content:center;padding:9px 0}
-  .sidebar:not(:hover):not(:focus-within) .lcsb-foot{padding:10px 8px 12px}
-  .sidebar:not(:hover):not(:focus-within) .lcsb-ws,.sidebar:not(:hover):not(:focus-within) .lcsb-signout{justify-content:center;padding:9px 0}
-  .sidebar:not(:hover):not(:focus-within) .lcsb-user{justify-content:center;padding:6px 0;background:none;border:0}
-  .sidebar:not(:hover):not(:focus-within) .lcsb-av{width:30px;height:30px}
+  .railbtn{display:flex;align-items:center;justify-content:center;gap:8px;width:calc(100% - 16px);margin:8px 8px 0;padding:7px 0;border-radius:8px;border:1px solid rgba(255,255,255,.15);background:transparent;color:#bdd8d6;font:inherit;font-size:12.5px;cursor:pointer}
+  .railbtn:hover{background:rgba(255,255,255,.06)}.railbtn:focus-visible{outline:2px solid #5fc9c4;outline-offset:2px}
+  .railbtn svg{width:15px;height:15px;transition:transform .18s ease}
+  body.rail-open .railbtn{justify-content:flex-start;padding:7px 10px}
+  body.rail-open .railbtn svg{transform:rotate(180deg)}
+  body:not(.rail-open) .railbtn span{display:none}
+  body:not(.rail-open) .sidebar .lcsb-logo{padding:16px 13px 14px}
+  body:not(.rail-open) .sidebar .lcsb-logo>div,
+  body:not(.rail-open) .sidebar .lcsb-item>span,
+  body:not(.rail-open) .sidebar .lcsb-ws>span,
+  body:not(.rail-open) .sidebar .lcsb-user>div:last-child,
+  body:not(.rail-open) .sidebar .lcsb-signout>span,
+  body:not(.rail-open) .sidebar .lcsb-ver{display:none}
+  body:not(.rail-open) .sidebar .lcsb-sec{font-size:0;padding:0;margin:10px 8px 6px;border-top:1px solid rgba(255,255,255,.1)}
+  body:not(.rail-open) .sidebar .lcsb-nav{padding:6px 8px}
+  body:not(.rail-open) .sidebar .lcsb-item{justify-content:center;padding:9px 0}
+  body:not(.rail-open) .sidebar .lcsb-foot{padding:10px 8px 12px}
+  body:not(.rail-open) .sidebar .lcsb-ws,body:not(.rail-open) .sidebar .lcsb-signout{justify-content:center;padding:9px 0}
+  body:not(.rail-open) .sidebar .lcsb-user{justify-content:center;padding:6px 0;background:none;border:0}
+  body:not(.rail-open) .sidebar .lcsb-av{width:30px;height:30px}
   .lcsb-item,.lcsb-ws,.lcsb-signout{white-space:nowrap}
   body.present .main{margin-left:0}body.present .sidebar{display:none}
 }
@@ -440,6 +448,11 @@ async function boot(){
   if(!session){gate('Harvest Planner','This page shows live Land Cloud data, so it needs your Land Cloud sign-in. Open Land Cloud, sign in, then reopen this page.',true);return}
   const acct=window.LCShell?await LCShell.loadAccount(SBC,session.user.id):{name:'',role:null};
   if(window.LCShell)LCShell.render(document.getElementById('lcshell'),{active:'planner',account:acct,onSignOut:()=>SBC.auth.signOut().then(()=>location.reload())});
+  (()=>{const sb=document.getElementById('lcshell'),lg=sb&&sb.querySelector('.lcsb-logo');if(!lg||sb.querySelector('.railbtn'))return;
+    const b=document.createElement('button');b.className='railbtn';b.type='button';b.setAttribute('aria-expanded','false');b.title='Expand menu';
+    b.innerHTML='<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 3l5 5-5 5M9 3l5 5-5 5"/></svg><span>Collapse</span>';
+    b.onclick=()=>{const o=document.body.classList.toggle('rail-open');b.setAttribute('aria-expanded',o);b.title=o?'Collapse menu':'Expand menu';setTimeout(()=>dispatchEvent(new Event('resize')),220)};
+    lg.insertAdjacentElement('afterend',b)})();
   if(!['admin','power_user','agronomy_admin'].includes(acct.role)){gate('Harvest Planner','The Harvest Planner is open to admins, power users and agronomy admins. Ask an admin if you need access.',false);return}
   try{
     const ss=(await SBC.from('seasons').select('id,name,active').order('name')).data||[];
