@@ -1340,7 +1340,7 @@ function BlockDetail(p){
   var lc=b.lifecycle, noActs=(lc==='retired'||lc==='superseded'||lc==='cancelled');
   var hasSeasons=!hist.loading && hist.seasons.length>0, cancelOff=hist.loading||hasSeasons;
   var cancelBtn=ce('span',{key:'cx',title:hasSeasons?'This block has recorded seasons, so use Retire instead.':null,style:{display:'inline-flex'}},
-    ce('button',{className:'btn btn-secondary btn-sm',disabled:cancelOff,'aria-disabled':cancelOff,
+    ce('button',{className:'btn btn-secondary btn-sm btn-tall',disabled:cancelOff,'aria-disabled':cancelOff,
       'aria-label':hasSeasons?'Cancel plan — unavailable: this block has recorded seasons, so use Retire instead.':'Cancel plan',
       style:{color:'var(--red)',borderColor:'color-mix(in srgb,var(--red) 45%,var(--border))'},
       onClick:function(){setAction('cancel');}},'Cancel plan'));
@@ -3449,10 +3449,11 @@ function EditIdentityModal(p){
     ce('div',{className:'field-row'},
       ce(Field,{label:'Total area (fed)'}, txt(f.total, up('total'), {type:'number',step:'0.01'})),
       ce(Field,{label:'Planted area (fed)',hint:'المساحة المنزرعة'}, txt(f.planted, up('planted'), {type:'number',step:'0.01'}))),
-    ce('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:12}},
+    ce('div',{className:'field-row'},
       ce(Field,{label:'Aerobotics (ha)'}, txt(f.aero, up('aero'), {type:'number',step:'0.01'})),
-      ce(Field,{label:'Trees count'}, txt(f.trees, up('trees'), {type:'number'})),
-      ce(Field,{label:'Lifecycle'}, selx(f.lifecycle, up('lifecycle'), lcOptions(full&&full.lifecycle)))),
+      ce(Field,{label:'Trees count'}, txt(f.trees, up('trees'), {type:'number'}))),
+    // own full-width row so long labels ('Fallow (resting land, not currently planted)') show in full
+    ce(Field,{label:'Lifecycle'}, selx(f.lifecycle, up('lifecycle'), lcOptions(full&&full.lifecycle))),
     ce(Field,{label:'Cost centre (JDE)'}, txt(f.jde, up('jde'), {placeholder:'— not assigned'})),
     ce(Field,{label:'Notes'}, txt(f.comments, up('comments'))),
     s.err?ce('div',{className:'band',style:{color:'var(--red)',borderColor:'var(--red)',background:'var(--red-bg)'}}, s.err):null);
@@ -3519,6 +3520,9 @@ function CancelPlanModal(p){
   var f=useState({reason:'',date:today,note:''}); var v=f[0],setV=f[1];
   var st=useState({busy:false,err:null}); var s=st[0],setS=st[1];
   function up(k){ return function(val){ setV(Object.assign({},v,mkObj(k,val))); }; }
+  // live validation (re-checked in submit): future date, and Other needs a non-blank note
+  var dateFuture=!!v.date && v.date>today;
+  var noteMissing=v.reason==='other' && !nul(v.note);
   function fail(raw,rule){
     if(window.console) console.error('fn_cancel_planned_block', raw);
     setS({busy:false,err: rule ? 'Only planned blocks with no recorded seasons can be cancelled.'
@@ -3538,12 +3542,13 @@ function CancelPlanModal(p){
   }
   return ce(Modal,{title:'Cancel plan',sub:b.aydi_block_number,onClose:p.onClose,busy:s.busy,
     footer:[ce('button',{key:'k',className:'btn btn-secondary btn-sm btn-tall',onClick:p.onClose,disabled:s.busy},'Keep plan'),
-            ce('button',{key:'x',className:'btn btn-danger btn-sm btn-tall',onClick:submit,disabled:s.busy||!v.reason||!v.date}, s.busy?'Cancelling…':'Cancel plan')]},
+            ce('button',{key:'x',className:'btn btn-danger btn-sm btn-tall',onClick:submit,disabled:s.busy||!v.reason||!v.date||dateFuture||noteMissing}, s.busy?'Cancelling…':'Cancel plan')]},
     ce('div',null,
       ce('p',{style:{fontSize:13,lineHeight:1.55,color:'var(--text2)'}},'This block was planned but never planted. Cancelling keeps it on record with the reason and date, removes it from Current, counts and area figures, and cannot be undone.'),
       ce(Field,{label:'Reason'}, selx(v.reason, up('reason'), [{v:'',l:'— select —'}].concat(CANCEL_REASONS.map(function(r){return {v:r[0],l:r[1]};})))),
-      ce(Field,{label:'Date cancelled'}, txt(v.date, up('date'), {type:'date',max:today})),
-      ce(Field,{label:v.reason==='other'?'Note (required)':'Note (optional)'}, txt(v.note, up('note'), {maxLength:1000})),
+      ce(Field,{label:'Date cancelled'}, txt(v.date, up('date'), {type:'date',max:today,'aria-invalid':dateFuture,'aria-describedby':dateFuture?'cx-date-err':null}),
+        dateFuture?ce('div',{id:'cx-date-err',role:'alert',style:{fontSize:12,color:'var(--red)',marginTop:4}},'Date can’t be in the future.'):null),
+      ce(Field,{label:v.reason==='other'?'Note (required)':'Note (optional)',hint:noteMissing?'Add a note for Other':null}, txt(v.note, up('note'), {maxLength:1000})),
       s.err?ce('div',{className:'band',role:'alert',style:{color:'var(--red)',borderColor:'var(--red)',background:'var(--red-bg)'}}, s.err):null));
 }
 
