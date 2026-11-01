@@ -773,7 +773,7 @@ function RegisterScreen(ctx){
 
   useEffect(function(){ setPage(0); setExpErr(null); }, [ctx.crop, search, chip, farmF]);
   useEffect(function(){ load(); }, [ctx.crop, page, search, chip, farmF, chainSet, chip==='tf'?aeroIds:null]);
-  useEffect(function(){ loadMeta(); }, [ctx.crop]);
+  useEffect(function(){ loadMeta(); }, [ctx.crop, farmF]);
 
   function base(selOverride){
     var sel=selOverride||'id,operational_block_id,aydi_block_number,product_id,farm_code,sector_code,plot_code,planting_year,total_area_fed,planted_area_fed,aerobotics_area_ha,jde_cost_center_id,rootstock_id,lifecycle,last_producing_season,farms(name),varieties(name,breeders(name)),farm_rootstocks(name)';
@@ -806,7 +806,7 @@ function RegisterScreen(ctx){
     });
   }
   function loadMeta(){
-    var cropEq=function(qq){ return ctx.crop==='all'?qq:qq.eq('product_id',ctx.crop); };
+    var cropEq=function(qq){ qq=ctx.crop==='all'?qq:qq.eq('product_id',ctx.crop); return farmF?qq.eq('farm_code',farmF):qq; };   // chip counts follow crop + farm, like base()
     Promise.all([
       cropEq(supabase.from('farm_blocks').select('id',{count:'exact',head:true})).not('lifecycle','in',CLOSED_IN),
       cropEq(supabase.from('farm_blocks').select('id',{count:'exact',head:true})).is('jde_cost_center_id',null).in('lifecycle',ACTIVE_LC),
@@ -843,6 +843,7 @@ function RegisterScreen(ctx){
         setChainSet(s);
         var rids=Object.keys(s); var cq=supabase.from('farm_blocks').select('id',{count:'exact',head:true}).in('id', rids.length?rids:['00000000-0000-0000-0000-000000000000']);
         if(ctx.crop!=='all') cq=cq.eq('product_id',ctx.crop);
+        if(farmF) cq=cq.eq('farm_code',farmF);
         cq.then(function(cr){ setCounts(function(c){ return Object.assign({},c,{replanted:cr.count||0}); }); });
       }); });
   }
