@@ -786,6 +786,7 @@ function RegisterScreen(ctx){
     else if(chip==='replanted'){ var rids=Object.keys(chainSet); query=query.in('id', rids.length?rids:['00000000-0000-0000-0000-000000000000']); }  // both predecessor + successor, incl retired
     else {
       query=query.not('lifecycle','in',CLOSED_IN);                         // closed blocks live in their own lists
+      if(chip==='planned') query=query.eq('lifecycle','planned');
       if(chip==='no_cc') query=query.is('jde_cost_center_id',null).in('lifecycle',ACTIVE_LC);
       if(chip==='no_aero') query=query.is('aerobotics_area_ha',null);
       if(chip==='no_root') query=query.is('rootstock_id',null);
@@ -812,8 +813,9 @@ function RegisterScreen(ctx){
       cropEq(supabase.from('farm_blocks').select('id',{count:'exact',head:true})).is('aerobotics_area_ha',null).not('lifecycle','in',CLOSED_IN),
       cropEq(supabase.from('farm_blocks').select('id',{count:'exact',head:true})).is('rootstock_id',null).not('lifecycle','in',CLOSED_IN),
       cropEq(supabase.from('farm_blocks').select('id',{count:'exact',head:true})).in('lifecycle',['retired','fallow']),
-      cropEq(supabase.from('farm_blocks').select('id',{count:'exact',head:true})).eq('lifecycle','cancelled')
-    ]).then(function(r){ setCounts(function(c){ return Object.assign({},c,{all:r[0].count||0,no_cc:r[1].count||0,no_aero:r[2].count||0,no_root:r[3].count||0,retired:r[4].count||0,cancelled:r[5].count||0}); }); });
+      cropEq(supabase.from('farm_blocks').select('id',{count:'exact',head:true})).eq('lifecycle','cancelled'),
+      cropEq(supabase.from('farm_blocks').select('id',{count:'exact',head:true})).eq('lifecycle','planned')
+    ]).then(function(r){ setCounts(function(c){ return Object.assign({},c,{all:r[0].count||0,no_cc:r[1].count||0,no_aero:r[2].count||0,no_root:r[3].count||0,retired:r[4].count||0,cancelled:r[5].count||0,planned:r[6].count||0}); }); });
     supabase.from('aero_orchards').select('synced_at').order('synced_at',{ascending:false}).limit(1).then(function(r){ if(r.data&&r.data[0]) setAeroLastSync(r.data[0].synced_at); });
     aeroMeasuredBlocks().then(function(ids){ setAeroIds(ids);
       if(!ids.length){ setCounts(function(c){ return Object.assign({},c,{tf:0}); }); return; }
@@ -845,7 +847,7 @@ function RegisterScreen(ctx){
       }); });
   }
 
-  var chips=[ {k:null,label:'Current',n:counts.all}, {k:'replanted',label:'↻ Replanted',n:counts.replanted},
+  var chips=[ {k:null,label:'Current',n:counts.all}, {k:'planned',label:'◌ Planned',n:counts.planned}, {k:'replanted',label:'↻ Replanted',n:counts.replanted},
               {k:'no_cc',label:'Missing cost centre',n:counts.no_cc},
               {k:'no_aero',label:'No Aerobotics',n:counts.no_aero}, {k:'no_root',label:'Rootstock blank',n:counts.no_root},
               {k:'retired',label:'↺ Retired & fallow',n:counts.retired}, {k:'cancelled',label:'⊘ Cancelled',n:counts.cancelled} ];
@@ -987,7 +989,7 @@ function exportPlotList(base, f, progress){
         U.book_append_sheet(wb, ws, tab[0]);
         summary.push([tab[0], bl.length, years[0]||'', years[years.length-1]||'', fb]);
       });
-      var chipName={retired:'Retired & fallow',cancelled:'Cancelled',replanted:'Replanted',no_cc:'Missing cost centre',no_aero:'No Aerobotics',no_root:'Rootstock blank'};
+      var chipName={planned:'Planned',retired:'Retired & fallow',cancelled:'Cancelled',replanted:'Replanted',no_cc:'Missing cost centre',no_aero:'No Aerobotics',no_root:'Rootstock blank'};
       var readme=[['DalOS Land Cloud — Orchards Master Plot List (block details + yield history)'],[],
         ['Exported', new Date().toISOString().slice(0,16).replace('T',' ')],
         ['Filters','Crop: '+(f.crop==='all'?'All crops':f.crop)+' · Farm: '+(f.farm||'All farms')+' · Search: '+(f.search&&f.search.trim()?f.search.trim():'—')+' · List: '+(chipName[f.chip]||'Current (open blocks)')],
