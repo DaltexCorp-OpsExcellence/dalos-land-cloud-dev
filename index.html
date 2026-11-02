@@ -88,6 +88,12 @@ button{cursor:pointer}
 .crop-chip:hover{background:var(--bg2)}
 .crop-chip.on{background:var(--accent);color:#fff;border-color:var(--accent);font-weight:600}
 .crop-chip .dot{width:9px;height:9px;border-radius:50%;flex-shrink:0}
+/* narrow screens: right-edge fade hints the crop row scrolls; hidden once scrolled to the end (lcCropFade) */
+.crop-bar-wrap{position:relative;flex-shrink:0}
+@media (max-width:767px){
+  .crop-bar-wrap::after{content:'';position:absolute;top:0;right:0;bottom:1px;width:36px;pointer-events:none;background:linear-gradient(to right,rgba(238,241,240,0),var(--bg));transition:opacity .15s}
+  .crop-bar-wrap.at-end::after{opacity:0}
+}
 
 /* Cards / grids */
 .card{background:var(--card);border:1px solid var(--border);border-radius:var(--r2);padding:14px 16px}
@@ -177,16 +183,20 @@ tr:last-child td{border-bottom:none}
 .search{flex:1;min-width:180px;border:1px solid var(--border2);border-radius:6px;padding:7px 10px;font-size:13px;background:#fff;color:var(--text)}
 .search:focus{outline:none;border-color:var(--accent)}
 .chip{border:1px solid var(--border2);background:#fff;border-radius:20px;padding:4px 11px;font-size:12px;color:var(--text2);display:inline-flex;gap:6px;align-items:center}
-.chip .cnt{font-family:var(--font-mono);font-size:11px;background:var(--bg2);border-radius:10px;padding:0 6px}
+.chip .cnt{font-family:var(--font-mono);font-size:13px;font-weight:600;color:var(--text);background:var(--bg2);border-radius:10px;padding:0 7px}
 .chip.active{background:var(--accent);border-color:var(--accent);color:#fff}
-.chip.active .cnt{background:rgba(255,255,255,.2);color:#fff}
-.chip.zero:not(.active){color:var(--text3);background:var(--bg2)}
+.chip.active .cnt{background:#fff;color:var(--accent)}
+/* zero = greyed but tappable; text2 on bg2 keeps ≥4.5:1 (text3 would be ~3.6:1) */
+.chip.zero:not(.active){color:var(--text2);background:var(--bg2);border-style:dashed}
+.chip.zero:not(.active) .cnt{background:#fff;color:var(--text2)}
 .chip .cnt.stale{opacity:.5}
+.reg-list{transition:opacity .12s}
+.reg-list.busy{opacity:.5}
 .search-wrap{position:relative;flex:1;min-width:180px;display:flex}
 .search-wrap .search{padding-right:34px}
 .search-clear{position:absolute;right:-6px;top:50%;transform:translateY(-50%);width:44px;height:44px;border:0;background:none;color:var(--text3);font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center}
 .search-clear:hover{color:var(--text)}
-.reg-result{font-size:12px;color:var(--text3);margin:-4px 0 10px}
+.reg-result{font-size:13px;color:var(--text2);margin:-4px 0 10px}
 .pager{display:flex;gap:8px;align-items:center;justify-content:flex-end;margin-top:10px;font-size:12px;color:var(--text3)}
 tr.rowlink{cursor:pointer}
 /* Block Register: the table scrolls inside its own box so the header row can stay pinned */
@@ -766,6 +776,8 @@ function regSearchOr(text){
   return 'operational_block_id.ilike.'+v+',aydi_block_number.ilike.'+v;
 }
 function applySearch(q, text){ var f=regSearchOr(text); return f?q.or(f):q; }
+// Crop bar: toggle .at-end on its wrapper so the right-edge fade hides when there's nothing more to scroll.
+function lcCropFade(el){ if(!el||!el.parentNode) return; el.parentNode.classList.toggle('at-end', el.scrollLeft+el.clientWidth>=el.scrollWidth-2); }
 
 function RegisterScreen(ctx){
   var s=useState({loading:true,err:null,rows:[],total:0}); var st=s[0],set=s[1];
@@ -790,6 +802,7 @@ function RegisterScreen(ctx){
   var cb=useState(false); var countsBusy=cb[0],setCountsBusy=cb[1];
   var chainLoaded=React.useRef(false);
   var searchOn=!!regSearchOr(qDeb);
+  var listKey=[ctx.crop,farmF,qDeb,chip,page].join('|'), countKey=[ctx.crop,farmF,qDeb].join('|');   // filters the data on screen was loaded for
 
   useEffect(function(){ var t=setTimeout(function(){ setQDeb(search); },250); return function(){ clearTimeout(t); }; }, [search]);
   useEffect(function(){ setPage(0); setExpErr(null); }, [ctx.crop, qDeb, chip, farmF]);
@@ -819,7 +832,7 @@ function RegisterScreen(ctx){
   }
   var loadSeq=React.useRef(0);
   function load(){
-    var my=++loadSeq.current;   // ignore out-of-order responses when filters change quickly
+    var my=++loadSeq.current, key=listKey;   // ignore out-of-order responses when filters change quickly
     set(function(x){return Object.assign({},x,{loading:true,err:null});});
     Promise.all([
       base().order('operational_block_id').range(page*PAGE,page*PAGE+PAGE-1),
@@ -827,7 +840,7 @@ function RegisterScreen(ctx){
     ]).then(function(rr){ var r=rr[0];
       if(my!==loadSeq.current) return;
       if(r.error){ set({loading:false,err:r.error.message,rows:[],total:0}); return; }
-      set({loading:false,err:null,rows:r.data||[],total:r.count||0,unsearched:rr[1]&&!rr[1].error?(rr[1].count||0):null});
+      set({loading:false,loaded:true,key:key,err:null,rows:r.data||[],total:r.count||0,unsearched:rr[1]&&!rr[1].error?(rr[1].count||0):null});
       if(showAero){ setAeroLoading(true); aeroBlockSummary((r.data||[]).map(function(b){return b.id;})).then(function(m){ if(my===loadSeq.current){ setAeroSum(m); setAeroLoading(false); } }); }
     });
   }
@@ -835,7 +848,7 @@ function RegisterScreen(ctx){
   // the whole batch lands; replies from a superseded batch are dropped.
   var countSeq=React.useRef(0);
   function loadCounts(){
-    var my=++countSeq.current;
+    var my=++countSeq.current, key=countKey;
     var cq=function(){ var qq=supabase.from('farm_blocks').select('id',{count:'exact',head:true});
       if(ctx.crop!=='all') qq=qq.eq('product_id',ctx.crop); if(farmF) qq=qq.eq('farm_code',farmF); return applySearch(qq, qDeb); };
     var Z=['00000000-0000-0000-0000-000000000000'], rids=Object.keys(chainSet);
@@ -854,7 +867,7 @@ function RegisterScreen(ctx){
     Promise.all(jobs.map(function(j){ return j[1]; })).then(function(r){
       if(my!==countSeq.current) return;
       var n={}; jobs.forEach(function(j,i){ if(!r[i]) n[j[0]]=0; else if(!r[i].error) n[j[0]]=r[i].count||0; });
-      setCounts(function(c){ return Object.assign({},c,n); }); setCountsBusy(false);
+      n._key=key; setCounts(function(c){ return Object.assign({},c,n); }); setCountsBusy(false);
     }, function(){ if(my===countSeq.current) setCountsBusy(false); });
   }
   function loadMeta(){
@@ -890,13 +903,18 @@ function RegisterScreen(ctx){
   if(showAero) chips.splice(chips.length-2,0,{k:'tf',label:'TrueFruit measured',n:counts.tf});
   var aeroSyncNote = (showAero&&aeroLastSync) ? ce('span',{key:'as',style:{fontSize:11,color:'var(--text3)',marginLeft:4},title:'Aerobotics data is copied into Land Cloud once a day (05:30 Cairo). Size now / Coloured / Clean are measured at the last TrueFruit visit; italic columns are Aerobotics forecasts.'},'Aerobotics synced '+aeroDT(aeroLastSync)) : null;
   var pages=Math.max(1,Math.ceil(st.total/PAGE));
+  // Dim (not skeleton) while anything feeding the list/counts is in flight. Comparing the key of the
+  // data on screen with the current filters dims in the same render as a crop/farm/search change.
+  var typing=search!==qDeb;
+  var listBusy=st.loading || st.key!==listKey || typing;
+  var countsStale=countsBusy || counts._key!==countKey || typing;
   var chipName=((chips.filter(function(ch){ return ch.k===chip; })[0]||chips[0]).label).replace(/^[^A-Za-z]+/,'');   // "◌ Planned" → "Planned"
 
   return ce('div',null,
     ce('div',{className:'toolbar'},
       ce('div',{className:'search-wrap'},
         ce('input',{className:'search',placeholder:'Search block ID or Aydi…',value:search,onChange:function(e){setSearch(e.target.value);},onKeyDown:function(e){ if(e.key==='Escape'&&search) clearSearch(); }}),
-        search ? ce('button',{type:'button',className:'search-clear',title:'Clear search','aria-label':'Clear search',onClick:clearSearch},'✕') : null),
+        search ? ce('button',{type:'button',className:'search-clear',title:'Clear search text','aria-label':'Clear search text',onClick:clearSearch},'✕') : null),
       ce('select',{className:'tb-select',value:farmF,onChange:function(e){setFarmF(e.target.value);}},
         ce('option',{value:''},'All farms'), farms.map(function(fm){return ce('option',{key:fm.code,value:fm.code}, fm.name);})),
       ce('button',{className:'btn btn-secondary btn-sm',disabled:!!exporting||st.loading||!st.total,title:st.total?'Orchards Master Plot List (.xlsx) — block details + full yield history for the '+st.total+' blocks matching the current filters':'No blocks match the current filters',onClick:function(){
@@ -907,11 +925,12 @@ function RegisterScreen(ctx){
     ),
     ce('div',{className:'toolbar'}, chips.map(function(ch){
       return ce('button',{key:ch.label,className:'chip'+(chip===ch.k?' active':'')+(ch.n===0?' zero':''),onClick:function(){setChip(ch.k);}},
-        ch.label, ce('span',{className:'cnt'+(countsBusy||search!==qDeb?' stale':'')}, ch.n==null?'…':ch.n));
+        ch.label, ce('span',{className:'cnt'+(countsStale?' stale':'')}, ch.n==null?'…':ch.n));
     }), aeroSyncNote),
-    searchOn && st.unsearched!=null ? ce('div',{className:'reg-result'}, fmt(st.total)+' of '+fmt(st.unsearched)+' blocks') : null,
     st.err ? ce(ErrorState,{msg:st.err,onRetry:load}) :
-    st.loading ? ce(Loading,{rows:8}) :
+    st.loading && !st.loaded ? ce(Loading,{rows:8}) :      // skeleton only on the very first load
+    ce('div',{className:'reg-list'+(listBusy?' busy':''),'aria-busy':listBusy?'true':'false'},   // later refreshes: old list stays, dimmed
+    searchOn && st.unsearched!=null ? ce('div',{className:'reg-result'}, fmt(st.total)+' of '+fmt(st.unsearched)+' blocks') : null,
     st.rows.length===0 && searchOn ? ce('div',{className:'card'},ce(EmptyState,{title:"No blocks match '"+qDeb.trim()+"' in "+chipName,msg:'',action:'Clear search',onAction:clearSearch})) :
     st.rows.length===0 ? ce('div',{className:'card'},ce(EmptyState,{title:'No blocks match',msg:(search||chip||farmF)?'Try clearing the search, chip, or farm filter.':'The register is empty for this crop.',action:(search||chip||farmF)?'Clear filters':null,onAction:function(){clearSearch();setChip(null);setFarmF('');}})) :
     ce('div',null,
@@ -948,7 +967,7 @@ function RegisterScreen(ctx){
         ce('button',{className:'btn btn-secondary btn-sm',disabled:page<=0,onClick:function(){setPage(page-1);}},'‹ Prev'),
         ce('button',{className:'btn btn-secondary btn-sm',disabled:page>=pages-1,onClick:function(){setPage(page+1);}},'Next ›')
       )
-    ),
+    )),
     sel ? ce(BlockDetail,{block:sel,ctx:ctx,onChanged:function(){ setSel(null); load(); loadMeta(); loadCounts(); },onClose:function(){setSel(null);}}) : null,
     newOpen ? ce(NewBlockModal,{ctx:ctx,onClose:function(){setNewOpen(false);},onDone:function(){ setNewOpen(false); load(); loadMeta(); loadCounts(); }}) : null
   );
@@ -4313,12 +4332,12 @@ function App(){
         ce('span',{className:'staging-badge'+(location.pathname.indexOf('-dev/')>=0?' on':''),title:'Staging environment'},
           ce('span',{className:'staging-dot'}), 'Staging')
       ),
-      ce('div',{className:'crop-bar'},
+      ce('div',{className:'crop-bar-wrap'}, ce('div',{className:'crop-bar',ref:function(el){ lcCropFade(el); },onScroll:function(e){ lcCropFade(e.currentTarget); }},
         ce('span',{className:'cb-lbl'},'Crop'),
         ce('button',{className:'crop-chip'+(crop==='all'?' on':''),onClick:function(){setCrop('all');}},
           ce('span',{className:'dot',style:{background:'conic-gradient(from 0deg,#e08a1e,#6a3d9a,#d94f2a,#b03060,#5a6b2a,#2a5a8a,#e08a1e)'}}), 'All crops'),
         products.map(function(pr){ return ce('button',{key:pr.id,className:'crop-chip'+(crop===pr.id?' on':''),onClick:function(){setCrop(pr.id);}},
-          ce('span',{className:'dot',style:{background:CROP_COLORS[pr.id]||'#999'}}), pr.name); })),
+          ce('span',{className:'dot',style:{background:CROP_COLORS[pr.id]||'#999'}}), pr.name); }))),
       ce('div',{className:'page'},
         scr.body ? scr.body(ctx) : ce(Scaffold,{title:scr.title,phase:scr.phase,msg:scr.msg})
       )
