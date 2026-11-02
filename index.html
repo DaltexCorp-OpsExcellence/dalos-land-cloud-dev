@@ -180,6 +180,13 @@ tr:last-child td{border-bottom:none}
 .chip .cnt{font-family:var(--font-mono);font-size:11px;background:var(--bg2);border-radius:10px;padding:0 6px}
 .chip.active{background:var(--accent);border-color:var(--accent);color:#fff}
 .chip.active .cnt{background:rgba(255,255,255,.2);color:#fff}
+.chip.zero:not(.active){color:var(--text3);background:var(--bg2)}
+.chip .cnt.stale{opacity:.5}
+.search-wrap{position:relative;flex:1;min-width:180px;display:flex}
+.search-wrap .search{padding-right:34px}
+.search-clear{position:absolute;right:-6px;top:50%;transform:translateY(-50%);width:44px;height:44px;border:0;background:none;color:var(--text3);font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.search-clear:hover{color:var(--text)}
+.reg-result{font-size:12px;color:var(--text3);margin:-4px 0 10px}
 .pager{display:flex;gap:8px;align-items:center;justify-content:flex-end;margin-top:10px;font-size:12px;color:var(--text3)}
 tr.rowlink{cursor:pointer}
 /* Block Register: the table scrolls inside its own box so the header row can stay pinned */
@@ -750,6 +757,15 @@ function lcText(lc){ return lc==='cancelled' ? [ '⊘ ', ce('span',{key:'s',clas
 var CANCEL_REASONS=[['plan_dropped','Plan dropped'],['moved_plot','Moved to another plot'],['replaced_plan','Replaced by a different plan'],['other','Other']];
 function localToday(){ var d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
 function fmt(n){ return n==null ? '—' : Number(n).toLocaleString(undefined,{maximumFractionDigits:2}); }
+// Register search → PostgREST .or() ilike filter. The value is double-quoted so , ( ) . : are literal,
+// with \ and " backslash-escaped; LIKE wildcards \ % _ are escaped to match literally; * (PostgREST's
+// like-wildcard alias) is dropped. Shared by the list, the chip counts and the export (all via base/applySearch).
+function regSearchOr(text){
+  var t=String(text||'').trim().replace(/\*/g,''); if(!t) return null;
+  var v='"'+('%'+t.replace(/[\\%_]/g,'\\$&')+'%').replace(/[\\"]/g,'\\$&')+'"';
+  return 'operational_block_id.ilike.'+v+',aydi_block_number.ilike.'+v;
+}
+function applySearch(q, text){ var f=regSearchOr(text); return f?q.or(f):q; }
 
 function RegisterScreen(ctx){
   var s=useState({loading:true,err:null,rows:[],total:0}); var st=s[0],set=s[1];
@@ -770,17 +786,24 @@ function RegisterScreen(ctx){
   var asl=useState(false); var aeroLoading=asl[0],setAeroLoading=asl[1];
   var als=useState(null); var aeroLastSync=als[0],setAeroLastSync=als[1];
   var showAero = ctx.crop==='all' || ctx.crop==='citrus';       // TrueFruit covers citrus only
+  var dq=useState(''); var qDeb=dq[0],setQDeb=dq[1];             // debounced search — drives list + counts
+  var cb=useState(false); var countsBusy=cb[0],setCountsBusy=cb[1];
+  var chainLoaded=React.useRef(false);
+  var searchOn=!!regSearchOr(qDeb);
 
-  useEffect(function(){ setPage(0); setExpErr(null); }, [ctx.crop, search, chip, farmF]);
-  useEffect(function(){ load(); }, [ctx.crop, page, search, chip, farmF, chainSet, chip==='tf'?aeroIds:null]);
+  useEffect(function(){ var t=setTimeout(function(){ setQDeb(search); },250); return function(){ clearTimeout(t); }; }, [search]);
+  useEffect(function(){ setPage(0); setExpErr(null); }, [ctx.crop, qDeb, chip, farmF]);
+  useEffect(function(){ load(); }, [ctx.crop, page, qDeb, chip, farmF, chainSet, chip==='tf'?aeroIds:null]);
   useEffect(function(){ loadMeta(); }, [ctx.crop, farmF]);
+  useEffect(function(){ loadCounts(); }, [ctx.crop, farmF, qDeb, chainSet, aeroIds]);
+  function clearSearch(){ setSearch(''); setQDeb(''); }
 
-  function base(selOverride){
+  function base(selOverride, srch){
     var sel=selOverride||'id,operational_block_id,aydi_block_number,product_id,farm_code,sector_code,plot_code,planting_year,total_area_fed,planted_area_fed,aerobotics_area_ha,jde_cost_center_id,rootstock_id,lifecycle,last_producing_season,farms(name),varieties(name,breeders(name)),farm_rootstocks(name)';
     var query=supabase.from('farm_blocks').select(sel,{count:'exact'});
     if(ctx.crop!=='all') query=query.eq('product_id',ctx.crop);
     if(farmF) query=query.eq('farm_code',farmF);
-    if(search.trim()){ var t='%'+search.trim()+'%'; query=query.or('operational_block_id.ilike.'+t+',aydi_block_number.ilike.'+t); }
+    query=applySearch(query, srch===undefined?qDeb:srch);
     if(chip==='retired'){ query=query.in('lifecycle',['retired','fallow']); }
     else if(chip==='cancelled'){ query=query.eq('lifecycle','cancelled'); }
     else if(chip==='replanted'){ var rids=Object.keys(chainSet); query=query.in('id', rids.length?rids:['00000000-0000-0000-0000-000000000000']); }  // both predecessor + successor, incl retired
@@ -798,29 +821,45 @@ function RegisterScreen(ctx){
   function load(){
     var my=++loadSeq.current;   // ignore out-of-order responses when filters change quickly
     set(function(x){return Object.assign({},x,{loading:true,err:null});});
-    base().order('operational_block_id').range(page*PAGE,page*PAGE+PAGE-1).then(function(r){
+    Promise.all([
+      base().order('operational_block_id').range(page*PAGE,page*PAGE+PAGE-1),
+      searchOn ? base('id','').range(0,0) : null      // same chip, no search → "n of total" line
+    ]).then(function(rr){ var r=rr[0];
       if(my!==loadSeq.current) return;
       if(r.error){ set({loading:false,err:r.error.message,rows:[],total:0}); return; }
-      set({loading:false,err:null,rows:r.data||[],total:r.count||0});
+      set({loading:false,err:null,rows:r.data||[],total:r.count||0,unsearched:rr[1]&&!rr[1].error?(rr[1].count||0):null});
       if(showAero){ setAeroLoading(true); aeroBlockSummary((r.data||[]).map(function(b){return b.id;})).then(function(m){ if(my===loadSeq.current){ setAeroSum(m); setAeroLoading(false); } }); }
     });
   }
+  // Chip counts follow crop + farm + debounced search, like base(). Old numbers stay (faded) until
+  // the whole batch lands; replies from a superseded batch are dropped.
+  var countSeq=React.useRef(0);
+  function loadCounts(){
+    var my=++countSeq.current;
+    var cq=function(){ var qq=supabase.from('farm_blocks').select('id',{count:'exact',head:true});
+      if(ctx.crop!=='all') qq=qq.eq('product_id',ctx.crop); if(farmF) qq=qq.eq('farm_code',farmF); return applySearch(qq, qDeb); };
+    var Z=['00000000-0000-0000-0000-000000000000'], rids=Object.keys(chainSet);
+    var jobs=[
+      ['all',     cq().not('lifecycle','in',CLOSED_IN)],
+      ['no_cc',   cq().is('jde_cost_center_id',null).in('lifecycle',ACTIVE_LC)],
+      ['no_aero', cq().is('aerobotics_area_ha',null).not('lifecycle','in',CLOSED_IN)],
+      ['no_root', cq().is('rootstock_id',null).not('lifecycle','in',CLOSED_IN)],
+      ['retired', cq().in('lifecycle',['retired','fallow'])],
+      ['cancelled',cq().eq('lifecycle','cancelled')],
+      ['planned', cq().eq('lifecycle','planned')]
+    ];
+    if(chainLoaded.current) jobs.push(['replanted', cq().in('id', rids.length?rids:Z)]);   // wait for loadMeta's lineage set
+    if(aeroIds) jobs.push(['tf', aeroIds.length ? cq().in('id',aeroIds).not('lifecycle','in',CLOSED_IN) : null]);
+    setCountsBusy(true);
+    Promise.all(jobs.map(function(j){ return j[1]; })).then(function(r){
+      if(my!==countSeq.current) return;
+      var n={}; jobs.forEach(function(j,i){ if(!r[i]) n[j[0]]=0; else if(!r[i].error) n[j[0]]=r[i].count||0; });
+      setCounts(function(c){ return Object.assign({},c,n); }); setCountsBusy(false);
+    }, function(){ if(my===countSeq.current) setCountsBusy(false); });
+  }
   function loadMeta(){
-    var cropEq=function(qq){ qq=ctx.crop==='all'?qq:qq.eq('product_id',ctx.crop); return farmF?qq.eq('farm_code',farmF):qq; };   // chip counts follow crop + farm, like base()
-    Promise.all([
-      cropEq(supabase.from('farm_blocks').select('id',{count:'exact',head:true})).not('lifecycle','in',CLOSED_IN),
-      cropEq(supabase.from('farm_blocks').select('id',{count:'exact',head:true})).is('jde_cost_center_id',null).in('lifecycle',ACTIVE_LC),
-      cropEq(supabase.from('farm_blocks').select('id',{count:'exact',head:true})).is('aerobotics_area_ha',null).not('lifecycle','in',CLOSED_IN),
-      cropEq(supabase.from('farm_blocks').select('id',{count:'exact',head:true})).is('rootstock_id',null).not('lifecycle','in',CLOSED_IN),
-      cropEq(supabase.from('farm_blocks').select('id',{count:'exact',head:true})).in('lifecycle',['retired','fallow']),
-      cropEq(supabase.from('farm_blocks').select('id',{count:'exact',head:true})).eq('lifecycle','cancelled'),
-      cropEq(supabase.from('farm_blocks').select('id',{count:'exact',head:true})).eq('lifecycle','planned')
-    ]).then(function(r){ setCounts(function(c){ return Object.assign({},c,{all:r[0].count||0,no_cc:r[1].count||0,no_aero:r[2].count||0,no_root:r[3].count||0,retired:r[4].count||0,cancelled:r[5].count||0,planned:r[6].count||0}); }); });
     supabase.from('aero_orchards').select('synced_at').order('synced_at',{ascending:false}).limit(1).then(function(r){ if(r.data&&r.data[0]) setAeroLastSync(r.data[0].synced_at); });
-    aeroMeasuredBlocks().then(function(ids){ setAeroIds(ids);
-      if(!ids.length){ setCounts(function(c){ return Object.assign({},c,{tf:0}); }); return; }
-      cropEq(supabase.from('farm_blocks').select('id',{count:'exact',head:true})).in('id',ids).not('lifecycle','in',CLOSED_IN)
-        .then(function(r){ setCounts(function(c){ return Object.assign({},c,{tf:r.count||0}); }); }); });
+    aeroMeasuredBlocks().then(function(ids){ setAeroIds(ids); });
     supabase.from('farm_blocks').select('farm_code,farms(name)').then(function(r){
       var seen={}; (r.data||[]).forEach(function(x){ if(x.farm_code&&!seen[x.farm_code]) seen[x.farm_code]=(x.farms&&x.farms.name)||x.farm_code; });
       setFarms(Object.keys(seen).sort().map(function(fc){return {code:fc,name:seen[fc]};}));
@@ -840,11 +879,7 @@ function RegisterScreen(ctx){
       var s=Object.assign({},sup); Object.keys(byLand).forEach(function(k){ var o=byLand[k]; if(o.ret>0&&o.cur>0) o.ids.forEach(function(id){s[id]=1;}); });
       supabase.from('farm_block_lineage').select('parent_block_id,child_block_id').then(function(lr){
         if(lr.data) lr.data.forEach(function(e){ if(e.parent_block_id)s[e.parent_block_id]=1; if(e.child_block_id)s[e.child_block_id]=1; });
-        setChainSet(s);
-        var rids=Object.keys(s); var cq=supabase.from('farm_blocks').select('id',{count:'exact',head:true}).in('id', rids.length?rids:['00000000-0000-0000-0000-000000000000']);
-        if(ctx.crop!=='all') cq=cq.eq('product_id',ctx.crop);
-        if(farmF) cq=cq.eq('farm_code',farmF);
-        cq.then(function(cr){ setCounts(function(c){ return Object.assign({},c,{replanted:cr.count||0}); }); });
+        chainLoaded.current=true; setChainSet(s);   // → loadCounts re-runs with the Replanted count
       }); });
   }
 
@@ -855,25 +890,30 @@ function RegisterScreen(ctx){
   if(showAero) chips.splice(chips.length-2,0,{k:'tf',label:'TrueFruit measured',n:counts.tf});
   var aeroSyncNote = (showAero&&aeroLastSync) ? ce('span',{key:'as',style:{fontSize:11,color:'var(--text3)',marginLeft:4},title:'Aerobotics data is copied into Land Cloud once a day (05:30 Cairo). Size now / Coloured / Clean are measured at the last TrueFruit visit; italic columns are Aerobotics forecasts.'},'Aerobotics synced '+aeroDT(aeroLastSync)) : null;
   var pages=Math.max(1,Math.ceil(st.total/PAGE));
+  var chipName=((chips.filter(function(ch){ return ch.k===chip; })[0]||chips[0]).label).replace(/^[^A-Za-z]+/,'');   // "◌ Planned" → "Planned"
 
   return ce('div',null,
     ce('div',{className:'toolbar'},
-      ce('input',{className:'search',placeholder:'Search block ID or Aydi…',value:search,onChange:function(e){setSearch(e.target.value);}}),
+      ce('div',{className:'search-wrap'},
+        ce('input',{className:'search',placeholder:'Search block ID or Aydi…',value:search,onChange:function(e){setSearch(e.target.value);},onKeyDown:function(e){ if(e.key==='Escape'&&search) clearSearch(); }}),
+        search ? ce('button',{type:'button',className:'search-clear',title:'Clear search','aria-label':'Clear search',onClick:clearSearch},'✕') : null),
       ce('select',{className:'tb-select',value:farmF,onChange:function(e){setFarmF(e.target.value);}},
         ce('option',{value:''},'All farms'), farms.map(function(fm){return ce('option',{key:fm.code,value:fm.code}, fm.name);})),
       ce('button',{className:'btn btn-secondary btn-sm',disabled:!!exporting||st.loading||!st.total,title:st.total?'Orchards Master Plot List (.xlsx) — block details + full yield history for the '+st.total+' blocks matching the current filters':'No blocks match the current filters',onClick:function(){
-        setExpErr(null); setExporting('Preparing…'); exportPlotList(base,{crop:ctx.crop,farm:farmF,search:search,chip:chip},setExporting).catch(function(e){ setExpErr('Export failed: '+(e&&e.message||e)); }).then(function(){ setExporting(null); }); }},
+        setExpErr(null); setExporting('Preparing…'); exportPlotList(base,{crop:ctx.crop,farm:farmF,search:qDeb,chip:chip},setExporting).catch(function(e){ setExpErr('Export failed: '+(e&&e.message||e)); }).then(function(){ setExporting(null); }); }},
         exporting||'Export'),
       expErr?ce('span',{style:{fontSize:12,color:'var(--red)'}},expErr):null,
       ctx.canWrite?ce('button',{className:'btn btn-primary btn-sm',style:{marginLeft:'auto'},onClick:function(){ setNewOpen(true); }},'+ New block'):null
     ),
     ce('div',{className:'toolbar'}, chips.map(function(ch){
-      return ce('button',{key:ch.label,className:'chip'+(chip===ch.k?' active':''),onClick:function(){setChip(ch.k);}},
-        ch.label, ce('span',{className:'cnt'}, ch.n==null?'…':ch.n));
+      return ce('button',{key:ch.label,className:'chip'+(chip===ch.k?' active':'')+(ch.n===0?' zero':''),onClick:function(){setChip(ch.k);}},
+        ch.label, ce('span',{className:'cnt'+(countsBusy||search!==qDeb?' stale':'')}, ch.n==null?'…':ch.n));
     }), aeroSyncNote),
+    searchOn && st.unsearched!=null ? ce('div',{className:'reg-result'}, fmt(st.total)+' of '+fmt(st.unsearched)+' blocks') : null,
     st.err ? ce(ErrorState,{msg:st.err,onRetry:load}) :
     st.loading ? ce(Loading,{rows:8}) :
-    st.rows.length===0 ? ce('div',{className:'card'},ce(EmptyState,{title:'No blocks match',msg:(search||chip||farmF)?'Try clearing the search, chip, or farm filter.':'The register is empty for this crop.',action:(search||chip||farmF)?'Clear filters':null,onAction:function(){setSearch('');setChip(null);setFarmF('');}})) :
+    st.rows.length===0 && searchOn ? ce('div',{className:'card'},ce(EmptyState,{title:"No blocks match '"+qDeb.trim()+"' in "+chipName,msg:'',action:'Clear search',onAction:clearSearch})) :
+    st.rows.length===0 ? ce('div',{className:'card'},ce(EmptyState,{title:'No blocks match',msg:(search||chip||farmF)?'Try clearing the search, chip, or farm filter.':'The register is empty for this crop.',action:(search||chip||farmF)?'Clear filters':null,onAction:function(){clearSearch();setChip(null);setFarmF('');}})) :
     ce('div',null,
       ce('div',{className:'table-wrap reg-scroll'},
         ce('table',null,
@@ -909,8 +949,8 @@ function RegisterScreen(ctx){
         ce('button',{className:'btn btn-secondary btn-sm',disabled:page>=pages-1,onClick:function(){setPage(page+1);}},'Next ›')
       )
     ),
-    sel ? ce(BlockDetail,{block:sel,ctx:ctx,onChanged:function(){ setSel(null); load(); loadMeta(); },onClose:function(){setSel(null);}}) : null,
-    newOpen ? ce(NewBlockModal,{ctx:ctx,onClose:function(){setNewOpen(false);},onDone:function(){ setNewOpen(false); load(); loadMeta(); }}) : null
+    sel ? ce(BlockDetail,{block:sel,ctx:ctx,onChanged:function(){ setSel(null); load(); loadMeta(); loadCounts(); },onClose:function(){setSel(null);}}) : null,
+    newOpen ? ce(NewBlockModal,{ctx:ctx,onClose:function(){setNewOpen(false);},onDone:function(){ setNewOpen(false); load(); loadMeta(); loadCounts(); }}) : null
   );
 }
 
