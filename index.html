@@ -183,12 +183,12 @@ tr:last-child td{border-bottom:none}
 .search{flex:1;min-width:180px;border:1px solid var(--border2);border-radius:6px;padding:7px 10px;font-size:13px;background:#fff;color:var(--text)}
 .search:focus{outline:none;border-color:var(--accent)}
 .chip{border:1px solid var(--border2);background:#fff;border-radius:20px;padding:4px 11px;font-size:12px;color:var(--text2);display:inline-flex;gap:6px;align-items:center}
-.chip .cnt{font-family:var(--font-mono);font-size:13px;font-weight:600;color:var(--text);background:var(--bg2);border-radius:10px;padding:0 7px}
+.chip .cnt{font-family:var(--font-mono);font-size:13px;font-weight:400;color:var(--text);background:var(--bg2);border-radius:10px;padding:0 7px}
 .chip.active{background:var(--accent);border-color:var(--accent);color:#fff}
-.chip.active .cnt{background:#fff;color:var(--accent)}
+.chip.active .cnt{background:#fff;color:var(--accent);font-weight:400}
 /* zero = greyed but tappable; text2 on bg2 keeps ≥4.5:1 (text3 would be ~3.6:1) */
 .chip.zero:not(.active){color:var(--text2);background:var(--bg2);border-style:dashed}
-.chip.zero:not(.active) .cnt{background:#fff;color:var(--text2)}
+.chip.zero:not(.active) .cnt{background:#fff;color:var(--text2);font-weight:400}
 .chip .cnt.stale{opacity:.5}
 .reg-list{transition:opacity .12s}
 .reg-list.busy{opacity:.5}
