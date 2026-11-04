@@ -571,15 +571,21 @@ const saveUI=()=>{try{localStorage.setItem('hp2-ui',JSON.stringify({tab:S.tab,gr
 const FARMS=['All',...new Set(PLOTS.map(p=>p.farm))];
 const TYPES=['All',...new Set(PLOTS.map(p=>p.type))];
 if(!FARMS.includes(S.farm))S.farm='All';if(!TYPES.includes(S.type))S.type='All';
-// search: every word must appear somewhere (any order, any case); plot IDs also match without dashes/spaces or leading zeros (02-03A = 0203a = 2-3a)
+// search: every word must appear somewhere (any order, any case).
+// Plot-ID words (02-03A, 2-3a, "02 03a", 0203a) match the WHOLE plot ID: same sector, same plot number, same suffix,
+// leading zeros ignored; no suffix typed = any suffix. Compact form = exactly 4 digits: first 2 = sector, last 2 = plot (0203a = 02-03A).
+// A plot-ID word also matches a plot whose block/aydi number equals it exactly (e.g. 1234).
 const sq=s=>String(s??'').toLowerCase().replace(/[\s\-_/.]+/g,'');
-const unpad=s=>String(s??'').toLowerCase().replace(/(^|[^0-9])0+(?=\d)/g,'$1');
+const nz=d=>d.replace(/^0+(?=\d)/,'');
+const idKey=(s,p)=>{const a=String(s).match(/^0*(\d+)$/),b=String(p).toLowerCase().match(/^0*(\d+)([a-z]*)$/);return a&&b?{s:a[1],p:b[1],x:b[2]}:null};
+const qId=w=>{const m=w.match(/^(\d{1,3})[-–](\d{1,3})([a-z]{0,2})$/)||w.match(/^(\d{2})(\d{2})([a-z]{0,2})$/);return m?{s:nz(m[1]),p:nz(m[2]),x:m[3]}:null};
 const HAY=new Map(PLOTS.map(p=>{const pid=p.sector+'-'+p.plot;
   const t=[pid,p.plot,p.sector,p.variety,p.vcode,p.farm,p.farmCode,p.blockCode,p.aydi,p.lifecycle].join(' ').toLowerCase();
-  const ids=[pid,p.aydi,p.blockCode].filter(Boolean);
-  return [p.id,{t,id:ids.map(sq).join(' '),u:ids.map(x=>sq(unpad(x))).join(' ')}]}));
-const qWords=()=>String(S.q||'').toLowerCase().trim().split(/\s+/).filter(Boolean);
-const qMatch=(p,ws)=>{const h=HAY.get(p.id);return !!h&&ws.every(w=>h.t.includes(w)||(sq(w)&&(h.id.includes(sq(w))||h.u.includes(sq(unpad(w))))))};
+  return [p.id,{t,k:idKey(p.sector,p.plot),ex:[p.aydi,p.blockCode].filter(Boolean).map(sq)}]}));
+// "02 03a" (two short number groups) is read as one plot ID "02-03a"
+const qWords=()=>String(S.q||'').toLowerCase().trim().replace(/\b(\d{1,3})\s+(\d{1,3}[a-z]{0,2})\b/g,'$1-$2').split(/\s+/).filter(Boolean);
+const qMatch=(p,ws)=>{const h=HAY.get(p.id);return !!h&&ws.every(w=>{const q=qId(w);
+  return q?(!!h.k&&h.k.s===q.s&&h.k.p===q.p&&(!q.x||h.k.x===q.x))||h.ex.includes(sq(w)):h.t.includes(w)})};
 const filtered=()=>{const ws=qWords();return PLOTS.filter(p=>(S.farm==='All'||p.farm===S.farm)&&(S.type==='All'||p.type===S.type)&&
   (!ws.length||qMatch(p,ws)))};
 // empty state that names the active filters; user text always escaped
@@ -587,7 +593,7 @@ function noMatch(){const q=String(S.q||'').trim(),inF=[S.farm!=='All'?S.farm:'',
   const h=(q?`No plots match ‘${esc(q)}’`:'No plots match')+(inF.length?' in '+inF.map(esc).join(' · '):'');
   const btns=[S.farm!=='All'?'<button class="btn sm" data-allfarms>Show all farms</button>':'',S.type!=='All'?'<button class="btn sm" data-alltypes>Show all types</button>':'',
     q?'<button class="btn sm" data-clearq>Clear search</button>':'','<button class="btn sm" data-clearf>Clear filters</button>'].filter(Boolean).join(' ');
-  return `<div class="card start"><h2>${h}</h2><div class="sub">${inF.length?'The farm or type filter may be hiding it.':'Nothing fits the search.'} Search matches plot ID (02-03A, 0203a), variety, farm, aydi number or EXP/WIP.</div><div style="padding:0 14px 14px;display:flex;gap:6px;flex-wrap:wrap">${btns}</div></div>`}
+  return `<div class="card start"><h2>${h}</h2><div class="sub">${inF.length?'The farm or type filter may be hiding it.':'Nothing fits the search.'} Search matches plot ID (02-03A, 0203a), variety, farm, block number or status.</div><div style="padding:0 14px 14px;display:flex;gap:6px;flex-wrap:wrap">${btns}</div></div>`}
 
 // ---------- chrome ----------
 const $=s=>document.querySelector(s);
