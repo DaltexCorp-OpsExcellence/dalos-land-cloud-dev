@@ -464,7 +464,7 @@ async function boot(){
     const m=(season.name||'').match(/(\d{4})\s*\/\s*(\d{2})/);const y1=m?+m[1]:new Date().getFullYear();
     const S_ID=season.id;
     const [blocks,events,plan,acts,wins,winEv,reasons,bdet]=await Promise.all([
-      paged(()=>SBC.from('farm_blocks').select('id,farm_id,sector_code,plot_code,block_add,planting_year,total_area_fed,planted_area_fed,lifecycle,variety_id,varieties(name,categories(name)),farms(name),farm_rootstocks(name)').eq('product_id','citrus').eq('active',true).in('lifecycle',['EXP','WIP']).not('variety_id','is',null).not('farm_id','is',null).order('id')),
+      paged(()=>SBC.from('farm_blocks').select('id,farm_id,farm_code,sector_code,plot_code,block_add,block_code,aydi_block_number,planting_year,total_area_fed,planted_area_fed,lifecycle,variety_id,varieties(name,code,categories(name)),farms(name),farm_rootstocks(name)').eq('product_id','citrus').eq('active',true).in('lifecycle',['EXP','WIP']).not('variety_id','is',null).not('farm_id','is',null).order('id')),
       paged(()=>SBC.from('hp2_estimate_events').select('id,block_id,kind,value_t,entered_as,reason_code,note,created_by,created_at').eq('season_id',S_ID).order('created_at').order('id')),
       paged(()=>SBC.from('hp2_plan_days').select('block_id,day,planned_t,updated_at').eq('season_id',S_ID).order('day').order('block_id')),
       paged(()=>SBC.from('hp2_actual_days').select('block_id,day,to_packhouse_t,field_sorting_t,local_sales_t,waste_t,entered_by,entered_at').eq('season_id',S_ID).order('day').order('block_id')),
@@ -479,6 +479,7 @@ async function boot(){
     const who=id=>names[id]||'User';
     const rlabel=Object.fromEntries(reasons.map(r=>[r.code,r.label]));
     const plots=blocks.map(b=>({id:b.id,farmId:b.farm_id,farm:(b.farms&&b.farms.name)||'—',sector:b.sector_code||'',plot:(b.plot_code||'')+(b.block_add||''),
+      farmCode:b.farm_code||'',blockCode:b.block_code||'',aydi:b.aydi_block_number!=null?String(b.aydi_block_number).trim():'',vcode:(b.varieties&&b.varieties.code)||'',
       type:(b.varieties&&b.varieties.categories&&b.varieties.categories.name)||'',root:(b.farm_rootstocks&&b.farm_rootstocks.name)||'—',variety:(b.varieties&&b.varieties.name)||'—',varietyId:b.variety_id,
       planted:b.planting_year||'',lifecycle:b.lifecycle,area:Number(b.planted_area_fed||b.total_area_fed||0)||0.0001,budget:0,ev:[],daily:{},ameta:{},aat:{}}))
       .sort((a,b)=>a.farm.localeCompare(b.farm)||a.sector.localeCompare(b.sector)||a.plot.localeCompare(b.plot));
@@ -570,8 +571,23 @@ const saveUI=()=>{try{localStorage.setItem('hp2-ui',JSON.stringify({tab:S.tab,gr
 const FARMS=['All',...new Set(PLOTS.map(p=>p.farm))];
 const TYPES=['All',...new Set(PLOTS.map(p=>p.type))];
 if(!FARMS.includes(S.farm))S.farm='All';if(!TYPES.includes(S.type))S.type='All';
-const filtered=()=>PLOTS.filter(p=>(S.farm==='All'||p.farm===S.farm)&&(S.type==='All'||p.type===S.type)&&
-  (!S.q||(p.plot+' '+p.variety+' '+p.farm+' '+p.sector).toLowerCase().includes(S.q.toLowerCase())));
+// search: every word must appear somewhere (any order, any case); plot IDs also match without dashes/spaces or leading zeros (02-03A = 0203a = 2-3a)
+const sq=s=>String(s??'').toLowerCase().replace(/[\s\-_/.]+/g,'');
+const unpad=s=>String(s??'').toLowerCase().replace(/(^|[^0-9])0+(?=\d)/g,'$1');
+const HAY=new Map(PLOTS.map(p=>{const pid=p.sector+'-'+p.plot;
+  const t=[pid,p.plot,p.sector,p.variety,p.vcode,p.farm,p.farmCode,p.blockCode,p.aydi,p.lifecycle].join(' ').toLowerCase();
+  const ids=[pid,p.aydi,p.blockCode].filter(Boolean);
+  return [p.id,{t,id:ids.map(sq).join(' '),u:ids.map(x=>sq(unpad(x))).join(' ')}]}));
+const qWords=()=>String(S.q||'').toLowerCase().trim().split(/\s+/).filter(Boolean);
+const qMatch=(p,ws)=>{const h=HAY.get(p.id);return !!h&&ws.every(w=>h.t.includes(w)||(sq(w)&&(h.id.includes(sq(w))||h.u.includes(sq(unpad(w))))))};
+const filtered=()=>{const ws=qWords();return PLOTS.filter(p=>(S.farm==='All'||p.farm===S.farm)&&(S.type==='All'||p.type===S.type)&&
+  (!ws.length||qMatch(p,ws)))};
+// empty state that names the active filters; user text always escaped
+function noMatch(){const q=String(S.q||'').trim(),inF=[S.farm!=='All'?S.farm:'',S.type!=='All'?S.type:''].filter(Boolean);
+  const h=(q?`No plots match ‘${esc(q)}’`:'No plots match')+(inF.length?' in '+inF.map(esc).join(' · '):'');
+  const btns=[S.farm!=='All'?'<button class="btn sm" data-allfarms>Show all farms</button>':'',S.type!=='All'?'<button class="btn sm" data-alltypes>Show all types</button>':'',
+    q?'<button class="btn sm" data-clearq>Clear search</button>':'','<button class="btn sm" data-clearf>Clear filters</button>'].filter(Boolean).join(' ');
+  return `<div class="card start"><h2>${h}</h2><div class="sub">${inF.length?'The farm or type filter may be hiding it.':'Nothing fits the search.'} Search matches plot ID (02-03A, 0203a), variety, farm, aydi number or EXP/WIP.</div><div style="padding:0 14px 14px;display:flex;gap:6px;flex-wrap:wrap">${btns}</div></div>`}
 
 // ---------- chrome ----------
 const $=s=>document.querySelector(s);
@@ -584,7 +600,9 @@ function chrome(){
   document.body.classList.toggle('showf',!!S.howto);saveUI();
 }
 document.addEventListener('toggle',e=>{if(e.target.classList&&e.target.classList.contains('howto')){S.howto=e.target.open;document.body.classList.toggle('showf',S.howto);saveUI()}},true);
-document.addEventListener('click',e=>{if(e.target.closest('[data-clearf]')){S.farm='All';S.type='All';S.q='';$('#q').value='';render()}});
+document.addEventListener('click',e=>{if(e.target.closest('[data-clearf]')){S.farm='All';S.type='All';S.q='';$('#q').value='';render()}
+  else if(e.target.closest('[data-allfarms]')){S.farm='All';render()}else if(e.target.closest('[data-alltypes]')){S.type='All';render()}
+  else if(e.target.closest('[data-clearq]')){S.q='';$('#q').value='';render()}});
 document.addEventListener('click',e=>{
   const f=e.target.closest('[data-farm]');if(f){S.farm=f.dataset.farm;render()}
   const t=e.target.closest('#tabs button');if(t){S.tab=t.dataset.t;saveUI();render()}
@@ -750,7 +768,7 @@ function viewEst(part){
       <li><b>Harvest windows.</b> Set a start and end date per variety with <button class="btn sm" data-windows>Harvest windows</button></li>
       <li><b>Estimates.</b> Click <i>+ add</i> under Latest t whenever the agronomy team updates a plot.</li>
       <li><b>Daily plan and actuals.</b> Type planned tonnes in the day cells; log what was picked with <button class="btn sm" data-logharvest>+ Log harvest</button></li></ol></div>`:'';
-  if(!list.length)return `<div class="card start"><h2>No plots match</h2><div class="sub">Nothing fits the farm, type or search filter.</div><div style="padding:0 14px 14px"><button class="btn sm" data-clearf>Clear filters</button></div></div>`;
+  if(!list.length)return noMatch();
   return start+kpis(list)+`
   <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
     <span class="lbl">Group by</span><div class="seg"><button data-group="farm" class="${S.group==='farm'?'on':''}">Farm</button><button data-group="variety" class="${S.group==='variety'?'on':''}">Variety</button></div>
@@ -797,7 +815,7 @@ function rollTable(keyFn,label,list,extraCol){
 }
 
 function viewSum(){
-  const list=filtered();
+  const list=filtered();if(!list.length)return noMatch();
   // weekly snapshots replace the hand-frozen dated columns in the old Plan tab
   const snaps=[];for(let d=addDays(TODAY,-63);d<TODAY;d=addDays(d,7))snaps.push(d);snaps.push(TODAY);
   const g={};list.forEach(p=>(g[p.variety]=g[p.variety]||[]).push(p));
@@ -819,7 +837,7 @@ function allChanges(list,from,to=TODAY){
   return out.sort((a,b)=>b.e.d.localeCompare(a.e.d)||Math.abs(b.d)-Math.abs(a.d));
 }
 function viewChg(){
-  const list=filtered();const ch=allChanges(list,S.since);
+  const list=filtered();if(!list.length)return noMatch();const ch=allChanges(list,S.since);
   const before=list.reduce((s,p)=>s+estAt(p,S.since),0),after=list.reduce((s,p)=>s+est(p),0);
   const byR={};ch.forEach(c=>{const k=c.e.reason||'No reason given';byR[k]=(byR[k]||0)+c.d});
   const rs=Object.entries(byR).sort((a,b)=>Math.abs(b[1])-Math.abs(a[1]));
