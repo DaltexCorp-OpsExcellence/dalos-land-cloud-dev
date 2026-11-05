@@ -197,6 +197,32 @@ tr:last-child td{border-bottom:none}
 .search-clear{position:absolute;right:-6px;top:50%;transform:translateY(-50%);width:44px;height:44px;border:0;background:none;color:var(--text3);font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center}
 .search-clear:hover{color:var(--text)}
 .reg-result{font-size:13px;color:var(--text2);margin:-4px 0 10px}
+/* Variety multi-select (Block Register): tb-select look; checklist stages until Apply */
+.vf{position:relative}
+.vf-btn{display:inline-flex;align-items:center;gap:6px;cursor:pointer;font-family:inherit;white-space:nowrap;text-align:left}
+.vf-btn.on{border-color:var(--accent);color:var(--accent);font-weight:600}
+.vf-btn .vf-caret{font-size:9px;opacity:.7}
+.vf-panel{position:absolute;top:calc(100% + 4px);left:0;z-index:30;width:260px;background:#fff;border:1px solid var(--border2);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.12);display:flex;flex-direction:column}
+.vf-head{display:flex;align-items:center;justify-content:space-between;padding:8px 10px 6px;border-bottom:1px solid var(--border);font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--text3);font-weight:600}
+.vf-head button{border:0;background:none;color:var(--accent);font-size:12px;font-weight:500;text-transform:none;letter-spacing:0;cursor:pointer;padding:4px 2px}
+.vf-head button:disabled{color:var(--text3);cursor:default}
+.vf-list{max-height:280px;overflow-y:auto;padding:4px 0}
+.vf-row{display:flex;align-items:center;gap:9px;padding:6px 12px;font-size:13px;color:var(--text);cursor:pointer;min-height:32px}
+.vf-row:hover{background:var(--bg2)}
+.vf-row input{accent-color:var(--accent);width:15px;height:15px;flex:none;margin:0}
+.vf-row .vf-n{margin-left:auto;font-family:var(--font-mono);font-size:11px;color:var(--text3)}
+.vf-empty{padding:12px;font-size:12px;color:var(--text3)}
+.vf-foot{display:flex;justify-content:flex-end;gap:8px;padding:8px 10px;border-top:1px solid var(--border)}
+@media (max-width:767px){
+  .toolbar{position:relative}
+  .vf{position:static}
+  .vf-btn{min-height:44px;font-size:13px;padding:0 12px}
+  .vf-panel{left:0;right:0;width:auto}
+  .vf-row{min-height:44px}
+  .vf-row input{width:18px;height:18px}
+  .vf-foot .btn{min-height:44px;padding:0 18px}
+  .vf-list{max-height:50vh}
+}
 .pager{display:flex;gap:8px;align-items:center;justify-content:flex-end;margin-top:10px;font-size:12px;color:var(--text3)}
 tr.rowlink{cursor:pointer}
 /* Block Register: the table scrolls inside its own box so the header row can stay pinned */
@@ -779,6 +805,44 @@ function applySearch(q, text){ var f=regSearchOr(text); return f?q.or(f):q; }
 // Crop bar: toggle .at-end on its wrapper so the right-edge fade hides when there's nothing more to scroll.
 function lcCropFade(el){ if(!el||!el.parentNode) return; el.parentNode.classList.toggle('at-end', el.scrollLeft+el.clientWidth>=el.scrollWidth-2); }
 
+// Variety multi-select for the Block Register toolbar. `applied` (ids) is owned by the parent and
+// drives queries; `draft` lives only while the panel is open — ticking boxes never refilters.
+// Apply commits draft → parent; Cancel / Escape / outside click discard it.
+function VarietyFilter(p){
+  var o=useState(false); var open=o[0],setOpen=o[1];
+  var dr=useState([]); var draft=dr[0],setDraft=dr[1];
+  var ref=React.useRef(null);
+  function openPanel(){ setDraft(p.applied.slice()); setOpen(true); }
+  function cancel(){ setOpen(false); }
+  function apply(){ setOpen(false); p.onApply(draft.slice()); }
+  useEffect(function(){ if(!open) return;
+    var onDown=function(e){ if(ref.current&&!ref.current.contains(e.target)) setOpen(false); };
+    var onKey=function(e){ if(e.key==='Escape') setOpen(false); };
+    document.addEventListener('mousedown',onDown); document.addEventListener('touchstart',onDown); document.addEventListener('keydown',onKey);
+    return function(){ document.removeEventListener('mousedown',onDown); document.removeEventListener('touchstart',onDown); document.removeEventListener('keydown',onKey); };
+  }, [open]);
+  function toggle(id){ setDraft(function(d){ return d.indexOf(id)>=0 ? d.filter(function(x){return x!==id;}) : d.concat([id]); }); }
+  var n=p.applied.length, label=n===0?'All varieties':n+(n===1?' variety':' varieties');
+  return ce('div',{className:'vf',ref:ref},
+    ce('button',{type:'button',className:'tb-select vf-btn'+(n?' on':''),'aria-haspopup':'listbox','aria-expanded':open?'true':'false',
+      title:n?'Variety: '+p.applied.map(function(id){ return (p.options.filter(function(v){return v.id===id;})[0]||{}).name||'?'; }).join(', '):'Filter by variety',onClick:function(){ open?cancel():openPanel(); }},
+      label, ce('span',{className:'vf-caret','aria-hidden':'true'},'▾')),
+    open ? ce('div',{className:'vf-panel',role:'dialog','aria-label':'Filter by variety'},
+      ce('div',{className:'vf-head'}, ce('span',null,'Varieties'+(draft.length?' · '+draft.length+' selected':'')),
+        ce('button',{type:'button',disabled:!draft.length,onClick:function(){ setDraft([]); }},'Clear')),
+      ce('div',{className:'vf-list',role:'listbox','aria-multiselectable':'true'},
+        p.options.length===0 ? ce('div',{className:'vf-empty'}, p.loading?'Loading varieties…':'No varieties on these blocks.') :
+        p.options.map(function(v){ var on=draft.indexOf(v.id)>=0;
+          return ce('label',{key:v.id,className:'vf-row',role:'option','aria-selected':on?'true':'false'},
+            ce('input',{type:'checkbox',checked:on,onChange:function(){ toggle(v.id); }}),
+            ce('span',{dir:'auto'}, v.name),
+            v.n!=null ? ce('span',{className:'vf-n'}, v.n) : null); })),
+      ce('div',{className:'vf-foot'},
+        ce('button',{type:'button',className:'btn btn-secondary btn-sm',onClick:cancel},'Cancel'),
+        ce('button',{type:'button',className:'btn btn-primary btn-sm',onClick:apply},'Apply'))
+    ) : null);
+}
+
 function RegisterScreen(ctx){
   var s=useState({loading:true,err:null,rows:[],total:0}); var st=s[0],set=s[1];
   var p=useState(0); var page=p[0],setPage=p[1];
@@ -800,22 +864,47 @@ function RegisterScreen(ctx){
   var showAero = ctx.crop==='all' || ctx.crop==='citrus';       // TrueFruit covers citrus only
   var dq=useState(''); var qDeb=dq[0],setQDeb=dq[1];             // debounced search — drives list + counts
   var cb=useState(false); var countsBusy=cb[0],setCountsBusy=cb[1];
+  var vf=useState([]); var varF=vf[0],setVarF=vf[1];             // APPLIED variety ids (draft lives inside VarietyFilter)
+  var vo=useState({loading:true,list:[]}); var varOpts=vo[0],setVarOpts=vo[1];
+  var varNames=React.useRef({});                                  // id -> name, survives option reloads (farm switch)
+  var varSeq=React.useRef(0);
+  var varKey=varF.join(',');
   var chainLoaded=React.useRef(false);
   var searchOn=!!regSearchOr(qDeb);
-  var listKey=[ctx.crop,farmF,qDeb,chip,page].join('|'), countKey=[ctx.crop,farmF,qDeb].join('|');   // filters the data on screen was loaded for
+  var listKey=[ctx.crop,farmF,varKey,qDeb,chip,page].join('|'), countKey=[ctx.crop,farmF,varKey,qDeb].join('|');   // filters the data on screen was loaded for
 
   useEffect(function(){ var t=setTimeout(function(){ setQDeb(search); },250); return function(){ clearTimeout(t); }; }, [search]);
-  useEffect(function(){ setPage(0); setExpErr(null); }, [ctx.crop, qDeb, chip, farmF]);
-  useEffect(function(){ load(); }, [ctx.crop, page, qDeb, chip, farmF, chainSet, chip==='tf'?aeroIds:null]);
+  useEffect(function(){ setVarF(function(v){ return v.length?[]:v; }); }, [ctx.crop]);   // variety ids are crop-specific
+  useEffect(function(){ setPage(0); setExpErr(null); }, [ctx.crop, qDeb, chip, farmF, varKey]);
+  useEffect(function(){ load(); }, [ctx.crop, page, qDeb, chip, farmF, varKey, chainSet, chip==='tf'?aeroIds:null]);
   useEffect(function(){ loadMeta(); }, [ctx.crop, farmF]);
-  useEffect(function(){ loadCounts(); }, [ctx.crop, farmF, qDeb, chainSet, aeroIds]);
+  useEffect(function(){ loadVarieties(); }, [ctx.crop, farmF]);
+  useEffect(function(){ loadCounts(); }, [ctx.crop, farmF, varKey, qDeb, chainSet, aeroIds]);
   function clearSearch(){ setSearch(''); setQDeb(''); }
+  // Variety options = varieties on register blocks under the current crop (+ farm when one is picked).
+  function loadVarieties(){
+    var my=++varSeq.current;
+    setVarOpts(function(x){ return {loading:true,list:x.list}; });
+    plPaged(function(){ var q=supabase.from('farm_blocks').select('id,variety_id,varieties(name)').not('variety_id','is',null);
+      if(ctx.crop!=='all') q=q.eq('product_id',ctx.crop); if(farmF) q=q.eq('farm_code',farmF); return q.order('id'); })
+    .then(function(rows){ if(my!==varSeq.current) return;
+      var m={}; rows.forEach(function(r){ if(!m[r.variety_id]) m[r.variety_id]=(r.varieties&&r.varieties.name)||r.variety_id; });
+      Object.assign(varNames.current,m);
+      setVarOpts({loading:false,list:Object.keys(m).map(function(id){ return {id:id,name:m[id]}; }).sort(function(a,b){ return a.name.localeCompare(b.name); })});
+    }, function(){ if(my===varSeq.current) setVarOpts({loading:false,list:[]}); });
+  }
+  // applied ids missing from the current option set (e.g. after a farm switch) stay listed so they can be unticked
+  var varOptions=varOpts.list.concat(varF.filter(function(id){ return !varOpts.list.some(function(v){ return v.id===id; }); })
+    .map(function(id){ return {id:id,name:(varNames.current[id]||'Unknown variety')+' (not on this farm)'}; }));
+  var varNamesApplied=varF.map(function(id){ return varNames.current[id]||id; });
+  function clearAll(){ clearSearch(); setChip(null); setFarmF(''); setVarF([]); }
 
   function base(selOverride, srch){
     var sel=selOverride||'id,operational_block_id,aydi_block_number,product_id,farm_code,sector_code,plot_code,planting_year,total_area_fed,planted_area_fed,aerobotics_area_ha,jde_cost_center_id,rootstock_id,lifecycle,last_producing_season,farms(name),varieties(name,breeders(name)),farm_rootstocks(name)';
     var query=supabase.from('farm_blocks').select(sel,{count:'exact'});
     if(ctx.crop!=='all') query=query.eq('product_id',ctx.crop);
     if(farmF) query=query.eq('farm_code',farmF);
+    if(varF.length) query=query.in('variety_id',varF);
     query=applySearch(query, srch===undefined?qDeb:srch);
     if(chip==='retired'){ query=query.in('lifecycle',['retired','fallow']); }
     else if(chip==='cancelled'){ query=query.eq('lifecycle','cancelled'); }
@@ -844,13 +933,13 @@ function RegisterScreen(ctx){
       if(showAero){ setAeroLoading(true); aeroBlockSummary((r.data||[]).map(function(b){return b.id;})).then(function(m){ if(my===loadSeq.current){ setAeroSum(m); setAeroLoading(false); } }); }
     });
   }
-  // Chip counts follow crop + farm + debounced search, like base(). Old numbers stay (faded) until
+  // Chip counts follow crop + farm + applied varieties + debounced search, like base(). Old numbers stay (faded) until
   // the whole batch lands; replies from a superseded batch are dropped.
   var countSeq=React.useRef(0);
   function loadCounts(){
     var my=++countSeq.current, key=countKey;
     var cq=function(){ var qq=supabase.from('farm_blocks').select('id',{count:'exact',head:true});
-      if(ctx.crop!=='all') qq=qq.eq('product_id',ctx.crop); if(farmF) qq=qq.eq('farm_code',farmF); return applySearch(qq, qDeb); };
+      if(ctx.crop!=='all') qq=qq.eq('product_id',ctx.crop); if(farmF) qq=qq.eq('farm_code',farmF); if(varF.length) qq=qq.in('variety_id',varF); return applySearch(qq, qDeb); };
     var Z=['00000000-0000-0000-0000-000000000000'], rids=Object.keys(chainSet);
     var jobs=[
       ['all',     cq().not('lifecycle','in',CLOSED_IN)],
@@ -917,8 +1006,9 @@ function RegisterScreen(ctx){
         search ? ce('button',{type:'button',className:'search-clear',title:'Clear search text','aria-label':'Clear search text',onClick:clearSearch},'✕') : null),
       ce('select',{className:'tb-select',value:farmF,onChange:function(e){setFarmF(e.target.value);}},
         ce('option',{value:''},'All farms'), farms.map(function(fm){return ce('option',{key:fm.code,value:fm.code}, fm.name);})),
+      ce(VarietyFilter,{options:varOptions,applied:varF,loading:varOpts.loading,onApply:function(ids){ setVarF(ids); }}),
       ce('button',{className:'btn btn-secondary btn-sm',disabled:!!exporting||st.loading||!st.total,title:st.total?'Orchards Master Plot List (.xlsx) — block details + full yield history for the '+st.total+' blocks matching the current filters':'No blocks match the current filters',onClick:function(){
-        setExpErr(null); setExporting('Preparing…'); exportPlotList(base,{crop:ctx.crop,farm:farmF,search:qDeb,chip:chip},setExporting).catch(function(e){ setExpErr('Export failed: '+(e&&e.message||e)); }).then(function(){ setExporting(null); }); }},
+        setExpErr(null); setExporting('Preparing…'); exportPlotList(base,{crop:ctx.crop,farm:farmF,varieties:varNamesApplied,search:qDeb,chip:chip},setExporting).catch(function(e){ setExpErr('Export failed: '+(e&&e.message||e)); }).then(function(){ setExporting(null); }); }},
         exporting||'Export'),
       expErr?ce('span',{style:{fontSize:12,color:'var(--red)'}},expErr):null,
       ctx.canWrite?ce('button',{className:'btn btn-primary btn-sm',style:{marginLeft:'auto'},onClick:function(){ setNewOpen(true); }},'+ New block'):null
@@ -931,8 +1021,11 @@ function RegisterScreen(ctx){
     st.loading && !st.loaded ? ce(Loading,{rows:8}) :      // skeleton only on the very first load
     ce('div',{className:'reg-list'+(listBusy?' busy':''),'aria-busy':listBusy?'true':'false'},   // later refreshes: old list stays, dimmed
     searchOn && st.unsearched!=null ? ce('div',{className:'reg-result'}, fmt(st.total)+' of '+fmt(st.unsearched)+' blocks') : null,
-    st.rows.length===0 && searchOn ? ce('div',{className:'card'},ce(EmptyState,{title:"No blocks match '"+qDeb.trim()+"' in "+chipName,msg:'',action:'Clear search',onAction:clearSearch})) :
-    st.rows.length===0 ? ce('div',{className:'card'},ce(EmptyState,{title:'No blocks match',msg:(search||chip||farmF)?'Try clearing the search, chip, or farm filter.':'The register is empty for this crop.',action:(search||chip||farmF)?'Clear filters':null,onAction:function(){clearSearch();setChip(null);setFarmF('');}})) :
+    st.rows.length===0 && searchOn && !varF.length ? ce('div',{className:'card'},ce(EmptyState,{title:"No blocks match '"+qDeb.trim()+"' in "+chipName,msg:'',action:'Clear search',onAction:clearSearch})) :
+    st.rows.length===0 && varF.length ? ce('div',{className:'card'},ce(EmptyState,{title:'No blocks match',
+      msg:'Variety filter is on ('+varNamesApplied.join(', ')+') — it may be hiding results'+((searchOn||farmF||chip)?' together with the search, farm or status filter.':'.'),
+      action:'Clear filters',onAction:clearAll})) :
+    st.rows.length===0 ? ce('div',{className:'card'},ce(EmptyState,{title:'No blocks match',msg:(search||chip||farmF)?'Try clearing the search, chip, or farm filter.':'The register is empty for this crop.',action:(search||chip||farmF)?'Clear filters':null,onAction:clearAll})) :
     ce('div',null,
       ce('div',{className:'table-wrap reg-scroll'},
         ce('table',null,
@@ -1052,7 +1145,7 @@ function exportPlotList(base, f, progress){
       var chipName={planned:'Planned',retired:'Retired & fallow',cancelled:'Cancelled',replanted:'Replanted',no_cc:'Missing cost centre',no_aero:'No Aerobotics',no_root:'Rootstock blank'};
       var readme=[['DalOS Land Cloud — Orchards Master Plot List (block details + yield history)'],[],
         ['Exported', new Date().toISOString().slice(0,16).replace('T',' ')],
-        ['Filters','Crop: '+(f.crop==='all'?'All crops':f.crop)+' · Farm: '+(f.farm||'All farms')+' · Search: '+(f.search&&f.search.trim()?f.search.trim():'—')+' · List: '+(chipName[f.chip]||'Current (open blocks)')],
+        ['Filters','Crop: '+(f.crop==='all'?'All crops':f.crop)+' · Farm: '+(f.farm||'All farms')+' · Variety: '+((f.varieties&&f.varieties.length)?f.varieties.join(', '):'All varieties')+' · Search: '+(f.search&&f.search.trim()?f.search.trim():'—')+' · List: '+(chipName[f.chip]||'Current (open blocks)')],
         ['Source','farm_blocks + v_farm_season_wide (scenario = actual). Tonnages, P/NP and block details are stored DB values.'],
         ['Per-year area','Not stored per season — the DB holds one planted area per block. Year area = block planted area; 0 for years before the planting year; where planted area is 0 but the block produced that year, total area is used (noted in ملاحظات).'],
         ['Rates','معدل ف = metric ÷ year area (t/fed). TOTAL row rates = column total ÷ total area.'],
