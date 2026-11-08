@@ -262,7 +262,7 @@ th.lh{border-bottom:3px solid var(--c)}
 .x:focus-visible,.budbtn:focus-visible,.msel:focus-visible,.winchip:focus-visible,.qclr:focus-visible,.todayact:focus-visible,.ain:focus-visible,.wdate:focus-visible,.wnote:focus-visible,.sel:focus-visible,.search:focus-visible{outline:2px solid var(--accent2);outline-offset:2px}
 .segtxt{padding:5px 10px;font-size:12px;font-weight:600;color:var(--text);background:var(--card);border-right:1px solid var(--border);white-space:nowrap;font-family:var(--font-num)}
 /* compact date rail above the daily columns: slim neutral track, small teal thumb, quiet day-step chevrons; every hit area ≥44px */
-.drail{display:flex;align-items:center;align-self:flex-start;box-sizing:border-box;height:44px;margin:-10px 0 -12px;touch-action:none;-webkit-user-select:none;user-select:none}
+.drail{position:relative;display:flex;align-items:center;align-self:flex-start;box-sizing:border-box;height:44px;margin:-10px 0 -12px;touch-action:none;-webkit-user-select:none;user-select:none}
 .drail-step{all:unset;box-sizing:border-box;flex:none;width:44px;height:44px;display:grid;place-items:center;color:var(--text3);cursor:pointer;border-radius:8px}
 .drail-step svg{width:14px;height:14px}
 .drail-step:hover:not(:disabled){color:var(--accent)}
@@ -278,8 +278,10 @@ th.lh{border-bottom:3px solid var(--c)}
 .drail-thumb:focus-visible::before{box-shadow:0 0 0 2px var(--card),0 0 0 4px var(--accent2)}
 body.drail-drag,body.drail-drag *{cursor:grabbing!important;-webkit-user-select:none;user-select:none}
 body.drail-drag .drail-thumb::before{background:var(--accent2)}
-/* in-band label above the track line (no extra height); while dragging, a tooltip riding on the thumb shows the target window in its place */
-.drail-lbl{position:absolute;left:0;top:3px;font:600 10px/12px var(--font-body);letter-spacing:.04em;text-transform:uppercase;color:var(--text2);white-space:nowrap;pointer-events:none}
+/* in-band label above the track line (no extra height); while dragging, a tooltip riding on the thumb shows the target window in its place.
+   The label is a child of .drail (not the track) so alignRail can start it at the track and, where the track is narrower than the label
+   (360px phones), slide it left over the chevrons instead of letting it run past the grid. The tooltip is kept on screen by fitTip. */
+.drail-lbl{position:absolute;left:44px;top:3px;font:600 10px/12px var(--font-body);letter-spacing:.04em;text-transform:uppercase;color:var(--text2);white-space:nowrap;pointer-events:none}
 .drail-tip{position:absolute;left:50%;top:3px;transform:translateX(-50%);font:600 10px/12px var(--font-num);color:var(--accent);white-space:nowrap;pointer-events:none;visibility:hidden}
 body.drail-drag .drail-lbl{visibility:hidden}
 body.drail-drag .drail-tip{visibility:visible}
@@ -745,14 +747,17 @@ const rangeLbl=(s0,s1)=>`Wk ${isoWeek(s0)}${isoWeek(s1)!==isoWeek(s0)?'–'+isoW
 function setOff(o){const n=clampOff(o);if(n===(S.off||0))return false;
   const f=document.activeElement,fk=f?.classList?.contains('drail-thumb')?'.drail-thumb':f?.classList?.contains('drail-step')?`.drail-step[data-step="${f.dataset.step}"]`:null;
   S.off=n;S.wk=Math.round(n/7);keepScroll(render);
+  /* render() aligned the rail and placed the dragged thumb/tooltip while the new grid was still at scrollLeft 0; keepScroll restores the
+     scroll only afterwards, so re-measure against the restored grid (otherwise the tooltip can name a different window than the grid shows) */
+  if(RD){alignRail();applyDrag()}
   if(fk){const t=document.querySelector(fk);(t&&!t.disabled?t:document.querySelector('.drail-thumb'))?.focus({preventScroll:true})}
   return true}
 /* a plan cell being typed in commits through the existing change handler before the window moves (as clicking Week does) */
 function commitCell(){const a=document.activeElement;if(a&&a.matches?.('.dayin[data-plan]'))a.blur()}
 function dateRail(days){const lo=offLo(),hi=offHi(),o=S.off||0,span=hi-lo,idx=Math.max(0,Math.min(span,o-lo));
   const f=Math.min(1,days.length/(dDiff(SEASON_LO,SEASON_HI)+1)),ch=d=>`<svg viewBox="0 0 16 16" aria-hidden="true"><path d="${d}" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
-  return `<div class="drail" id="drail"><button type="button" class="drail-step" data-step="-1" aria-label="Previous day" title="Previous day" ${o<=lo?'disabled':''}>${ch('M10 3.5 5.5 8l4.5 4.5')}</button>
-    <div class="drail-track" title="Drag to browse dates"><span class="drail-lbl" id="drailLbl">Browse dates</span><div class="drail-thumb" role="slider" tabindex="0" aria-labelledby="drailLbl" aria-orientation="horizontal" aria-valuemin="0" aria-valuemax="${span}" aria-valuenow="${idx}" aria-valuetext="${esc(rangeLbl(days[0],days[days.length-1]))}" style="--p:${span?idx/span:0};--f:${f}"><span class="drail-tip" aria-hidden="true"></span></div></div>
+  return `<div class="drail" id="drail"><span class="drail-lbl" id="drailLbl">Browse dates</span><button type="button" class="drail-step" data-step="-1" aria-label="Previous day" title="Previous day" ${o<=lo?'disabled':''}>${ch('M10 3.5 5.5 8l4.5 4.5')}</button>
+    <div class="drail-track" title="Drag to browse dates"><div class="drail-thumb" role="slider" tabindex="0" aria-labelledby="drailLbl" aria-orientation="horizontal" aria-valuemin="0" aria-valuemax="${span}" aria-valuenow="${idx}" aria-valuetext="${esc(rangeLbl(days[0],days[days.length-1]))}" style="--p:${span?idx/span:0};--f:${f}"><span class="drail-tip" aria-hidden="true"></span></div></div>
     <button type="button" class="drail-step" data-step="1" aria-label="Next day" title="Next day" ${o>=hi?'disabled':''}>${ch('M6 3.5 10.5 8 6 12.5')}</button></div>`}
 /* the rail spans exactly the visible day columns of the grid below it (chevrons sit just outside).
    Narrow screens (≤700px, same breakpoint as the slimmer sticky columns): only ~130px of grid shows right of the sticky columns and the
@@ -766,12 +771,18 @@ function alignRail(){const rl=document.getElementById('drail'),m=document.queryS
   const nar=RAIL_NARROW.matches,tr=rl.querySelector('.drail-track'),nx=rl.querySelector('.drail-step[data-step="1"]');
   if(tr&&nx){const want=nar?tr:null;if(nx.nextElementSibling!==want){const fo=document.activeElement===nx;rl.insertBefore(nx,want);if(fo)nx.focus({preventScroll:true})}}
   const cur=parseFloat(rl.style.marginLeft)||0,base=rl.getBoundingClientRect().left-cur,bw=44;
-  if(nar){const mt=60;   /* track min-width */
+  if(nar){const mt=60;   /* track min-width (same as the CSS min-width on .drail-track) */
     if(R-L<=0){L=minL;R=maxR}                        /* no day column in view: span the scrollable strip */
     else if(R-L<mt){if(L>minL)L=Math.max(minL,R-mt);else R=Math.min(maxR,L+mt)}
-    rl.style.marginLeft=Math.max(0,L-2*bw-base)+'px';rl.style.width=(R-L+2*bw)+'px';rl.style.visibility='';return}
+    /* the strip right of the sticky columns can be narrower than mt (360px phones, or a classic scrollbar): the CSS min-width then pushed the
+       track past the grid's right edge. Grow the track leftwards over the sticky column instead, so it still ends at R (≤ grid edge). */
+    if(R-L<mt)L=R-mt;
+    rl.style.marginLeft=Math.max(0,L-2*bw-base)+'px';rl.style.width=(R-L+2*bw)+'px';rl.style.visibility='';placeLbl(rl);return}
   if(R-L<120){L=minL;R=maxR}
-  rl.style.marginLeft=Math.max(0,L-bw-base)+'px';rl.style.width=Math.max(160,R-L+2*bw)+'px';rl.style.visibility=''}
+  rl.style.marginLeft=Math.max(0,L-bw-base)+'px';rl.style.width=Math.max(160,R-L+2*bw)+'px';rl.style.visibility='';placeLbl(rl)}
+/* label starts at the track (as before); only if the track is narrower than the label does it slide left over the chevrons, never past the rail's right end */
+function placeLbl(rl){const lb=rl.querySelector('.drail-lbl'),tr=rl.querySelector('.drail-track');if(!lb||!tr)return;
+  lb.style.left=Math.max(0,Math.min(tr.offsetLeft,rl.clientWidth-lb.offsetWidth))+'px'}
 RAIL_NARROW.addEventListener?.('change',()=>alignRailSoon());
 let raT=0;const alignRailSoon=()=>{if(!raT)raT=requestAnimationFrame(()=>{raT=0;alignRail()})};
 addEventListener('resize',alignRailSoon);document.addEventListener('scroll',e=>{if(e.target.classList&&e.target.classList.contains('mg'))alignRailSoon()},true);
@@ -784,14 +795,21 @@ function applyDrag(){const t=document.querySelector('.drail-track'),th=t&&t.quer
   const lo=offLo(),span=offHi()-lo,w=Math.max(1,t.getBoundingClientRect().width-th.offsetWidth);
   const pc=Math.max(0,Math.min(1,RD.p0+(RD.x-RD.x0)/w));RD.t=clampOff(lo+Math.round(pc*span));
   const pDay=span?((S.off||0)-lo)/span:0;th.style.transform=`translateX(${((pc-pDay)*w).toFixed(2)}px)`;
-  const tip=th.querySelector('.drail-tip');if(tip)tip.textContent=fmtD(addDays(DAY0,RD.t))+' – '+fmtD(addDays(DAY0,RD.t+(S.days||7)-1))}
+  const tip=th.querySelector('.drail-tip');if(tip){tip.textContent=fmtD(addDays(DAY0,RD.t))+' – '+fmtD(addDays(DAY0,RD.t+(S.days||7)-1));fitTip(tip)}}
+/* the tooltip is centred on the thumb; at the season ends that put it past the rail / viewport edge. Shift it back inside both. */
+function fitTip(tip){tip.style.transform='';const rl=document.getElementById('drail');if(!rl)return;
+  const a=tip.getBoundingClientRect(),b=rl.getBoundingClientRect(),vw=document.documentElement.clientWidth||innerWidth;
+  const lo=Math.max(b.left,2),hi=Math.min(b.right,vw-2),dx=a.left<lo?lo-a.left:a.right>hi?hi-a.right:0;
+  if(dx)tip.style.transform=`translateX(calc(-50% + ${dx.toFixed(1)}px))`}
+/* after a held-day commit the redraw re-measures the rail; paintDrag again so the tooltip, the thumb and the grid agree even if the pointer stays still */
 function paintDrag(){if(!RD)return;applyDrag();clearTimeout(RD.hold);
-  if(RD.t!==(S.off||0))RD.hold=setTimeout(()=>{if(RD&&RD.t!==(S.off||0))setOff(RD.t)},HOLD_MS)}
+  if(RD.t!==(S.off||0))RD.hold=setTimeout(()=>{if(RD&&RD.t!==(S.off||0)){setOff(RD.t);paintDrag()}},HOLD_MS)}
 /* release: ease the leftover sub-day offset back to the whole day (instant with reduced motion) */
 function settleThumb(){const th=document.querySelector('.drail-thumb');if(!th||!th.style.transform)return;
   if(RM.matches){th.style.transform='';return}
   th.classList.add('settle');void th.offsetWidth;th.style.transform='';setTimeout(()=>th.classList.remove('settle'),200)}
 document.addEventListener('pointerdown',e=>{if(e.button)return;
+  if(RD){if(!e.target.closest('.drail'))return;if(e.pointerId!==RD.pid){e.preventDefault();return}endRail(null)}   /* a second finger on the rail is ignored; the same pointer again means its pointerup was lost */
   const st=e.target.closest('.drail-step');if(st){e.preventDefault();if(st.disabled)return;commitCell();setOff((S.off||0)+(+st.dataset.step));return}
   if(!e.target.closest('.drail-track'))return;
   const onThumb=!!e.target.closest('.drail-thumb');e.preventDefault();commitCell();
@@ -811,7 +829,7 @@ addEventListener('pointerup',endRail);addEventListener('pointercancel',endRail);
 /* keyboard: ←/→ a day, PgUp/PgDn a week, Home/End the season bounds; chevrons work with Enter/Space */
 document.addEventListener('keydown',e=>{if(!e.target.classList?.contains('drail-thumb'))return;const o=S.off||0;
   const n={ArrowLeft:o-1,ArrowDown:o-1,ArrowRight:o+1,ArrowUp:o+1,PageDown:o-7,PageUp:o+7,Home:offLo(),End:offHi()}[e.key];
-  if(n==null)return;e.preventDefault();setOff(n)});
+  if(n==null)return;e.preventDefault();if(RD)return;setOff(n)});   /* during a pointer drag the pointer owns the window (a key step would be overwritten by the drag and leave the tooltip disagreeing with the grid) */
 document.addEventListener('click',e=>{const st=e.target.closest('.drail-step');if(st&&e.detail===0&&!st.disabled)setOff((S.off||0)+(+st.dataset.step))});
 /* optional budget-sheet columns (hidden by default; 'Budget details' button) — read-only, from hp2_budget_detail */
 const BD=DB.bd||{};
