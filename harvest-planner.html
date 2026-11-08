@@ -270,12 +270,14 @@ th.lh{border-bottom:3px solid var(--c)}
 .drail-step:focus-visible{outline:2px solid var(--accent2);outline-offset:-6px}
 .drail-track{position:relative;flex:1;min-width:60px;height:44px;cursor:pointer;touch-action:none}
 .drail-track::before{content:'';position:absolute;left:0;right:0;top:50%;height:4px;margin-top:-2px;border-radius:2px;background:var(--border)}
-.drail-thumb{--tw:max(48px,calc(var(--f,0) * 100%));position:absolute;top:50%;height:8px;margin-top:-4px;width:var(--tw);left:calc(var(--p,0) * (100% - var(--tw)));border-radius:4px;background:var(--accent);cursor:grab;outline:none}
-.drail-thumb::after{content:'';position:absolute;left:-4px;right:-4px;top:-18px;bottom:-18px}
-.drail-thumb:hover{background:var(--accent2)}
-.drail-thumb:focus-visible{box-shadow:0 0 0 2px var(--card),0 0 0 4px var(--accent2)}
+/* the thumb element itself is the full 44px-tall hit box (≥48 wide); the 8px teal bar is drawn by ::before */
+.drail-thumb{--tw:max(48px,calc(var(--f,0) * 100%));position:absolute;top:0;height:44px;width:var(--tw);left:calc(var(--p,0) * (100% - var(--tw)));cursor:grab;outline:none}
+.drail-thumb::before{content:'';position:absolute;left:0;right:0;top:50%;height:8px;margin-top:-4px;border-radius:4px;background:var(--accent)}
+.drail-thumb::after{content:'';position:absolute;left:-4px;right:-4px;top:0;bottom:0}
+.drail-thumb:hover::before{background:var(--accent2)}
+.drail-thumb:focus-visible::before{box-shadow:0 0 0 2px var(--card),0 0 0 4px var(--accent2)}
 body.drail-drag,body.drail-drag *{cursor:grabbing!important;-webkit-user-select:none;user-select:none}
-body.drail-drag .drail-thumb{background:var(--accent2)}
+body.drail-drag .drail-thumb::before{background:var(--accent2)}
 body.present .drail{display:none}
 .legendrow{display:flex;gap:14px;flex-wrap:wrap;font-size:11.5px;color:var(--text3);align-items:center}.legendrow i.lg{display:inline-block;width:14px;height:11px;border-radius:3px;border:1px solid var(--border);vertical-align:-1px;margin-right:5px}
 .lg.past{background:color-mix(in srgb,var(--green-bg) var(--past-mix),var(--card))}.lg.today{background:var(--accent-bg)}.lg.fri{background:var(--bg2)}.lg.off{background:repeating-linear-gradient(135deg,var(--card) 0 3px,var(--bg3) 3px 5px)}.lg.ok{background:var(--green-bg);border-color:var(--green-border)}
@@ -744,14 +746,25 @@ function dateRail(days){const lo=offLo(),hi=offHi(),o=S.off||0,span=hi-lo,idx=Ma
   return `<div class="drail" id="drail"><button type="button" class="drail-step" data-step="-1" aria-label="Previous day" title="Previous day" ${o<=lo?'disabled':''}>${ch('M10 3.5 5.5 8l4.5 4.5')}</button>
     <div class="drail-track" title="Drag to move the plan days one day at a time"><div class="drail-thumb" role="slider" tabindex="0" aria-label="Plan days date window" aria-orientation="horizontal" aria-valuemin="0" aria-valuemax="${span}" aria-valuenow="${idx}" aria-valuetext="${esc(rangeLbl(days[0],days[days.length-1]))}" style="--p:${span?idx/span:0};--f:${f}"></div></div>
     <button type="button" class="drail-step" data-step="1" aria-label="Next day" title="Next day" ${o>=hi?'disabled':''}>${ch('M6 3.5 10.5 8 6 12.5')}</button></div>`}
-/* the rail spans exactly the visible day columns of the grid below it (chevrons sit just outside) */
+/* the rail spans exactly the visible day columns of the grid below it (chevrons sit just outside).
+   Narrow screens (≤700px, same breakpoint as the slimmer sticky columns): only ~130px of grid shows right of the sticky columns and the
+   days usually reach the grid's right edge, so both chevrons sit as a pair on the left (over the sticky columns) and the track keeps
+   following the visible day columns as the grid scrolls; it never extends past the grid. Desktop path unchanged. */
+const RAIL_NARROW=matchMedia('(max-width:700px)');
 function alignRail(){const rl=document.getElementById('drail'),m=document.querySelector('.mg');if(!rl||!m)return;
   const hs=m.querySelectorAll('thead th.dcol');if(!hs.length){rl.style.visibility='hidden';return}
   const mr=m.getBoundingClientRect(),s2=m.querySelector('thead th.stk2'),minL=s2?s2.getBoundingClientRect().right:mr.left,maxR=mr.left+m.clientWidth;
   let L=Math.max(hs[0].getBoundingClientRect().left,minL),R=Math.min(hs[hs.length-1].getBoundingClientRect().right,maxR);
-  if(R-L<120){L=minL;R=maxR}
+  const nar=RAIL_NARROW.matches,tr=rl.querySelector('.drail-track'),nx=rl.querySelector('.drail-step[data-step="1"]');
+  if(tr&&nx){const want=nar?tr:null;if(nx.nextElementSibling!==want){const fo=document.activeElement===nx;rl.insertBefore(nx,want);if(fo)nx.focus({preventScroll:true})}}
   const cur=parseFloat(rl.style.marginLeft)||0,base=rl.getBoundingClientRect().left-cur,bw=44;
+  if(nar){const mt=60;   /* track min-width */
+    if(R-L<=0){L=minL;R=maxR}                        /* no day column in view: span the scrollable strip */
+    else if(R-L<mt){if(L>minL)L=Math.max(minL,R-mt);else R=Math.min(maxR,L+mt)}
+    rl.style.marginLeft=Math.max(0,L-2*bw-base)+'px';rl.style.width=(R-L+2*bw)+'px';rl.style.visibility='';return}
+  if(R-L<120){L=minL;R=maxR}
   rl.style.marginLeft=Math.max(0,L-bw-base)+'px';rl.style.width=Math.max(160,R-L+2*bw)+'px';rl.style.visibility=''}
+RAIL_NARROW.addEventListener?.('change',()=>alignRailSoon());
 let raT=0;const alignRailSoon=()=>{if(!raT)raT=requestAnimationFrame(()=>{raT=0;alignRail()})};
 addEventListener('resize',alignRailSoon);document.addEventListener('scroll',e=>{if(e.target.classList&&e.target.classList.contains('mg'))alignRailSoon()},true);
 /* drag (mouse / touch / pen): window-level listeners, because every whole-day step redraws the rail */
