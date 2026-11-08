@@ -3531,6 +3531,12 @@ function MiniMap(p){
     setTimeout(fit,80);
     return function(){ try{ m.remove(); }catch(err){} mapR.current=null; };
   },[]);
+  // The split dialog's parent outline loads after the map mounts — draw it (and zoom to it) when it arrives.
+  useEffect(function(){ var m=mapR.current; if(!m||!p.seed||seedR.current) return;
+    var sll=geomToLatLngs(p.seed); if(!sll) return;
+    seedR.current=L.polygon(sll,{color:'#fff',weight:1.5,opacity:.6,dashArray:'5 5',fill:false,interactive:false}).addTo(m);
+    setTimeout(fit,40);
+  },[p.seed]);
   function stopDraw(){ if(drawR.current){ try{drawR.current.disable();}catch(e){} drawR.current=null; } setActive(null); }
   function stopEdit(save){ if(editR.current){ try{ if(save) editR.current.save(); editR.current.disable(); }catch(e){} editR.current=null; }
     setEditing(false);
