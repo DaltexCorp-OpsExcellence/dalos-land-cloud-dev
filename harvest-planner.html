@@ -258,6 +258,22 @@ th.lh{border-bottom:3px solid var(--c)}
 @media (prefers-reduced-motion:reduce){.skel{animation:none}}
 .x:focus-visible,.budbtn:focus-visible,.msel:focus-visible,.winchip:focus-visible,.qclr:focus-visible,.todayact:focus-visible,.ain:focus-visible,.wdate:focus-visible,.wnote:focus-visible,.sel:focus-visible,.search:focus-visible{outline:2px solid var(--accent2);outline-offset:2px}
 .segtxt{padding:5px 10px;font-size:12px;font-weight:600;color:var(--text);background:var(--card);border-right:1px solid var(--border);white-space:nowrap;font-family:var(--font-num)}
+/* compact date rail above the daily columns: slim neutral track, small teal thumb, quiet day-step chevrons; every hit area ≥44px */
+.drail{display:flex;align-items:center;align-self:flex-start;box-sizing:border-box;height:44px;margin:-10px 0 -12px;touch-action:none;-webkit-user-select:none;user-select:none}
+.drail-step{all:unset;box-sizing:border-box;flex:none;width:44px;height:44px;display:grid;place-items:center;color:var(--text3);cursor:pointer;border-radius:8px}
+.drail-step svg{width:14px;height:14px}
+.drail-step:hover:not(:disabled){color:var(--accent)}
+.drail-step:disabled{opacity:.3;cursor:default}
+.drail-step:focus-visible{outline:2px solid var(--accent2);outline-offset:-6px}
+.drail-track{position:relative;flex:1;min-width:60px;height:44px;cursor:pointer;touch-action:none}
+.drail-track::before{content:'';position:absolute;left:0;right:0;top:50%;height:4px;margin-top:-2px;border-radius:2px;background:var(--border)}
+.drail-thumb{--tw:max(48px,calc(var(--f,0) * 100%));position:absolute;top:50%;height:8px;margin-top:-4px;width:var(--tw);left:calc(var(--p,0) * (100% - var(--tw)));border-radius:4px;background:var(--accent);cursor:grab;outline:none}
+.drail-thumb::after{content:'';position:absolute;left:-4px;right:-4px;top:-18px;bottom:-18px}
+.drail-thumb:hover{background:var(--accent2)}
+.drail-thumb:focus-visible{box-shadow:0 0 0 2px var(--card),0 0 0 4px var(--accent2)}
+body.drail-drag,body.drail-drag *{cursor:grabbing!important;-webkit-user-select:none;user-select:none}
+body.drail-drag .drail-thumb{background:var(--accent2)}
+body.present .drail{display:none}
 .legendrow{display:flex;gap:14px;flex-wrap:wrap;font-size:11.5px;color:var(--text3);align-items:center}.legendrow i.lg{display:inline-block;width:14px;height:11px;border-radius:3px;border:1px solid var(--border);vertical-align:-1px;margin-right:5px}
 .lg.past{background:color-mix(in srgb,var(--green-bg) var(--past-mix),var(--card))}.lg.today{background:var(--accent-bg)}.lg.fri{background:var(--bg2)}.lg.off{background:repeating-linear-gradient(135deg,var(--card) 0 3px,var(--bg3) 3px 5px)}.lg.ok{background:var(--green-bg);border-color:var(--green-border)}
 .estcell{display:flex;align-items:center;justify-content:space-between;gap:6px}
@@ -566,7 +582,7 @@ function agg(list,since){
 // ---------- state ----------
 const S={tab:'est',farm:'All',type:'All',q:'',since:(addDays(MEETINGS[0],1)===TODAY?MEETINGS[1]:MEETINGS[0]),group:'farm',reason:'All'};
 try{const u=JSON.parse(localStorage.getItem('hp2-ui')||'{}');S.tab=u.tab||S.tab;S.group=u.group||S.group;if(MEETINGS.includes(u.since))S.since=u.since;
-  S.farm=u.farm||'All';S.type=u.type||'All';S.days=u.days||7;S.wk=0;S.bd=!!u.bd;S.howto=!!u.howto}catch(e){}
+  S.farm=u.farm||'All';S.type=u.type||'All';S.days=u.days||7;S.wk=0;S.off=0;S.bd=!!u.bd;S.howto=!!u.howto}catch(e){}
 const saveUI=()=>{try{localStorage.setItem('hp2-ui',JSON.stringify({tab:S.tab,group:S.group,since:S.since,farm:S.farm,type:S.type,days:S.days,wk:S.wk,howto:S.howto,bd:S.bd}))}catch(e){}};
 const FARMS=['All',...new Set(PLOTS.map(p=>p.farm))];
 const TYPES=['All',...new Set(PLOTS.map(p=>p.type))];
@@ -701,7 +717,60 @@ async function savePlan(k,v,old,force){const i=k.lastIndexOf('|'),bid=k.slice(0,
 /* redraw but keep whatever the user is typing in another cell */
 function rerenderKeep(){const a=document.activeElement,k=a&&a.dataset&&a.dataset.plan,val=a&&a.value,ss=a&&a.selectionStart;keepScroll(render);
   if(k){const n=document.querySelector(`[data-plan="${k}"]`);if(n){n.value=val;n.focus();try{n.setSelectionRange(ss,ss)}catch(e){}}}}
-const planDays=()=>{const n=S.days||7;const s=addDays(TODAY,(S.wk||0)*7-3);return [...Array(n)].map((_,i)=>addDays(s,i))};
+const planDays=()=>{const n=S.days||7;const s=addDays(TODAY,(S.off||0)-3);return [...Array(n)].map((_,i)=>addDays(s,i))};
+/* ---------- date window ----------
+   S.off = days the window start sits from its default (today − 3). Week = ±7, Today = 0, the date rail = ±1.
+   Navigation bounds = the season: Jul 1 – Jun 30 (public.seasons has no start/end columns). The last day in view never passes the season end.
+   Navigating only redraws; it never saves. A plan cell being typed in commits first through its normal change → savePlan path (same as Week). */
+const SEASON_LO=DB.y1+'-07-01',SEASON_HI=(DB.y1+1)+'-06-30';
+const dDiff=(a,b)=>Math.round((Date.parse(b+'T00:00:00Z')-Date.parse(a+'T00:00:00Z'))/864e5);
+const DAY0=addDays(TODAY,-3);
+const offLo=()=>dDiff(DAY0,SEASON_LO),offHi=()=>Math.max(offLo(),dDiff(DAY0,SEASON_HI)-((S.days||7)-1));
+const clampOff=o=>Math.max(offLo(),Math.min(offHi(),o));
+const rangeLbl=(s0,s1)=>`Wk ${isoWeek(s0)}${isoWeek(s1)!==isoWeek(s0)?'–'+isoWeek(s1):''} · ${fmtD(s0)} – ${fmtD(s1)}`;
+function setOff(o){const n=clampOff(o);if(n===(S.off||0))return false;
+  const f=document.activeElement,fk=f?.classList?.contains('drail-thumb')?'.drail-thumb':f?.classList?.contains('drail-step')?`.drail-step[data-step="${f.dataset.step}"]`:null;
+  S.off=n;S.wk=Math.round(n/7);keepScroll(render);
+  if(fk){const t=document.querySelector(fk);(t&&!t.disabled?t:document.querySelector('.drail-thumb'))?.focus({preventScroll:true})}
+  return true}
+/* a plan cell being typed in commits through the existing change handler before the window moves (as clicking Week does) */
+function commitCell(){const a=document.activeElement;if(a&&a.matches?.('.dayin[data-plan]'))a.blur()}
+function dateRail(days){const lo=offLo(),hi=offHi(),o=S.off||0,span=hi-lo,idx=Math.max(0,Math.min(span,o-lo));
+  const f=Math.min(1,days.length/(dDiff(SEASON_LO,SEASON_HI)+1)),ch=d=>`<svg viewBox="0 0 16 16" aria-hidden="true"><path d="${d}" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+  return `<div class="drail" id="drail"><button type="button" class="drail-step" data-step="-1" aria-label="Previous day" title="Previous day" ${o<=lo?'disabled':''}>${ch('M10 3.5 5.5 8l4.5 4.5')}</button>
+    <div class="drail-track" title="Drag to move the plan days one day at a time"><div class="drail-thumb" role="slider" tabindex="0" aria-label="Plan days date window" aria-orientation="horizontal" aria-valuemin="0" aria-valuemax="${span}" aria-valuenow="${idx}" aria-valuetext="${esc(rangeLbl(days[0],days[days.length-1]))}" style="--p:${span?idx/span:0};--f:${f}"></div></div>
+    <button type="button" class="drail-step" data-step="1" aria-label="Next day" title="Next day" ${o>=hi?'disabled':''}>${ch('M6 3.5 10.5 8 6 12.5')}</button></div>`}
+/* the rail spans exactly the visible day columns of the grid below it (chevrons sit just outside) */
+function alignRail(){const rl=document.getElementById('drail'),m=document.querySelector('.mg');if(!rl||!m)return;
+  const hs=m.querySelectorAll('thead th.dcol');if(!hs.length){rl.style.visibility='hidden';return}
+  const mr=m.getBoundingClientRect(),s2=m.querySelector('thead th.stk2'),minL=s2?s2.getBoundingClientRect().right:mr.left,maxR=mr.left+m.clientWidth;
+  let L=Math.max(hs[0].getBoundingClientRect().left,minL),R=Math.min(hs[hs.length-1].getBoundingClientRect().right,maxR);
+  if(R-L<120){L=minL;R=maxR}
+  const cur=parseFloat(rl.style.marginLeft)||0,base=rl.getBoundingClientRect().left-cur,bw=44;
+  rl.style.marginLeft=Math.max(0,L-bw-base)+'px';rl.style.width=Math.max(160,R-L+2*bw)+'px';rl.style.visibility=''}
+let raT=0;const alignRailSoon=()=>{if(!raT)raT=requestAnimationFrame(()=>{raT=0;alignRail()})};
+addEventListener('resize',alignRailSoon);document.addEventListener('scroll',e=>{if(e.target.classList&&e.target.classList.contains('mg'))alignRailSoon()},true);
+/* drag (mouse / touch / pen): window-level listeners, because every whole-day step redraws the rail */
+let RD=null;
+document.addEventListener('pointerdown',e=>{if(e.button)return;
+  const st=e.target.closest('.drail-step');if(st){e.preventDefault();if(st.disabled)return;commitCell();setOff((S.off||0)+(+st.dataset.step));return}
+  if(!e.target.closest('.drail-track'))return;
+  const onThumb=!!e.target.closest('.drail-thumb');e.preventDefault();commitCell();
+  const t=document.querySelector('.drail-track');if(!t)return;
+  const r=t.getBoundingClientRect(),tw=t.querySelector('.drail-thumb').offsetWidth,lo=offLo(),span=offHi()-lo,w=Math.max(1,r.width-tw);
+  const o0=onThumb?(S.off||0):lo+Math.round(Math.max(0,Math.min(1,(e.clientX-r.left-tw/2)/w))*span);
+  RD={pid:e.pointerId,x0:e.clientX,x:e.clientX,o0,w,span,raf:0};
+  document.body.classList.add('drail-drag');
+  setOff(o0);document.querySelector('.drail-thumb')?.focus({preventScroll:true})});
+addEventListener('pointermove',e=>{if(!RD||e.pointerId!==RD.pid)return;RD.x=e.clientX;
+  if(!RD.raf)RD.raf=requestAnimationFrame(()=>{if(!RD)return;RD.raf=0;setOff(RD.o0+Math.round((RD.x-RD.x0)/RD.w*RD.span))})});
+const endRail=e=>{if(!RD||e.pointerId!==RD.pid)return;if(RD.raf)cancelAnimationFrame(RD.raf);RD=null;document.body.classList.remove('drail-drag')};
+addEventListener('pointerup',endRail);addEventListener('pointercancel',endRail);
+/* keyboard: ←/→ a day, PgUp/PgDn a week, Home/End the season bounds; chevrons work with Enter/Space */
+document.addEventListener('keydown',e=>{if(!e.target.classList?.contains('drail-thumb'))return;const o=S.off||0;
+  const n={ArrowLeft:o-1,ArrowDown:o-1,ArrowRight:o+1,ArrowUp:o+1,PageDown:o-7,PageUp:o+7,Home:offLo(),End:offHi()}[e.key];
+  if(n==null)return;e.preventDefault();setOff(n)});
+document.addEventListener('click',e=>{const st=e.target.closest('.drail-step');if(st&&e.detail===0&&!st.disabled)setOff((S.off||0)+(+st.dataset.step))});
 /* optional budget-sheet columns (hidden by default; 'Budget details' button) — read-only, from hp2_budget_detail */
 const BD=DB.bd||{};
 const BDH=[['Trees','عدد الأشجار'],['Total plan t','اجمالى مخطط انتاج'],['Export plan t','مخطط صادر'],['Export %','of Raw PK budget'],['Local sales plan t','مخطط مبيعات محلى'],['Field sorting %','of total plan'],['Plan yield t/fed','معدل الفدان']];
@@ -766,7 +835,7 @@ function viewEst(part){
       <th>Budget qty</th><th>${monthSel()}</th><th>Latest update</th><th>Raw PK actual</th><th>Local farm sales<span class="f">incl. field sorting · not counted</span></th><th>Farm waste<span class="f">not counted</span></th><th>Remaining<span class="f">= latest − Raw PK actual</span></th><th class="daystart">Actual so far<span class="f">past days · vs plan</span></th><th>Plan ahead<span class="f">today on</span></th>
       ${days.map((d,i)=>{const t=new Date(d+'T00:00:00Z');return `<th class="dcol ${i===0?'daystart':''} ${wkCls(d)}">${t.toLocaleDateString('en-GB',{weekday:'short',timeZone:'UTC'})}<span class="dd">${fmtD(d)}</span></th>`}).join('')}</tr></thead>
       <tbody>${ent.map(([k,ps])=>row(esc(k),ps)).join('')}${row('Total',list,'tot')}</tbody></table></div></div>`};
-  const dayNav=`<span class="lbl">Days</span><div class="seg"><button data-wk="-1" aria-label="Previous week" title="Previous week">‹ Week</button><span class="segtxt">Wk ${isoWeek(s0)}${isoWeek(s1)!==isoWeek(s0)?'–'+isoWeek(s1):''} · ${fmtD(s0)} – ${fmtD(s1)}</span><button data-wk="1" aria-label="Next week" title="Next week">Week ›</button></div><button class="btn sm" data-wk="0" ${(S.wk||0)===0?'disabled':''}>Today</button>
+  const dayNav=`<span class="lbl">Days</span><div class="seg"><button data-wk="-1" aria-label="Previous week" title="Previous week">‹ Week</button><span class="segtxt">${rangeLbl(s0,s1)}</span><button data-wk="1" aria-label="Next week" title="Next week">Week ›</button></div><button class="btn sm" data-wk="0" ${(S.off||0)===0?'disabled':''}>Today</button>
     <div class="seg"><button data-days="7" class="${(S.days||7)===7?'on':''}">7 d</button><button data-days="14" class="${S.days===14?'on':''}">14 d</button></div>`;
   if(part==='sum')return `<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">${dayNav}<span class="spacer"></span><button class="btn sm" data-windows>Harvest windows</button><button class="btn sm pri" data-logharvest>+ Log harvest</button></div>${sumGrid(p=>p.variety,'Variety')}${sumGrid(p=>p.farm,'Farm')}`;
   const fresh=PLOTS.every(p=>!p.ev.length)&&!Object.keys(PLAN).length&&!Object.values(WIN).some(w=>w.start);
@@ -780,12 +849,13 @@ function viewEst(part){
   <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
     <span class="lbl">Group by</span><div class="seg"><button data-group="farm" class="${S.group==='farm'?'on':''}">Farm</button><button data-group="variety" class="${S.group==='variety'?'on':''}">Variety</button></div>
     <span class="lbl" style="margin-left:6px">Plan days</span>
-    <div class="seg"><button data-wk="-1" aria-label="Previous week" title="Previous week">‹ Week</button><span class="segtxt">Wk ${isoWeek(s0)}${isoWeek(s1)!==isoWeek(s0)?'–'+isoWeek(s1):''} · ${fmtD(s0)} – ${fmtD(s1)}</span><button data-wk="1" aria-label="Next week" title="Next week">Week ›</button></div><button class="btn sm" data-wk="0" ${(S.wk||0)===0?'disabled':''}>Today</button>
+    <div class="seg"><button data-wk="-1" aria-label="Previous week" title="Previous week">‹ Week</button><span class="segtxt">${rangeLbl(s0,s1)}</span><button data-wk="1" aria-label="Next week" title="Next week">Week ›</button></div><button class="btn sm" data-wk="0" ${(S.off||0)===0?'disabled':''}>Today</button>
     <div class="seg"><button data-days="7" class="${(S.days||7)===7?'on':''}">7 d</button><button data-days="14" class="${S.days===14?'on':''}">14 d</button></div>
     <button class="btn sm ${S.bd?'on':''}" data-bdtoggle aria-pressed="${S.bd?'true':'false'}" title="Show or hide the extra budget-sheet columns (trees, total plan, export plan, local sales, sorting %, plan yield)">Budget details ${S.bd?'▾':'▸'}</button>
     <span class="spacer"></span><span class="btnpair"><button class="btn sm" data-windows>Harvest windows</button><button class="btn sm pri" data-logharvest>+ Log harvest</button></span>
     <details class="howto" ${S.howto?'open':''}><summary>How this works</summary><p class="hint">Left: the estimate per plot. Click it to update by tonnes or t/fed; every change is saved with who, when and why (<b style="color:var(--amber)">● updates</b> = since the selected week). Right: Raw PK tonnes per day. Past days show the <b>actual</b> from the harvest log with the plan under it (green = above plan, red = below). Click a past day to enter or correct a plot's harvest, use <b>+ actual</b> under today, or <b>Log harvest</b> to enter a whole farm's day at once. Today and later are plan inputs. <b>Left after plan</b> = remaining − plan ahead; red means the plan is more than the estimate. Hover Raw PK actual for everything picked by category.</p></details>
   </div>
+  ${dateRail(days)}
   <div class="table-wrap mg"><table>
     <thead><tr><th class="grpcol stk">Plot</th><th class="grpcol stk2">Estimate</th><th class="grpcol" colspan="${4+(S.bd?7:0)}">Yield, budget &amp; size</th><th class="grpcol" colspan="2">Actual (harvest log)</th><th class="grpcol daystart" colspan="${days.length}">Raw PK t per day · actual (past) · plan (today on)</th><th class="grpcol daystart" colspan="3">Plan check</th></tr>
     <tr><th class="stk" style="text-align:left">${S.group==='farm'?'Plot · variety':'Plot · farm'}</th><th class="stk2">Latest t<span class="f">Raw PK</span></th><th>t/fed<span class="f">= est ÷ area</span></th><th>Budget t<span class="f">Raw PK</span></th><th>vs budget</th>${S.bd?BDH.map((h,i)=>`<th class="bdc${i===0?' bdstart':''}">${h[0]}<span class="f" ${/[\u0600-\u06FF]/.test(h[1])?'lang="ar"':''}>${h[1]}</span></th>`).join(''):''}<th>TrueFruit<span class="f">latest scan · peak count</span></th>
@@ -797,8 +867,12 @@ function viewEst(part){
   ${part==='grid'?'':sumGrid(p=>p.variety,'Variety')+sumGrid(p=>p.farm,'Farm')}`;
 }
 document.addEventListener('click',e=>{if(e.target.closest('[data-bdtoggle]')){S.bd=!S.bd;saveUI();keepScroll(render);return}});
-document.addEventListener('click',e=>{const w=e.target.closest('[data-wk]');if(w){const v=+w.dataset.wk;const nw=v?(S.wk||0)+v:0,s0=addDays(TODAY,nw*7-3);if(v&&(s0<DB.y1+'-07-01'||s0>(DB.y1+1)+'-06-30')){toast('That is outside the '+DB.y1+'/'+String(DB.y1+1).slice(2)+' season');return}S.wk=nw;render()}
-  const d=e.target.closest('[data-days]');if(d){S.days=+d.dataset.days;render()}});
+/* Week = ±7 days, clamped to the season bounds (toast only when already at the bound); Today = back to the default window */
+document.addEventListener('click',e=>{const w=e.target.closest('[data-wk]');if(w){const v=+w.dataset.wk;
+    if(!v){S.off=0;S.wk=0;render();return}
+    const o=S.off||0,n=clampOff(o+v*7);if(n===o){toast('That is outside the '+DB.y1+'/'+String(DB.y1+1).slice(2)+' season');return}
+    S.off=n;S.wk=Math.round(n/7);render()}
+  const d=e.target.closest('[data-days]');if(d){S.days=+d.dataset.days;if(S.off)S.off=clampOff(S.off);render()}});
 // Enter in a plan cell or a Log harvest box moves to the same column one row down
 document.addEventListener('keydown',e=>{if(e.key!=='Enter'||e.shiftKey)return;const i=e.target;if(!i.matches||!i.matches('.dayin[data-plan],#lgrid .ain'))return;e.preventDefault();
   const td=i.closest('td'),tr=td.parentElement,col=[...tr.children].indexOf(td);let n=tr.nextElementSibling;
@@ -1193,7 +1267,7 @@ function alignHeads(scope){(scope||document).querySelectorAll('table').forEach(t
     const isNum=td.classList.contains('num')||td.classList.contains('day')||td.classList.contains('dsum')||td.classList.contains('stk2')||!!td.querySelector('.dayin,.mval');th.classList.toggle('num',isNum)})})}
 function render(){if(S.present){$('#page').innerHTML=presentView();setHH();alignHeads();return}chrome();const pg=$('#page');
   if(S.tab==='plan')S.tab='est';
-  pg.innerHTML=S.tab==='est'?viewEst():S.tab==='sum'?viewSum():viewChg();alignHeads();setHH();}
+  pg.innerHTML=S.tab==='est'?viewEst():S.tab==='sum'?viewSum():viewChg();alignHeads();setHH();alignRail();}
 
 /* ---------- live updates (Supabase Realtime) ----------
    Other users' saves arrive within a second: numbers, totals and cards update in place, the changed cell flashes, a note says who.
