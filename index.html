@@ -3761,7 +3761,7 @@ function SplitModal(p){
   var st=useState({busy:false,err:null,res:null}); var s=st[0],setS=st[1];
   useEffect(function(){
     supabase.from('farm_blocks').select('variety_id,rootstock_id,planting_year,jde_cost_center_id,total_area_fed').eq('id',b.id).maybeSingle().then(function(r){
-      var d=r.data||{}; setParent(d);
+      var d=r.data||{}; setParent(function(x){ return Object.assign({}, x||{}, d); });
       setKids(function(cur){ return cur.map(function(c){ return Object.assign({},c,{variety_id:c.variety_id||d.variety_id||'',rootstock_id:c.rootstock_id||d.rootstock_id||'',planting_year:c.planting_year||(d.planting_year==null?'':d.planting_year),jde:c.jde||d.jde_cost_center_id||''}); }); });
     });
     supabase.from('v_farm_block_geom').select('geojson').eq('id',b.id).maybeSingle().then(function(r){
