@@ -118,6 +118,9 @@ tr.tot td{background:var(--subtot);color:var(--subtot-text);font-weight:700;bord
 #tip .h{font-weight:600;color:var(--text);margin-bottom:6px}
 #tip .row{display:grid;grid-template-columns:auto 1fr;gap:2px 10px;padding:4px 0;border-top:1px solid var(--border)}
 #tip .foot{color:var(--accent);font-size:11px;margin-top:6px}
+/* Raw PK actual breakdown: Arabic label after the English, isolated RTL; line-height 1 so rows keep their height, nowrap so nothing wraps */
+.hsl{white-space:nowrap}
+.hsar{font-family:'Noto Sans Arabic',var(--font-body);font-size:11px;line-height:1;font-weight:500;color:var(--text3);margin-left:6px;unicode-bidi:isolate}
 .ovl{position:fixed;inset:0;background:rgba(10,30,32,.45);z-index:50;display:flex;align-items:flex-start;justify-content:center;padding:6vh 16px;overflow:auto}
 .modal{background:var(--card);border-radius:14px;box-shadow:var(--shadow);width:min(760px,100%);border:1px solid var(--border)}
 .modal.sm{width:min(520px,100%)}
@@ -644,7 +647,8 @@ $('#qClr').onclick=()=>{$('#q').value='';S.q='';render()};
 // ---------- change badge + hover ----------
 /* picked by category: only To packhouse (Raw PK) counts against estimate and plan */
 function harvSplit(p){let a=[0,0,0,0];for(const [d,x] of Object.entries(p.daily))if(d<=TODAY)for(let j=0;j<4;j++)a[j]+=x[j];
-  return ['To packhouse','Field sorting','Local farm sales','Farm waste'].map((l,j)=>`<div class="row"><span class="calc">${l}</span><span class="num" style="text-align:right">${n0(a[j])} t</span></div>`).join('')}
+  /* Arabic labels are display-only, isolated RTL after the English; numbers and units stay LTR */
+  return [['To packhouse','وارد محطة'],['Field sorting','فرزة ارض'],['Local farm sales','خام تجار'],['Farm waste','اعدامات']].map(([l,ar],j)=>`<div class="row"><span class="calc hsl">${l}<bdi class="hsar" dir="rtl" lang="ar">${ar}</bdi></span><span class="num" style="text-align:right" dir="ltr">${n0(a[j])} t</span></div>`).join('')}
 function badge(p){
   const all=inSeason(p);if(!all.length)return '';
   const nw=changes(p,S.since).length;
