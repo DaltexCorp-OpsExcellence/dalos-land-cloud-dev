@@ -3758,8 +3758,9 @@ function SplitModal(p){
       var d=r.data||{}; setParent(d);
       setKids(function(cur){ return cur.map(function(c){ return Object.assign({},c,{variety_id:c.variety_id||d.variety_id||'',rootstock_id:c.rootstock_id||d.rootstock_id||'',planting_year:c.planting_year||(d.planting_year==null?'':d.planting_year),jde:c.jde||d.jde_cost_center_id||''}); }); });
     });
-    supabase.from('v_farm_block_geom').select('geometry').eq('id',b.id).maybeSingle().then(function(r){
-      var g=r.data&&r.data.geometry; if(g) setParent(function(x){ return Object.assign({},x||{},{geom:g}); });
+    supabase.from('v_farm_block_geom').select('geojson').eq('id',b.id).maybeSingle().then(function(r){
+      var g=null; if(r.data&&r.data.geojson){ try{ g=JSON.parse(r.data.geojson); }catch(e){} }
+      if(g) setParent(function(x){ return Object.assign({},x||{},{geom:g}); });
     });
   },[b.id]);
   function upk(idx,k){ return function(val){ setKids(kids.map(function(c,i){ return i===idx?Object.assign({},c,mkObj(k,val)):c; })); }; }
