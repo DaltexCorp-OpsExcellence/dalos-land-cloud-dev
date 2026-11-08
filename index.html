@@ -3535,7 +3535,12 @@ function MiniMap(p){
     if(p.refGeoms&&p.refGeoms.length){ refR.current=L.featureGroup().addTo(m); p.refGeoms.forEach(function(g){ var rl=geomToLatLngs(g); if(rl){ try{ L.polygon(rl,{color:'#cfe6d8',weight:1,opacity:.6,dashArray:'3 4',fill:false,interactive:false}).addTo(refR.current); }catch(e){} } }); }
     (p.targets||[]).forEach(drawTarget);
     setTimeout(fit,80);
-    return function(){ try{ m.remove(); }catch(err){} mapR.current=null; };
+    // The dialog can still be growing when the map first fits; Leaflet then keeps the old view pinned top-left (outline tiny in a corner).
+    // Re-fit whenever the map box changes size, until the user pans or zooms it themselves.
+    var touched=false, ro=null, onTouch=function(){ touched=true; };
+    box.current.addEventListener('pointerdown',onTouch); box.current.addEventListener('wheel',onTouch,{passive:true});
+    if(window.ResizeObserver){ ro=new ResizeObserver(function(){ if(!mapR.current) return; if(touched) mapR.current.invalidateSize(); else fit(); }); ro.observe(box.current); }
+    return function(){ try{ if(ro) ro.disconnect(); }catch(err){} try{ m.remove(); }catch(err){} mapR.current=null; };
   },[]);
   // The split dialog's parent outline loads after the map mounts — draw it (and zoom to it) when it arrives.
   useEffect(function(){ var m=mapR.current; if(!m||!p.seed||seedR.current) return;
