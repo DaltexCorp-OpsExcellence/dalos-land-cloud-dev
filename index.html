@@ -3539,7 +3539,12 @@ function MiniMap(p){
     // Re-fit whenever the map box changes size, until the user pans or zooms it themselves.
     var touched=false, ro=null, onTouch=function(){ touched=true; };
     box.current.addEventListener('pointerdown',onTouch); box.current.addEventListener('wheel',onTouch,{passive:true});
-    if(window.ResizeObserver){ ro=new ResizeObserver(function(){ if(!mapR.current) return; if(touched) mapR.current.invalidateSize(); else fit(); }); ro.observe(box.current); }
+    // A hidden dialog shrinks the box to 0: ignore that, and when it shows again (reopen) start fresh and fit the outline again.
+    var wasHidden=false;
+    if(window.ResizeObserver){ ro=new ResizeObserver(function(){ var b=box.current; if(!mapR.current||!b) return;
+      if(!b.offsetWidth||!b.offsetHeight){ wasHidden=true; return; }
+      if(wasHidden){ wasHidden=false; touched=false; }
+      if(touched) mapR.current.invalidateSize(); else fit(); }); ro.observe(box.current); }
     return function(){ try{ if(ro) ro.disconnect(); }catch(err){} try{ m.remove(); }catch(err){} mapR.current=null; };
   },[]);
   // The split dialog's parent outline loads after the map mounts — draw it (and zoom to it) when it arrives.
