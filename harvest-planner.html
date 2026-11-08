@@ -289,6 +289,15 @@ body.drail-drag .drail-thumb{will-change:transform}
 .drail-thumb.settle{transition:transform .14s ease-out}
 @media (prefers-reduced-motion:reduce){.drail-thumb.settle{transition:none}}
 .pest .drail{margin:-6px 0 -8px}
+/* phones ≤480px (main grid and Present slide 4): own full-width row under the controls. A 16px label line ("Browse dates", replaced by
+   the drag tooltip while dragging) above a 44px row: ‹ 44×44 · track (whole remaining width) · › 44×44. Thumb stays ≥48×44.
+   alignRail clears its inline width/margin here, so the row never runs past the viewport. */
+@media (max-width:480px){
+  .drail,.pest .drail{align-self:stretch;width:100%;max-width:100%;height:60px;padding-top:16px;margin:0}
+  .drail-lbl{top:2px}
+  .drail-tip{top:-14px}
+  .drail-track{min-width:0}
+}
 .legendrow{display:flex;gap:14px;flex-wrap:wrap;font-size:11.5px;color:var(--text3);align-items:center}.legendrow i.lg{display:inline-block;width:14px;height:11px;border-radius:3px;border:1px solid var(--border);vertical-align:-1px;margin-right:5px}
 .lg.past{background:color-mix(in srgb,var(--green-bg) var(--past-mix),var(--card))}.lg.today{background:var(--accent-bg)}.lg.fri{background:var(--bg2)}.lg.off{background:repeating-linear-gradient(135deg,var(--card) 0 3px,var(--bg3) 3px 5px)}.lg.ok{background:var(--green-bg);border-color:var(--green-border)}
 .estcell{display:flex;align-items:center;justify-content:space-between;gap:6px}
@@ -733,7 +742,11 @@ async function savePlan(k,v,old,force){const i=k.lastIndexOf('|'),bid=k.slice(0,
 /* redraw but keep whatever the user is typing in another cell */
 function rerenderKeep(){const a=document.activeElement,k=a&&a.dataset&&a.dataset.plan,val=a&&a.value,ss=a&&a.selectionStart;keepScroll(render);
   if(k){const n=document.querySelector(`[data-plan="${k}"]`);if(n){n.value=val;n.focus();try{n.setSelectionRange(ss,ss)}catch(e){}}}}
-const planDays=()=>{const n=S.days||7;const s=addDays(TODAY,(S.off||0)-3);return [...Array(n)].map((_,i)=>addDays(s,i))};
+/* the one date-window calculation: offset o → its days, first/last day, the control/slider label and the short tooltip text.
+   The grid (planDays), the Week control text, the drag tooltip and the slider's aria-valuetext all come from here. */
+function winOf(o,n){n=n||S.days||7;const s=addDays(TODAY,(o||0)-3),days=[...Array(n)].map((_,i)=>addDays(s,i)),s0=days[0],s1=days[n-1];
+  return {days,s0,s1,label:rangeLbl(s0,s1),dates:fmtD(s0)+' – '+fmtD(s1)}}
+const planDays=()=>winOf(S.off||0).days;
 /* ---------- date window ----------
    S.off = days the window start sits from its default (today − 3). Week = ±7, Today = 0, the date rail = ±1.
    Navigation bounds = the season: Jul 1 – Jun 30 (public.seasons has no start/end columns). The last day in view never passes the season end.
@@ -743,33 +756,37 @@ const dDiff=(a,b)=>Math.round((Date.parse(b+'T00:00:00Z')-Date.parse(a+'T00:00:0
 const DAY0=addDays(TODAY,-3);
 const offLo=()=>dDiff(DAY0,SEASON_LO),offHi=()=>Math.max(offLo(),dDiff(DAY0,SEASON_HI)-((S.days||7)-1));
 const clampOff=o=>Math.max(offLo(),Math.min(offHi(),o));
-const rangeLbl=(s0,s1)=>`Wk ${isoWeek(s0)}${isoWeek(s1)!==isoWeek(s0)?'–'+isoWeek(s1):''} · ${fmtD(s0)} – ${fmtD(s1)}`;
+function rangeLbl(s0,s1){return `Wk ${isoWeek(s0)}${isoWeek(s1)!==isoWeek(s0)?'–'+isoWeek(s1):''} · ${fmtD(s0)} – ${fmtD(s1)}`}
 function setOff(o){const n=clampOff(o);if(n===(S.off||0))return false;
   const f=document.activeElement,fk=f?.classList?.contains('drail-thumb')?'.drail-thumb':f?.classList?.contains('drail-step')?`.drail-step[data-step="${f.dataset.step}"]`:null;
   S.off=n;S.wk=Math.round(n/7);keepScroll(render);
   /* render() aligned the rail and placed the dragged thumb/tooltip while the new grid was still at scrollLeft 0; keepScroll restores the
      scroll only afterwards, so re-measure against the restored grid (otherwise the tooltip can name a different window than the grid shows) */
-  if(RD){alignRail();applyDrag()}
+  if(RD){alignRail();redrawDrag()}
   if(fk){const t=document.querySelector(fk);(t&&!t.disabled?t:document.querySelector('.drail-thumb'))?.focus({preventScroll:true})}
   return true}
 /* a plan cell being typed in commits through the existing change handler before the window moves (as clicking Week does) */
 function commitCell(){const a=document.activeElement;if(a&&a.matches?.('.dayin[data-plan]'))a.blur()}
-function dateRail(days){const lo=offLo(),hi=offHi(),o=S.off||0,span=hi-lo,idx=Math.max(0,Math.min(span,o-lo));
+function dateRail(days){const lo=offLo(),hi=offHi(),o=S.off||0,span=hi-lo,idx=Math.max(0,Math.min(span,o-lo)),W=winOf(o,days.length);
   const f=Math.min(1,days.length/(dDiff(SEASON_LO,SEASON_HI)+1)),ch=d=>`<svg viewBox="0 0 16 16" aria-hidden="true"><path d="${d}" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
   return `<div class="drail" id="drail"><span class="drail-lbl" id="drailLbl">Browse dates</span><button type="button" class="drail-step" data-step="-1" aria-label="Previous day" title="Previous day" ${o<=lo?'disabled':''}>${ch('M10 3.5 5.5 8l4.5 4.5')}</button>
-    <div class="drail-track" title="Drag to browse dates"><div class="drail-thumb" role="slider" tabindex="0" aria-labelledby="drailLbl" aria-orientation="horizontal" aria-valuemin="0" aria-valuemax="${span}" aria-valuenow="${idx}" aria-valuetext="${esc(rangeLbl(days[0],days[days.length-1]))}" style="--p:${span?idx/span:0};--f:${f}"><span class="drail-tip" aria-hidden="true"></span></div></div>
+    <div class="drail-track" title="Drag to browse dates"><div class="drail-thumb" role="slider" tabindex="0" aria-labelledby="drailLbl" aria-orientation="horizontal" aria-valuemin="0" aria-valuemax="${span}" aria-valuenow="${idx}" aria-valuetext="${esc(W.label)}" style="--p:${span?idx/span:0};--f:${f}"><span class="drail-tip" aria-hidden="true"></span></div></div>
     <button type="button" class="drail-step" data-step="1" aria-label="Next day" title="Next day" ${o>=hi?'disabled':''}>${ch('M6 3.5 10.5 8 6 12.5')}</button></div>`}
 /* the rail spans exactly the visible day columns of the grid below it (chevrons sit just outside).
    Narrow screens (≤700px, same breakpoint as the slimmer sticky columns): only ~130px of grid shows right of the sticky columns and the
    days usually reach the grid's right edge, so both chevrons sit as a pair on the left (over the sticky columns) and the track keeps
    following the visible day columns as the grid scrolls; it never extends past the grid. Desktop path unchanged. */
 const RAIL_NARROW=matchMedia('(max-width:700px)');
+/* phones ≤480px: the rail is its own full-width row under the controls (CSS: label line above a 44px row of ‹ track ›), in natural
+   order, not tied to the day columns, so the track gets the whole row width as drag travel. 481–700px and desktop paths unchanged. */
+const RAIL_TINY=matchMedia('(max-width:480px)');
 function alignRail(){const rl=document.getElementById('drail'),m=document.querySelector('.mg');if(!rl||!m)return;
   const hs=m.querySelectorAll('thead th.dcol');if(!hs.length){rl.style.visibility='hidden';return}
   const mr=m.getBoundingClientRect(),s2=m.querySelector('thead th.stk2'),minL=s2?s2.getBoundingClientRect().right:mr.left,maxR=mr.left+m.clientWidth;
   let L=Math.max(hs[0].getBoundingClientRect().left,minL),R=Math.min(hs[hs.length-1].getBoundingClientRect().right,maxR);
-  const nar=RAIL_NARROW.matches,tr=rl.querySelector('.drail-track'),nx=rl.querySelector('.drail-step[data-step="1"]');
-  if(tr&&nx){const want=nar?tr:null;if(nx.nextElementSibling!==want){const fo=document.activeElement===nx;rl.insertBefore(nx,want);if(fo)nx.focus({preventScroll:true})}}
+  const tiny=RAIL_TINY.matches,nar=RAIL_NARROW.matches,tr=rl.querySelector('.drail-track'),nx=rl.querySelector('.drail-step[data-step="1"]');
+  if(tr&&nx){const want=nar&&!tiny?tr:null;if(nx.nextElementSibling!==want){const fo=document.activeElement===nx;rl.insertBefore(nx,want);if(fo)nx.focus({preventScroll:true})}}
+  if(tiny){rl.style.marginLeft='';rl.style.width='';rl.style.visibility='';placeLbl(rl);return}
   const cur=parseFloat(rl.style.marginLeft)||0,base=rl.getBoundingClientRect().left-cur,bw=44;
   if(nar){const mt=60;   /* track min-width (same as the CSS min-width on .drail-track) */
     if(R-L<=0){L=minL;R=maxR}                        /* no day column in view: span the scrollable strip */
@@ -783,7 +800,7 @@ function alignRail(){const rl=document.getElementById('drail'),m=document.queryS
 /* label starts at the track (as before); only if the track is narrower than the label does it slide left over the chevrons, never past the rail's right end */
 function placeLbl(rl){const lb=rl.querySelector('.drail-lbl'),tr=rl.querySelector('.drail-track');if(!lb||!tr)return;
   lb.style.left=Math.max(0,Math.min(tr.offsetLeft,rl.clientWidth-lb.offsetWidth))+'px'}
-RAIL_NARROW.addEventListener?.('change',()=>alignRailSoon());
+RAIL_NARROW.addEventListener?.('change',()=>alignRailSoon());RAIL_TINY.addEventListener?.('change',()=>alignRailSoon());
 let raT=0;const alignRailSoon=()=>{if(!raT)raT=requestAnimationFrame(()=>{raT=0;alignRail()})};
 addEventListener('resize',alignRailSoon);document.addEventListener('scroll',e=>{if(e.target.classList&&e.target.classList.contains('mg'))alignRailSoon()},true);
 /* drag (mouse / touch / pen): window-level listeners, because a committed day step redraws the rail.
@@ -791,17 +808,29 @@ addEventListener('resize',alignRailSoon);document.addEventListener('scroll',e=>{
    pointer rests on a new day for HOLD_MS, and on release. Headers and cells always come from one render, so they never disagree.
    pointercancel / window blur revert to the last committed day. In Present a pointer drag does not focus the thumb (← → stay with the slides). */
 let RD=null;const HOLD_MS=150;
+/* pure: thumb fraction + pointer travel (px) over the usable track width → clamped fraction and target offset. No DOM. */
+function dragTarget(p0,dx,w,lo,span){const pc=Math.max(0,Math.min(1,p0+dx/Math.max(1,w)));return {pc,t:lo+Math.round(pc*span)}}
+/* writes offset o's window into the Week control text, the slider value/valuetext and the drag tooltip (all from winOf).
+   During a drag o is the target, so control and tooltip always name the same window; the grid follows on pause / release. */
+function paintWin(o){const W=winOf(o);document.querySelectorAll('.segtxt[data-win]').forEach(s=>{if(s.textContent!==W.label)s.textContent=W.label});
+  const th=document.querySelector('.drail-thumb');if(!th)return;
+  th.setAttribute('aria-valuenow',String(Math.max(0,o-offLo())));th.setAttribute('aria-valuetext',W.label);
+  const tip=th.querySelector('.drail-tip');if(tip){tip.textContent=W.dates;if(RD)fitTip(tip)}}
 function applyDrag(){const t=document.querySelector('.drail-track'),th=t&&t.querySelector('.drail-thumb');if(!RD||!th)return;
   const lo=offLo(),span=offHi()-lo,w=Math.max(1,t.getBoundingClientRect().width-th.offsetWidth);
-  const pc=Math.max(0,Math.min(1,RD.p0+(RD.x-RD.x0)/w));RD.t=clampOff(lo+Math.round(pc*span));
-  const pDay=span?((S.off||0)-lo)/span:0;th.style.transform=`translateX(${((pc-pDay)*w).toFixed(2)}px)`;
-  const tip=th.querySelector('.drail-tip');if(tip){tip.textContent=fmtD(addDays(DAY0,RD.t))+' – '+fmtD(addDays(DAY0,RD.t+(S.days||7)-1));fitTip(tip)}}
+  const d=dragTarget(RD.p0,RD.x-RD.x0,w,lo,span);RD.pc=d.pc;RD.px=RD.x;RD.t=clampOff(d.t);
+  const pDay=span?((S.off||0)-lo)/span:0;th.style.transform=`translateX(${((d.pc-pDay)*w).toFixed(2)}px)`;
+  paintWin(RD.t)}
+/* after a redraw the track can be a few px wider/narrower (the 481–700px rail follows the day columns). Re-anchor the drag on the
+   fraction last painted, not on raw pixels, so a stationary pointer keeps the same target instead of jumping days. */
+function redrawDrag(){if(!RD)return;RD.p0=RD.pc;RD.x0=RD.px;applyDrag()}
 /* the tooltip is centred on the thumb; at the season ends that put it past the rail / viewport edge. Shift it back inside both. */
 function fitTip(tip){tip.style.transform='';const rl=document.getElementById('drail');if(!rl)return;
   const a=tip.getBoundingClientRect(),b=rl.getBoundingClientRect(),vw=document.documentElement.clientWidth||innerWidth;
   const lo=Math.max(b.left,2),hi=Math.min(b.right,vw-2),dx=a.left<lo?lo-a.left:a.right>hi?hi-a.right:0;
   if(dx)tip.style.transform=`translateX(calc(-50% + ${dx.toFixed(1)}px))`}
-/* after a held-day commit the redraw re-measures the rail; paintDrag again so the tooltip, the thumb and the grid agree even if the pointer stays still */
+/* per frame: thumb + control + tooltip only (no grid rebuild). The grid commits once the target has been held for HOLD_MS, and on release;
+   after that redraw, redrawDrag re-anchors so the tooltip, the control, the thumb and the grid agree even if the pointer stays still */
 function paintDrag(){if(!RD)return;applyDrag();clearTimeout(RD.hold);
   if(RD.t!==(S.off||0))RD.hold=setTimeout(()=>{if(RD&&RD.t!==(S.off||0)){setOff(RD.t);paintDrag()}},HOLD_MS)}
 /* release: ease the leftover sub-day offset back to the whole day (instant with reduced motion) */
@@ -817,14 +846,14 @@ document.addEventListener('pointerdown',e=>{if(e.button)return;
   const r=t.getBoundingClientRect(),tw=t.querySelector('.drail-thumb').offsetWidth,lo=offLo(),span=offHi()-lo,w=Math.max(1,r.width-tw);
   const p0=onThumb?(span?((S.off||0)-lo)/span:0):Math.max(0,Math.min(1,(e.clientX-r.left-tw/2)/w));
   const o0=onThumb?(S.off||0):clampOff(lo+Math.round(p0*span));
-  RD={pid:e.pointerId,x0:e.clientX,x:e.clientX,p0,t:o0,raf:0,hold:0};
+  RD={pid:e.pointerId,x0:e.clientX,x:e.clientX,px:e.clientX,p0,pc:p0,t:o0,raf:0,hold:0};
   document.body.classList.add('drail-drag');
   setOff(o0);applyDrag();if(!S.present)document.querySelector('.drail-thumb')?.focus({preventScroll:true})});
 addEventListener('pointermove',e=>{if(!RD||e.pointerId!==RD.pid)return;RD.x=e.clientX;
   if(!RD.raf)RD.raf=requestAnimationFrame(()=>{if(!RD)return;RD.raf=0;paintDrag()})});
 function endRail(e){if(!RD||(e&&e.pointerId!==RD.pid))return;clearTimeout(RD.hold);if(RD.raf)cancelAnimationFrame(RD.raf);RD.raf=0;
   if(e&&e.type==='pointerup'){RD.x=e.clientX;applyDrag();if(RD.t!==(S.off||0))setOff(RD.t)}   /* RD still set: the redraw keeps the thumb under the pointer */
-  RD=null;document.body.classList.remove('drail-drag');settleThumb()}
+  RD=null;document.body.classList.remove('drail-drag');paintWin(S.off||0);settleThumb()}   /* cancel / blur: control + slider text fall back to the committed window */
 addEventListener('pointerup',endRail);addEventListener('pointercancel',endRail);addEventListener('blur',()=>endRail(null));
 /* keyboard: ←/→ a day, PgUp/PgDn a week, Home/End the season bounds; chevrons work with Enter/Space */
 document.addEventListener('keydown',e=>{if(!e.target.classList?.contains('drail-thumb'))return;const o=S.off||0;
@@ -909,7 +938,7 @@ function viewEst(part){
   <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
     <span class="lbl">Group by</span><div class="seg"><button data-group="farm" class="${S.group==='farm'?'on':''}">Farm</button><button data-group="variety" class="${S.group==='variety'?'on':''}">Variety</button></div>
     <span class="lbl" style="margin-left:6px">Plan days</span>
-    <div class="seg"><button data-wk="-1" aria-label="Previous week" title="Previous week">‹ Week</button><span class="segtxt">${rangeLbl(s0,s1)}</span><button data-wk="1" aria-label="Next week" title="Next week">Week ›</button></div><button class="btn sm" data-wk="0" ${(S.off||0)===0?'disabled':''}>Today</button>
+    <div class="seg"><button data-wk="-1" aria-label="Previous week" title="Previous week">‹ Week</button><span class="segtxt" data-win>${winOf(S.off||0,days.length).label}</span><button data-wk="1" aria-label="Next week" title="Next week">Week ›</button></div><button class="btn sm" data-wk="0" ${(S.off||0)===0?'disabled':''}>Today</button>
     <div class="seg"><button data-days="7" class="${(S.days||7)===7?'on':''}">7 d</button><button data-days="14" class="${S.days===14?'on':''}">14 d</button></div>
     <button class="btn sm ${S.bd?'on':''}" data-bdtoggle aria-pressed="${S.bd?'true':'false'}" title="Show or hide the extra budget-sheet columns (trees, total plan, export plan, local sales, sorting %, plan yield)">Budget details ${S.bd?'▾':'▸'}</button>
     <span class="spacer"></span><span class="btnpair"><button class="btn sm" data-windows>Harvest windows</button><button class="btn sm pri" data-logharvest>+ Log harvest</button></span>
@@ -928,7 +957,8 @@ function viewEst(part){
 }
 document.addEventListener('click',e=>{if(e.target.closest('[data-bdtoggle]')){S.bd=!S.bd;saveUI();keepScroll(render);return}});
 /* Week = ±7 days, clamped to the season bounds (toast only when already at the bound); Today = back to the default window */
-document.addEventListener('click',e=>{const w=e.target.closest('[data-wk]');if(w){const v=+w.dataset.wk;
+document.addEventListener('click',e=>{if(RD&&e.target.closest('[data-wk],[data-days]'))return;   /* during a pointer drag on the date rail the pointer owns the window (as for the rail keys) */
+  const w=e.target.closest('[data-wk]');if(w){const v=+w.dataset.wk;
     if(!v){S.off=0;S.wk=0;render();return}
     const o=S.off||0,n=clampOff(o+v*7);if(n===o){toast('That is outside the '+DB.y1+'/'+String(DB.y1+1).slice(2)+' season');return}
     S.off=n;S.wk=Math.round(n/7);render()}
@@ -1326,9 +1356,9 @@ function alignHeads(scope){(scope||document).querySelectorAll('table').forEach(t
   const body=[...t.tBodies[0]?.rows||[]].find(r=>!r.classList.contains('grp')&&!r.classList.contains('tot')&&r.cells.length===hr.cells.length);if(!body)return;
   [...hr.cells].forEach((th,i)=>{const td=body.cells[i];if(!td||th.classList.contains('lh')||th.classList.contains('c'))return;
     const isNum=td.classList.contains('num')||td.classList.contains('day')||td.classList.contains('dsum')||td.classList.contains('stk2')||!!td.querySelector('.dayin,.mval');th.classList.toggle('num',isNum)})})}
-function render(){if(S.present){$('#page').innerHTML=presentView();setHH();alignHeads();alignRail();if(RD)applyDrag();return}chrome();const pg=$('#page');
+function render(){if(S.present){$('#page').innerHTML=presentView();setHH();alignHeads();alignRail();if(RD)redrawDrag();return}chrome();const pg=$('#page');
   if(S.tab==='plan')S.tab='est';
-  pg.innerHTML=S.tab==='est'?viewEst():S.tab==='sum'?viewSum():viewChg();alignHeads();setHH();alignRail();if(RD)applyDrag();}
+  pg.innerHTML=S.tab==='est'?viewEst():S.tab==='sum'?viewSum():viewChg();alignHeads();setHH();alignRail();if(RD)redrawDrag();}
 
 /* ---------- live updates (Supabase Realtime) ----------
    Other users' saves arrive within a second: numbers, totals and cards update in place, the changed cell flashes, a note says who.
