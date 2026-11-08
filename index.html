@@ -3518,14 +3518,20 @@ function MiniMap(p){
     if(fgR.current&&fgR.current.getLayers().length) b=fgR.current.getBounds();
     else if(seedR.current) b=seedR.current.getBounds();
     else if(refR.current&&refR.current.getLayers().length) b=refR.current.getBounds();
-    if(b&&b.isValid()) m.fitBounds(b.pad(0.35)); m.invalidateSize(); }catch(err){} }
+    m.invalidateSize(); if(b&&b.isValid()) m.fitBounds(b.pad(0.35)); if(seedR.current) seedR.current.bringToFront(); }catch(err){} }
+  // Parent outline: dark halo under a bright dashed yellow line so it reads on pale satellite imagery.
+  function drawSeed(m){ var sll=geomToLatLngs(p.seed); if(!sll) return false;
+    var g=L.featureGroup([
+      L.polygon(sll,{color:'#111',weight:5,opacity:.55,fill:false,interactive:false}),
+      L.polygon(sll,{color:'#ffd400',weight:2.5,opacity:1,dashArray:'7 5',fill:false,interactive:false})]).addTo(m);
+    seedR.current=g; return true; }
   function drawTarget(t){ var g=(p.geoms||{})[t.id]; if(!g) return; var ll=geomToLatLngs(g); if(!ll) return;
     var layer=L.polygon(ll,{color:t.color,weight:2.5,fillOpacity:0.28}); layer._tid=t.id; layer.addTo(fgR.current); }
   useEffect(function(){ if(!box.current||!window.L){ return; }
     var m=L.map(box.current,{attributionControl:false,zoomControl:true}).setView([30.42,30.6],10);
     L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:19}).addTo(m);
     mapR.current=m; fgR.current=L.featureGroup().addTo(m);
-    if(p.seed){ var sll=geomToLatLngs(p.seed); if(sll){ seedR.current=L.polygon(sll,{color:'#fff',weight:1.5,opacity:.6,dashArray:'5 5',fill:false,interactive:false}).addTo(m); } }
+    if(p.seed){ drawSeed(m); }
     if(p.refGeoms&&p.refGeoms.length){ refR.current=L.featureGroup().addTo(m); p.refGeoms.forEach(function(g){ var rl=geomToLatLngs(g); if(rl){ try{ L.polygon(rl,{color:'#cfe6d8',weight:1,opacity:.6,dashArray:'3 4',fill:false,interactive:false}).addTo(refR.current); }catch(e){} } }); }
     (p.targets||[]).forEach(drawTarget);
     setTimeout(fit,80);
@@ -3533,9 +3539,7 @@ function MiniMap(p){
   },[]);
   // The split dialog's parent outline loads after the map mounts — draw it (and zoom to it) when it arrives.
   useEffect(function(){ var m=mapR.current; if(!m||!p.seed||seedR.current) return;
-    var sll=geomToLatLngs(p.seed); if(!sll) return;
-    seedR.current=L.polygon(sll,{color:'#fff',weight:1.5,opacity:.6,dashArray:'5 5',fill:false,interactive:false}).addTo(m);
-    setTimeout(fit,40);
+    if(drawSeed(m)) setTimeout(fit,40);
   },[p.seed]);
   function stopDraw(){ if(drawR.current){ try{drawR.current.disable();}catch(e){} drawR.current=null; } setActive(null); }
   function stopEdit(save){ if(editR.current){ try{ if(save) editR.current.save(); editR.current.disable(); }catch(e){} editR.current=null; }
@@ -3561,7 +3565,7 @@ function MiniMap(p){
   return ce('div',null,
     ce('div',{className:'minimap',ref:box,style:{height:(p.height||210)+'px'}}),
     ce('div',{className:'splitmap-legend'},
-      p.seed?ce('span',{className:'leg'}, ce('span',{className:'sw',style:{background:'transparent',border:'1.5px dashed #9aa8a7'}}), ce('span',{className:'ln',style:{color:'var(--text3)'}},'Original — history')):null,
+      p.seed?ce('span',{className:'leg'}, ce('span',{className:'sw',style:{background:'transparent',border:'2px dashed #e0b800'}}), ce('span',{className:'ln',style:{color:'var(--text3)'}},'Original — history (yellow dashed)')):null,
       (p.targets||[]).map(function(t){ var has=(p.geoms||{})[t.id]; var ha=has?geojsonHa(has):null;
         return ce('span',{key:t.id,className:'leg'},
           ce('span',{className:'sw',style:{background:t.color+'4d',borderColor:t.color}}),
