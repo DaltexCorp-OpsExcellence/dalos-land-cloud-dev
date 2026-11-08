@@ -3518,7 +3518,7 @@ function MiniMap(p){
     if(fgR.current&&fgR.current.getLayers().length) b=fgR.current.getBounds();
     else if(seedR.current) b=seedR.current.getBounds();
     else if(refR.current&&refR.current.getLayers().length) b=refR.current.getBounds();
-    m.invalidateSize(); if(b&&b.isValid()) m.fitBounds(b.pad(0.35)); if(seedR.current) seedR.current.bringToFront(); }catch(err){} }
+    m.invalidateSize({pan:false}); if(b&&b.isValid()) m.fitBounds(b.pad(0.35),{animate:false}); if(seedR.current) seedR.current.bringToFront(); }catch(err){} }
   // Parent outline: dark halo under a bright dashed yellow line so it reads on pale satellite imagery.
   function drawSeed(m){ var sll=geomToLatLngs(p.seed); if(!sll) return false;
     var g=L.featureGroup([
