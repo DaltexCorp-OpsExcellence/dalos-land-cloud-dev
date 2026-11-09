@@ -529,6 +529,14 @@ thead .stickyc{background:var(--card)}
 .rc-lnk{background:none;border:none;padding:0;color:#8a5a10;font:inherit;font-weight:600;text-decoration:underline;cursor:pointer}
 .rc-lnk:focus-visible,.rc-chip:focus-visible{outline:2px solid var(--accent2);outline-offset:2px}
 .rc-perm{flex-basis:100%;font-size:12px;color:#55625f}
+/* drawer header: block name + Edit Block Name pencil (long names wrap; the button never leaves the row) */
+.rc-title{display:flex;align-items:flex-start;gap:8px;min-width:0;padding-right:6px}   /* keeps the pencil's tap area clear of the close button's */
+.rc-title h2{min-width:0;flex:0 1 auto;overflow-wrap:anywhere}
+.rc-pencil{flex:none;position:relative;width:28px;height:28px;margin-top:1px;display:inline-flex;align-items:center;justify-content:center;background:none;border:1px solid var(--border2);border-radius:6px;color:var(--text2);cursor:pointer;padding:0}
+.rc-pencil:hover{background:var(--bg3);color:var(--accent)}
+.rc-pencil:focus-visible{outline:2px solid var(--accent2);outline-offset:2px}
+.rc-pencil svg{width:14px;height:14px;display:block}
+.rc-pencil::after{content:"";position:absolute;inset:-8px}   /* 44px tap area around the 28px icon */
 .rc-sep{width:1px;align-self:stretch;background:var(--border2);margin:0 6px 0 10px}
 .rc-retire-grp{display:inline-flex;align-items:stretch;white-space:nowrap}
 .rc-done{background:var(--green-bg);border:1px solid var(--green-border);border-radius:8px;padding:10px 12px;font-size:12.5px;color:var(--green);margin:0 0 14px;line-height:1.5}
@@ -1478,7 +1486,7 @@ function RecodeModal(p){
 
   var farmCrop=((b.farms&&b.farms.name)||(row&&row.farm_code)||'')+' '+(b.product_id||'');
   var chk=!row?null: !codeOk ? ce('div',{className:'rc-chk info',role:'status'},'Fix the highlighted field to see the new code.')
-    : same ? ce('div',{className:'rc-chk info',role:'status'},'This is the current code ('+row.aydi_block_number+'). Change the plot or letter to recode.')
+    : same ? ce('div',{className:'rc-chk info',role:'status'},'This is the current code ('+row.aydi_block_number+'). Change the plot or letter to rename it.')
     : clash ? ce('div',{className:'rc-chk bad',role:'status'},'✕ ', ce('b',{style:{fontFamily:'var(--font-mono)'}},nAydi),
         (rcNorm(clash.sector_code,clash.plot_code,clash.block_add)&&clash.aydi_block_number!==nAydi?(' is the same code as '+clash.aydi_block_number+', used by '):' is already used by '),
         ce('b',null,rcName(clash)),' on '+farmCrop+'. Pick another letter.')
@@ -1491,8 +1499,8 @@ function RecodeModal(p){
   var body=!row ? (s.err?ce('div',{className:'band',style:{color:'var(--red)',borderColor:'var(--red)',background:'var(--red-bg)'}},s.err):ce('div',{className:'skel',style:{height:160}}))
    : ce('div',{className:'rc'},
     chips,
-    preview==='viewer'?ce('div',{className:'rc-chk info'},'Non-admin view: in the drawer, Recode is shown disabled with the line “Admins and power users only”.'):null,
-    preview==='done'?ce('div',{className:'rc-done'},'✓ Preview of the drawer after saving: Recoded '+row.aydi_block_number+' → '+(nAydi||'…')+'. History, cost centre and notes kept. Old codes saved as aliases.', rcOutsideList(row.aydi_block_number,nAydi||'…')):null,
+    preview==='viewer'?ce('div',{className:'rc-chk info'},'Non-admin view: in the drawer, the Edit Block Name pencil is hidden for anyone who isn’t an admin or power user.'):null,
+    preview==='done'?ce('div',{className:'rc-done'},'✓ Preview of the drawer after saving: Renamed '+row.aydi_block_number+' → '+(nAydi||'…')+'. History, cost centre and notes kept. Old codes saved as aliases.', rcOutsideList(row.aydi_block_number,nAydi||'…')):null,
     ce('div',{className:'rc-row3'}, codeInput('sector','Sector',3), codeInput('plot','Plot',3), codeInput('letter','Letter',2)),
     ce('div',{className:'rc-hint'},'Only the plot code changes. Variety, rootstock and planting year stay as they are; a mistake there needs an admin correction, because Edit identity locks them once a block has seasons. Use Replant only when the trees were actually replaced.'),
     chk,
@@ -1524,10 +1532,10 @@ function RecodeModal(p){
     showN&&noteErr?ce('div',{id:'rc-m-note',className:'rc-err'},noteErr):null,
     s.err?ce('div',{className:'band',role:'alert',style:{color:'var(--red)',borderColor:'var(--red)',background:'var(--red-bg)'}}, s.err):null);
 
-  return ce(Modal,{title:'Recode block',sub:(row?row.aydi_block_number:b.aydi_block_number)+' · '+rcName(row||b),onClose:p.onClose,busy:s.busy,closerRef:closer,
+  return ce(Modal,{title:'Edit Block Name',sub:(row?row.aydi_block_number:b.aydi_block_number)+' · '+rcName(row||b),onClose:p.onClose,busy:s.busy,closerRef:closer,
     footer:[ce('span',{key:'w',className:'rc-who'},'Admins and power users only. Logged in the History log.'),
             ce('button',{key:'c',className:'btn btn-secondary btn-sm rc-fbtn',onClick:function(){ closeAnim(); },disabled:s.busy},'Cancel'),
-            ce('button',{key:'s',className:'btn btn-primary btn-sm rc-fbtn',onClick:save,disabled:s.busy}, s.busy?'Recoding…':'Recode block')]}, body);
+            ce('button',{key:'s',className:'btn btn-primary btn-sm rc-fbtn',onClick:save,disabled:s.busy}, s.busy?'Saving…':'Save Block Name')]}, body);
 }
 
 function BlockDetail(p){
@@ -1778,9 +1786,12 @@ function BlockDetail(p){
 
   // Recode: enabled for admin / power_user only (fn_recode_block re-checks farm_can_approve)
   var canRecode=!!ctx.isAdmin;
-  var recodeBtn=ce('span',{key:'rc',title:canRecode?'Fix this block’s plot code or letter':'Admins and power users only',style:{display:'inline-flex'}},
-    ce('button',{className:'btn btn-secondary btn-sm',disabled:!canRecode,'aria-disabled':!canRecode,'aria-describedby':canRecode?null:'rc-perm',
-      onClick:function(){ if(canRecode) setAction('recode'); }},'Recode'));
+  // Edit Block Name: pencil beside the block name, only for admin / power_user on a live block
+  var recodeBtn=(canRecode&&!noActs)?ce('button',{type:'button',className:'rc-pencil',title:'Edit Block Name','aria-label':'Edit Block Name',
+      onClick:function(){ setAction('recode'); }},
+    ce('svg',{viewBox:'0 0 16 16',fill:'none',stroke:'currentColor',strokeWidth:1.6,strokeLinecap:'round',strokeLinejoin:'round','aria-hidden':'true',focusable:'false'},
+      ce('path',{d:'M11.2 2.3a1.6 1.6 0 0 1 2.3 2.3L5.3 12.8 2.5 13.5l.7-2.8z'}),
+      ce('path',{d:'M10 3.5l2.5 2.5'}))):null;
   var dupPeers=noActs?[]:peers.rows.filter(function(x){ return x.id!==b.id && b.plot_code!=null && b.block_add!==undefined
     && rcNorm(x.sector_code,x.plot_code,x.block_add)===rcNorm(b.sector_code,b.plot_code,b.block_add) && !rcSkipPair(b,x); });
   var dupBand=dupPeers.length?ce('div',{className:'rc-dup',role:'note'},
@@ -1790,10 +1801,10 @@ function BlockDetail(p){
       var twin=dupPeers.some(function(y){ return y.id!==x.id && rcName(y)===rcName(x); });
       var lbl='Open '+rcName(x)+(twin&&x.operational_block_id?(' ('+String(x.operational_block_id).slice(-2)+')'):'');
       return ce('span',{key:x.id}, i?', ':'', ce('button',{type:'button',className:'rc-lnk',onClick:function(){ openBlock(x.id); }},lbl)); }),
-    canRecode?' to compare, then recode one of them.':' to compare.'):null;
+    canRecode?' to compare, then rename one of them.':' to compare.'):null;
   var doneBand=(recoded&&recoded.id===b.id)?ce('div',{className:'rc-done',role:'status'},
     ce('button',{type:'button',className:'rc-done-x','aria-label':'Dismiss',onClick:function(){ setRecoded(null); }},'×'),
-    '✓ Recoded ', ce('b',null,recoded.from+' → '+recoded.to), '. History, cost centre and notes kept. Old codes saved as aliases.',
+    '✓ Renamed ', ce('b',null,recoded.from+' → '+recoded.to), '. History, cost centre and notes kept. Old codes saved as aliases.',
     rcOutsideList(recoded.from,recoded.to)):null;
 
   // season-snapshot KPI tiles (derived from the latest producing season)
@@ -1861,12 +1872,11 @@ function BlockDetail(p){
     ce('div',{className:'drawer-scrim'+(dClosing?' is-closing':''),onClick:closeDrawer}),
     ce('div',{className:'drawer'+(dClosing?' is-closing':''),role:'dialog','aria-label':'Block detail'},
       ce('div',{className:'drawer-head',style:{alignItems:'flex-start'}},
-        ce('div',{style:{minWidth:0,flex:1}}, ce('h2',{className:'ar',dir:'auto',style:{margin:0}}, b.aydi_block_number), headChips),
+        ce('div',{style:{minWidth:0,flex:1}}, ce('div',{className:'rc-title'}, ce('h2',{className:'ar',dir:'auto',style:{margin:0}}, b.aydi_block_number), recodeBtn), headChips),
         ce('button',{className:'drawer-x','aria-label':'Close',onClick:closeDrawer},'×')),
       ce('div',{className:'drawer-body'},
         canWrite && !noActs ? ce('div',{className:'action-row',style:{margin:'0 0 16px',paddingBottom:14,borderBottom:'1px solid var(--border)'}},
           ce('button',{className:'btn btn-secondary btn-sm',onClick:function(){setAction('edit');}},'Edit identity'),
-          recodeBtn,
           // planned (never planted): Cancel plan replaces Split/Replant/Retire
           lc==='planned' ? cancelBtn : null,
           // fallow land can be replanted or retired, not split
@@ -1876,8 +1886,7 @@ function BlockDetail(p){
           // Retire kept apart from the everyday actions; the divider wraps with it
           lc!=='planned' ? ce('span',{className:'rc-retire-grp'},
             ce('span',{className:'rc-sep','aria-hidden':'true'}),
-            ce('button',{className:'btn btn-secondary btn-sm',style:{color:'var(--red)',borderColor:'color-mix(in srgb,var(--red) 45%,var(--border))'},onClick:function(){setAction('retire');},title:'Retire this planting — irreversible'},'Retire')) : null,
-          canRecode ? null : ce('div',{id:'rc-perm',className:'rc-perm'},'Recode: Admins and power users only.')
+            ce('button',{className:'btn btn-secondary btn-sm',style:{color:'var(--red)',borderColor:'color-mix(in srgb,var(--red) 45%,var(--border))'},onClick:function(){setAction('retire');},title:'Retire this planting — irreversible'},'Retire')) : null
         ) : (canWrite ? ce('div',{className:'action-row',style:{margin:'0 0 16px',paddingBottom:14,borderBottom:'1px solid var(--border)'}},
           ce('button',{className:'btn btn-secondary btn-sm',onClick:function(){setAction('history');}},'History log')) : null),
         doneBand,
@@ -2710,7 +2719,7 @@ function BulkImportScreen(ctx){
             ce('tbody',null, valn.rows.slice(0,300).map(function(r,i){ var col=r.outcome==='blocked'?'var(--red)':r.warn?'var(--amber)':'var(--green)';
               return ce('tr',{key:i},
                 ce('td',null,ce('span',{style:{width:8,height:8,borderRadius:'50%',background:col,display:'inline-block'}})),
-                ce('td',null, r.viaAlias ? ce('span',{className:'lot',title:'Old Operational ID, matched through its recode alias'}, r.op+' → '+r.viaAlias) : ce('span',{className:'lot'},r.op||'—')),
+                ce('td',null, r.viaAlias ? ce('span',{className:'lot',title:'Old Operational ID, matched through the alias saved when the block was renamed'}, r.op+' → '+r.viaAlias) : ce('span',{className:'lot'},r.op||'—')),
                 ce('td',{className:'num'},r.bearing==null?'—':fmt(r.bearing)),
                 ce('td',{className:'num'},r.vals.actual_production==null?'—':fmt(r.vals.actual_production)),
                 ce('td',null,r.outcome==='blocked'?ce('span',{className:'badge badge-fail',style:{fontSize:10}},'blocked: '+r.why):r.warn?ce('span',{className:'badge badge-warn',style:{fontSize:10}},r.outcome+' · '+r.warn):ce('span',{className:'badge badge-pass',style:{fontSize:10}},r.outcome)));}))
@@ -4347,7 +4356,7 @@ function HistoryLogModal(p){
       var who=s.names[e.user_id]||(e.user_id?'Unknown user':'System');
       var head=e.action==='INSERT'?'Created':e.action==='DELETE'?'Deleted':null;
       if(e.action==='recode_block'){ var ro=e.old_value||{}, rn=e.new_value||{};
-        head='Recoded '+(ro.aydi||'?')+' → '+(rn.aydi||'?')+(rn.reason?' · '+rn.reason:'')+(rn.note?' · '+rn.note:''); }
+        head='Renamed '+(ro.aydi||'?')+' → '+(rn.aydi||'?')+(rn.reason?' · '+rn.reason:'')+(rn.note?' · '+rn.note:''); }
       return ce('div',{key:i,style:{padding:'10px 0',borderBottom:i<s.edits.length-1?'1px solid var(--border)':'none'}},
         ce('div',{style:{fontSize:12,color:'var(--text3)'}}, fmt(e.created_at)+' · ', ce('b',{style:{color:'var(--text)'}},who)),
         head?ce('div',{style:{fontSize:13,marginTop:3}},head):
