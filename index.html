@@ -1498,7 +1498,7 @@ function RecodeModal(p){
   var body=!row ? (s.err?ce('div',{className:'band',style:{color:'var(--red)',borderColor:'var(--red)',background:'var(--red-bg)'}},s.err):ce('div',{className:'skel',style:{height:160}}))
    : ce('div',{className:'rc'},
     chips,
-    preview==='viewer'?ce('div',{className:'rc-chk info'},'Non-admin view: in the drawer, the Edit Block Name pencil is hidden for anyone who isn’t an admin or power user.'):null,
+    preview==='viewer'?ce('div',{className:'rc-chk info'},'Non-admin view: in the drawer, the Edit Block Name pencil is hidden for anyone who isn’t an admin, power user or agronomy admin.'):null,
     preview==='done'?ce('div',{className:'rc-done'},'✓ Preview of the drawer after saving: Renamed '+row.aydi_block_number+' → '+(nAydi||'…')+'. History, cost centre and notes kept. Old codes saved as aliases.', rcOutsideList(row.aydi_block_number,nAydi||'…')):null,
     ce('div',{className:'rc-row3'}, codeInput('sector','Sector',3), codeInput('plot','Plot',3), codeInput('letter','Letter',2)),
     ce('div',{className:'rc-hint'},'Only the plot code changes. Variety, rootstock and planting year stay as they are; a mistake there needs an admin correction, because Edit identity locks them once a block has seasons. Use Replant only when the trees were actually replaced.'),
@@ -1532,7 +1532,7 @@ function RecodeModal(p){
     s.err?ce('div',{className:'band',role:'alert',style:{color:'var(--red)',borderColor:'var(--red)',background:'var(--red-bg)'}}, s.err):null);
 
   return ce(Modal,{title:'Edit Block Name',sub:(row?row.aydi_block_number:b.aydi_block_number)+' · '+rcName(row||b),onClose:p.onClose,busy:s.busy,closerRef:closer,
-    footer:[ce('span',{key:'w',className:'rc-who'},'Admins and power users only. Logged in the History log.'),
+    footer:[ce('span',{key:'w',className:'rc-who'},'Admins, power users and agronomy admins only. Logged in the History log.'),
             ce('button',{key:'c',className:'btn btn-secondary btn-sm rc-fbtn',onClick:function(){ closeAnim(); },disabled:s.busy},'Cancel'),
             ce('button',{key:'s',className:'btn btn-primary btn-sm rc-fbtn',onClick:save,disabled:s.busy}, s.busy?'Saving…':'Save Block Name')]}, body);
 }
@@ -1783,10 +1783,9 @@ function BlockDetail(p){
       style:{color:'var(--red)',borderColor:'color-mix(in srgb,var(--red) 45%,var(--border))'},
       onClick:function(){setAction('cancel');}},'Cancel plan'));
 
-  // Edit Block Name: only roles fn_recode_block accepts (farm_can_approve = admin, power_user).
-  // agronomy_admin is wanted too but stays out until the database check allows it
-  // (draft: landcloud_recode_agro_admin_20261109) — otherwise Save would be refused.
-  var RECODE_ROLES=['admin','power_user'];
+  // Edit Block Name: the roles fn_recode_block accepts (farm_can_write = admin, power_user,
+  // agronomy_admin; migration landcloud_recode_agro_admin_20261109).
+  var RECODE_ROLES=['admin','power_user','agronomy_admin'];
   var canRecode=RECODE_ROLES.indexOf(ctx.role)>=0;
   // pencil beside the block name, only for those roles on a live block
   var recodeBtn=(canRecode&&!noActs)?ce('button',{type:'button',className:'rc-pencil',title:'Edit Block Name','aria-label':'Edit Block Name',
