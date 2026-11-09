@@ -250,7 +250,7 @@ tr.rowlink:hover td{background:var(--bg)}
 .drawer-head h2{font-family:var(--font-display);font-size:19px;font-weight:400}
 .drawer-body{padding:16px 18px}
 .drawer-x{margin-left:auto;background:none;border:1px solid var(--border2);border-radius:6px;width:28px;height:28px;color:var(--text2);font-size:16px;line-height:1;position:relative}
-.drawer-x::after{content:"";position:absolute;inset:-8px}   /* 44px tap area around the 28px icon */
+.drawer-x::after{content:"";position:absolute;inset:-9px}   /* 44px tap area: 26px inside the border + 2 x 9px */
 .kv{display:grid;grid-template-columns:130px 1fr;gap:6px 12px;font-size:13px}
 .kv dt{color:var(--text3);font-size:11px;text-transform:uppercase;letter-spacing:.04em;padding-top:2px}
 .kv dd{color:var(--text);font-family:var(--font-mono);font-size:12px}
@@ -490,7 +490,6 @@ thead .stickyc{background:var(--card)}
   .drawer-scrim,.modal-scrim{opacity:1} .drawer,.modal-card{transform:none}
 }
 
-/* ── Recode block (staging) — scoped; darker amber/red/grey for 4.5:1 on tinted bands ── */
 .rc{--rc-amber:#8a5a10;--rc-red:#a82a2a;--rc-muted:#55625f}
 .rc .form-label{font-size:11.5px;color:var(--rc-muted)}
 .rc .form-label .opt{text-transform:none;letter-spacing:0;font-weight:400}
@@ -536,7 +535,7 @@ thead .stickyc{background:var(--card)}
 .rc-pencil:hover{background:var(--bg3);color:var(--accent)}
 .rc-pencil:focus-visible{outline:2px solid var(--accent2);outline-offset:2px}
 .rc-pencil svg{width:14px;height:14px;display:block}
-.rc-pencil::after{content:"";position:absolute;inset:-8px}   /* 44px tap area around the 28px icon */
+.rc-pencil::after{content:"";position:absolute;inset:-9px}   /* 44px tap area: 26px inside the border + 2 x 9px */
 .rc-sep{width:1px;align-self:stretch;background:var(--border2);margin:0 6px 0 10px}
 .rc-retire-grp{display:inline-flex;align-items:stretch;white-space:nowrap}
 .rc-done{background:var(--green-bg);border:1px solid var(--green-border);border-radius:8px;padding:10px 12px;font-size:12.5px;color:var(--green);margin:0 0 14px;line-height:1.5}
@@ -1784,9 +1783,12 @@ function BlockDetail(p){
       style:{color:'var(--red)',borderColor:'color-mix(in srgb,var(--red) 45%,var(--border))'},
       onClick:function(){setAction('cancel');}},'Cancel plan'));
 
-  // Recode: enabled for admin / power_user only (fn_recode_block re-checks farm_can_approve)
-  var canRecode=!!ctx.isAdmin;
-  // Edit Block Name: pencil beside the block name, only for admin / power_user on a live block
+  // Edit Block Name: only roles fn_recode_block accepts (farm_can_approve = admin, power_user).
+  // agronomy_admin is wanted too but stays out until the database check allows it
+  // (draft: landcloud_recode_agro_admin_20261109) — otherwise Save would be refused.
+  var RECODE_ROLES=['admin','power_user'];
+  var canRecode=RECODE_ROLES.indexOf(ctx.role)>=0;
+  // pencil beside the block name, only for those roles on a live block
   var recodeBtn=(canRecode&&!noActs)?ce('button',{type:'button',className:'rc-pencil',title:'Edit Block Name','aria-label':'Edit Block Name',
       onClick:function(){ setAction('recode'); }},
     ce('svg',{viewBox:'0 0 16 16',fill:'none',stroke:'currentColor',strokeWidth:1.6,strokeLinecap:'round',strokeLinejoin:'round','aria-hidden':'true',focusable:'false'},
