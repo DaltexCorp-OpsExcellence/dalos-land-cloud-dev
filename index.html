@@ -1348,6 +1348,16 @@ var RC_LIVE_OUT='(retired,superseded,cancelled)';     // same "live" rule as fn_
 var RC_PREVIEW=/[?&]recodepreview=1\b/.test(location.search);   // review-only state chips
 function rcStrip(x){ x=String(x==null?'':x).toUpperCase().replace(/^0+/,''); return x||'0'; }
 function rcNorm(s,p,l){ return rcStrip(s)+'-'+rcStrip(p)+String(l||'').toUpperCase(); }   // 0-1A = 00-01A = 00-001A
+// Pairs that share a code legitimately, so no duplicate band / "already used" (Tarek, 2026-11-09):
+//  - rootstock-only: same variety + planting year, Operational IDs differ only in the last two letters;
+//  - planned replant: exactly one of the two is 'planned' (a future planting on the existing block's plot).
+function rcSkipPair(a,c){
+  var ao=String(a.operational_block_id||''), co=String(c.operational_block_id||'');
+  var sameVar=(a.variety_code==null||c.variety_code==null||a.variety_code===c.variety_code);
+  if(ao&&co&&ao!==co&&ao.length===co.length&&ao.slice(0,-2)===co.slice(0,-2)&&sameVar&&a.planting_year!=null&&+a.planting_year===+c.planting_year) return true;
+  if((a.lifecycle==='planned')!==(c.lifecycle==='planned')) return true;
+  return false;
+}
 function rcName(x){ return ((x.varieties&&x.varieties.name)||x.variety_code||x.aydi_block_number||'block')+(x.planting_year?(' '+x.planting_year):''); }
 function rcPart(raw,isLetter){   // same rules as the function
   var v=raw==null?'':String(raw);
@@ -1365,7 +1375,7 @@ function useRecodePeers(b){
   var s=useState({loading:true,rows:[]}); var d=s[0],set=s[1];
   var k=useState(0); var tick=k[0],setTick=k[1];
   useEffect(function(){ if(!b||!b.farm_code||!b.product_id){ set({loading:false,rows:[]}); return; } var gone=false;
-    supabase.from('farm_blocks').select('id,aydi_block_number,sector_code,plot_code,block_add,planting_year,lifecycle,variety_code,varieties(name)')
+    supabase.from('farm_blocks').select('id,aydi_block_number,operational_block_id,sector_code,plot_code,block_add,planting_year,lifecycle,variety_code,varieties(name)')
       .eq('farm_code',b.farm_code).eq('product_id',b.product_id).eq('active',true).not('lifecycle','in',RC_LIVE_OUT).limit(1000)
       .then(function(r){ if(!gone) set({loading:false,rows:r.data||[]}); });
     return function(){ gone=true; };
@@ -1418,7 +1428,8 @@ function RecodeModal(p){
   var nFin=(next&&finSuf!=null)?(row.farm_code+next[0]+next[1]+next[2]+finSuf):null;
   var nOp=(next&&opSuf!=null)?(row.farm_code+next[0]+next[1]+next[2]+opSuf):null;
   var same=next&&row&&rcNorm(next[0],next[1],next[2])===rcNorm(row.sector_code,row.plot_code,row.block_add);
-  var clash=(next&&!same)?peers.filter(function(x){ return x.id!==b.id && rcNorm(x.sector_code,x.plot_code,x.block_add)===rcNorm(next[0],next[1],next[2]); })[0]:null;
+  var me=row?{operational_block_id:nOp,variety_code:row.variety_code,planting_year:row.planting_year,lifecycle:row.lifecycle}:null;
+  var clash=(next&&!same)?peers.filter(function(x){ return x.id!==b.id && rcNorm(x.sector_code,x.plot_code,x.block_add)===rcNorm(next[0],next[1],next[2]) && !rcSkipPair(me,x); })[0]:null;
   var note=(v.note||'').trim();
   var reasonErr=!v.reason?'Choose a reason.':'';
   var noteErr=(v.reason==='other'&&!note)?'Add a note when the reason is Other.':(note.length>500?'Note is limited to 500 characters ('+note.length+').':'');
@@ -1771,10 +1782,14 @@ function BlockDetail(p){
     ce('button',{className:'btn btn-secondary btn-sm',disabled:!canRecode,'aria-disabled':!canRecode,'aria-describedby':canRecode?null:'rc-perm',
       onClick:function(){ if(canRecode) setAction('recode'); }},'Recode'));
   var dupPeers=noActs?[]:peers.rows.filter(function(x){ return x.id!==b.id && b.plot_code!=null && b.block_add!==undefined
-    && rcNorm(x.sector_code,x.plot_code,x.block_add)===rcNorm(b.sector_code,b.plot_code,b.block_add); });
+    && rcNorm(x.sector_code,x.plot_code,x.block_add)===rcNorm(b.sector_code,b.plot_code,b.block_add) && !rcSkipPair(b,x); });
   var dupBand=dupPeers.length?ce('div',{className:'rc-dup',role:'note'},
     'Another active block on this farm also uses ', ce('b',{style:{fontFamily:'var(--font-mono)'}},b.aydi_block_number), ': ',
-    dupPeers.map(function(x,i){ return ce('span',{key:x.id}, i?', ':'', ce('button',{type:'button',className:'rc-lnk',onClick:function(){ openBlock(x.id); }},'Open '+rcName(x))); }),
+    dupPeers.map(function(x,i){
+      // two links with the same variety + year: add the rootstock letters so they read apart
+      var twin=dupPeers.some(function(y){ return y.id!==x.id && rcName(y)===rcName(x); });
+      var lbl='Open '+rcName(x)+(twin&&x.operational_block_id?(' ('+String(x.operational_block_id).slice(-2)+')'):'');
+      return ce('span',{key:x.id}, i?', ':'', ce('button',{type:'button',className:'rc-lnk',onClick:function(){ openBlock(x.id); }},lbl)); }),
     canRecode?' to compare, then recode one of them.':' to compare.'):null;
   var doneBand=(recoded&&recoded.id===b.id)?ce('div',{className:'rc-done',role:'status'},
     ce('button',{type:'button',className:'rc-done-x','aria-label':'Dismiss',onClick:function(){ setRecoded(null); }},'×'),
