@@ -249,7 +249,8 @@ tr.rowlink:hover td{background:var(--bg)}
 .drawer-head{position:sticky;top:0;z-index:2;background:var(--bg2);border-bottom:1px solid var(--border);padding:14px 18px;display:flex;align-items:center;gap:10px}
 .drawer-head h2{font-family:var(--font-display);font-size:19px;font-weight:400}
 .drawer-body{padding:16px 18px}
-.drawer-x{margin-left:auto;background:none;border:1px solid var(--border2);border-radius:6px;width:28px;height:28px;color:var(--text2);font-size:16px;line-height:1}
+.drawer-x{margin-left:auto;background:none;border:1px solid var(--border2);border-radius:6px;width:28px;height:28px;color:var(--text2);font-size:16px;line-height:1;position:relative}
+.drawer-x::after{content:"";position:absolute;inset:-8px}   /* 44px tap area around the 28px icon */
 .kv{display:grid;grid-template-columns:130px 1fr;gap:6px 12px;font-size:13px}
 .kv dt{color:var(--text3);font-size:11px;text-transform:uppercase;letter-spacing:.04em;padding-top:2px}
 .kv dd{color:var(--text);font-family:var(--font-mono);font-size:12px}
@@ -475,11 +476,26 @@ thead .stickyc{background:var(--card)}
   .bn-item svg{width:18px;height:18px}
   .bn-item.active{color:#fff}
 }
+/* ── Drawer + dialog close: 0.15s, mirrors the open; off under reduced motion ── */
+@keyframes fadeout{from{opacity:1}to{opacity:0}}
+@keyframes slideout{from{transform:translateX(0)}to{transform:translateX(100%)}}
+@keyframes sheetout{from{transform:translateY(0)}to{transform:translateY(100%)}}
+@keyframes popout{from{transform:translateY(0);opacity:1}to{transform:translateY(8px);opacity:0}}
+.drawer-scrim.is-closing,.modal-scrim.is-closing{opacity:1;animation:fadeout .15s ease-in forwards}
+.drawer.is-closing{transform:translateX(0);animation:slideout .15s ease-in forwards}
+.modal-card.is-closing{transform:translateY(0);animation:popout .15s ease-in forwards}
+@media (max-width:700px){ .drawer.is-closing{transform:translateY(0);animation:sheetout .15s ease-in forwards} }
+@media (prefers-reduced-motion:reduce){
+  .drawer-scrim,.modal-scrim,.drawer,.modal-card,.drawer.is-closing,.modal-card.is-closing,.drawer-scrim.is-closing,.modal-scrim.is-closing{animation:none!important}
+  .drawer-scrim,.modal-scrim{opacity:1} .drawer,.modal-card{transform:none}
+}
+
 /* ── Recode block (staging) — scoped; darker amber/red/grey for 4.5:1 on tinted bands ── */
 .rc{--rc-amber:#8a5a10;--rc-red:#a82a2a;--rc-muted:#55625f}
 .rc .form-label{font-size:11.5px;color:var(--rc-muted)}
 .rc .form-label .opt{text-transform:none;letter-spacing:0;font-weight:400}
-.rc-row3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.rc-row3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));grid-template-rows:auto auto auto;column-gap:12px;align-items:end}
+@supports (grid-template-rows:subgrid){ .rc-row3>div{display:grid;grid-row:span 3;grid-template-rows:subgrid;align-items:end} .rc-row3>div>.rc-err,.rc-row3>div>.rc-warn{align-self:start} }
 .rc-err{font-size:12px;color:var(--rc-red);margin-top:4px;line-height:1.35}
 .rc-warn{font-size:12px;color:var(--rc-amber);margin-top:4px;line-height:1.35}
 .rc .form-input.is-err,.rc .form-select.is-err{border-color:var(--rc-red)}
@@ -507,12 +523,14 @@ thead .stickyc{background:var(--card)}
 .rc-chips{display:flex;gap:6px;flex-wrap:wrap;align-items:center;font-size:12px;color:var(--rc-muted);margin-bottom:10px;padding-bottom:10px;border-bottom:1px dashed var(--border2)}
 .rc-chip{border:1px solid var(--border2);background:#fff;border-radius:20px;padding:3px 10px;font-size:12px;color:var(--text2);cursor:pointer}
 .rc-chip.on{background:var(--accent);border-color:var(--accent);color:#fff}
-.rc-who{margin-right:auto;font-size:12px;color:var(--rc-muted)}
+.rc-who{margin-right:auto;font-size:12px;color:var(--rc-muted);flex:1 1 auto;min-width:0}
+.modal-foot .rc-fbtn{white-space:nowrap;min-height:34px}
 .rc-dup{background:var(--amber-bg);border:1px solid var(--amber-border);border-radius:8px;padding:10px 12px;font-size:12.5px;color:#8a5a10;margin:0 0 14px;line-height:1.5}
 .rc-lnk{background:none;border:none;padding:0;color:#8a5a10;font:inherit;font-weight:600;text-decoration:underline;cursor:pointer}
 .rc-lnk:focus-visible,.rc-chip:focus-visible{outline:2px solid var(--accent2);outline-offset:2px}
 .rc-perm{flex-basis:100%;font-size:12px;color:#55625f}
 .rc-sep{width:1px;align-self:stretch;background:var(--border2);margin:0 6px 0 10px}
+.rc-retire-grp{display:inline-flex;align-items:stretch;white-space:nowrap}
 .rc-done{background:var(--green-bg);border:1px solid var(--green-border);border-radius:8px;padding:10px 12px;font-size:12.5px;color:var(--green);margin:0 0 14px;line-height:1.5}
 .rc-done .rc-out{margin-top:8px;color:var(--text2)}
 .rc-done .rc-out ul{margin:4px 0 0;padding-left:18px;display:flex;flex-direction:column;gap:3px}
@@ -525,7 +543,7 @@ thead .stickyc{background:var(--card)}
   .rc-lnk::after{content:"";position:absolute;left:-8px;right:-8px;top:50%;height:44px;transform:translateY(-50%)}
 }
 @media (max-width:480px){
-  .rc-row3{gap:8px}
+  .rc-row3{column-gap:8px}
   .rc-keep{grid-template-columns:1fr}
   .rc-codes .h{display:none}
   .rc-codes .r{display:flex;flex-direction:column;gap:2px;padding:8px 10px}
@@ -1354,6 +1372,12 @@ function useRecodePeers(b){
   },[b&&b.farm_code,b&&b.product_id,tick]);
   return [d,function(){ setTick(function(x){return x+1;}); }];
 }
+// "3 recorded seasons (2023–2025)"; gaps are listed: "3 recorded seasons (2019, 2021, 2023)"
+function rcSeasonsText(yrs){ if(!yrs||!yrs.length) return 'No recorded seasons yet';
+  var n=yrs.length, w=n+' recorded season'+(n===1?'':'s'), span=yrs[n-1]-yrs[0]+1;
+  if(n===1) return w+' ('+yrs[0]+')';
+  if(span===n) return w+' ('+yrs[0]+'–'+yrs[n-1]+')';
+  return w+' ('+(n<=6?yrs.join(', '):(yrs[0]+'–'+yrs[n-1]+', with gaps'))+')'; }
 function rcOutsideList(from,to){
   return ce('div',{className:'rc-out'}, ce('b',null,'Also update outside DalOS'),
     ce('ul',null,
@@ -1369,12 +1393,14 @@ function RecodeModal(p){
   var at=useState(false); var attempted=at[0],setAttempted=at[1];
   var st=useState({busy:false,err:null}); var s=st[0],setS=st[1];
   var pv=useState(null); var preview=pv[0],setPreview=pv[1];   // RC_PREVIEW only
+  var closer=React.useRef(null);
+  function closeAnim(then){ if(closer.current) closer.current(then); else (then||p.onClose)(); }
   useEffect(function(){
     Promise.all([
       supabase.from('farm_blocks').select('id,farm_code,sector_code,plot_code,block_add,aydi_block_number,financial_block_id,operational_block_id,jde_cost_center_id,planting_year,variety_code,lifecycle,varieties(name)').eq('id',b.id).maybeSingle(),
       supabase.from('farm_block_seasons').select('season_year').eq('block_id',b.id).limit(200)
     ]).then(function(r){ var d=r[0].data; if(!d){ setS({busy:false,err:(r[0].error&&r[0].error.message)||'Block not found.'}); return; }
-      var yrs=(r[1].data||[]).map(function(x){return x.season_year;}).filter(function(x){return x!=null;}).sort();
+      var yrs=[]; (r[1].data||[]).forEach(function(x){ if(x.season_year!=null && yrs.indexOf(x.season_year)<0) yrs.push(x.season_year); }); yrs.sort();
       d._years=yrs; setRow(d);
       setV({sector:d.sector_code||'',plot:d.plot_code||'',letter:d.block_add||'',reason:'',note:''}); });
   },[b.id]);
@@ -1409,7 +1435,8 @@ function RecodeModal(p){
     setS({busy:true,err:null});
     supabase.rpc('fn_recode_block',{p_block:b.id,p_sector:next[0],p_plot:next[1],p_letter:next[2],p_reason:v.reason,p_note:note||null}).then(function(r){
       if(r.error){ setS({busy:false,err:r.error.message||String(r.error)}); return; }
-      setS({busy:false,err:null}); p.onDone(r.data||{old:{aydi:row.aydi_block_number},new:{aydi:nAydi}});
+      setS({busy:false,err:null}); var res=r.data||{old:{aydi:row.aydi_block_number},new:{aydi:nAydi}};
+      closeAnim(function(){ p.onDone(res); });
     },function(e){ setS({busy:false,err:String((e&&e.message)||e)}); });
   }
 
@@ -1455,7 +1482,7 @@ function RecodeModal(p){
     chips,
     preview==='viewer'?ce('div',{className:'rc-chk info'},'Non-admin view: in the drawer, Recode is shown disabled with the line “Admins and power users only”.'):null,
     preview==='done'?ce('div',{className:'rc-done'},'✓ Preview of the drawer after saving: Recoded '+row.aydi_block_number+' → '+(nAydi||'…')+'. History, cost centre and notes kept. Old codes saved as aliases.', rcOutsideList(row.aydi_block_number,nAydi||'…')):null,
-    ce('div',{className:'rc-row3'}, codeInput('sector','Sector',3), codeInput('plot','Plot',3), codeInput('letter','Block letter',2)),
+    ce('div',{className:'rc-row3'}, codeInput('sector','Sector',3), codeInput('plot','Plot',3), codeInput('letter','Letter',2)),
     ce('div',{className:'rc-hint'},'Only the plot code changes. Variety, rootstock and planting year stay as they are; a mistake there needs an admin correction, because Edit identity locks them once a block has seasons. Use Replant only when the trees were actually replaced.'),
     chk,
     ce('div',{className:'rc-codes','aria-label':'Codes that will change'},
@@ -1468,7 +1495,7 @@ function RecodeModal(p){
         ce('div',{className:'same'}, ce('span',{className:'tag'},'After'), 'unchanged'))),
     ce('span',{className:'form-label'},'Stays with the block'),
     ce('ul',{className:'rc-keep'},
-      ce('li',null, yrs.length?(yrs.length+' recorded season'+(yrs.length===1?'':'s')+' ('+yrs[0]+(yrs.length>1?'–'+yrs[yrs.length-1]:'')+')'):'Season records (none yet)'),
+      ce('li',null, rcSeasonsText(yrs)),
       ce('li',null,'Cost centre and areas'),
       ce('li',null,'Notes and old plot number'),
       ce('li',null,'Plot boundary and Aerobotics link'),
@@ -1486,10 +1513,10 @@ function RecodeModal(p){
     showN&&noteErr?ce('div',{id:'rc-m-note',className:'rc-err'},noteErr):null,
     s.err?ce('div',{className:'band',role:'alert',style:{color:'var(--red)',borderColor:'var(--red)',background:'var(--red-bg)'}}, s.err):null);
 
-  return ce(Modal,{title:'Recode block',sub:(row?row.aydi_block_number:b.aydi_block_number)+' · '+rcName(row||b),onClose:p.onClose,busy:s.busy,
+  return ce(Modal,{title:'Recode block',sub:(row?row.aydi_block_number:b.aydi_block_number)+' · '+rcName(row||b),onClose:p.onClose,busy:s.busy,closerRef:closer,
     footer:[ce('span',{key:'w',className:'rc-who'},'Admins and power users only. Logged in the History log.'),
-            ce('button',{key:'c',className:'btn btn-secondary btn-sm',onClick:p.onClose,disabled:s.busy},'Cancel'),
-            ce('button',{key:'s',className:'btn btn-primary btn-sm',onClick:save,disabled:s.busy}, s.busy?'Recoding…':'Recode block')]}, body);
+            ce('button',{key:'c',className:'btn btn-secondary btn-sm rc-fbtn',onClick:function(){ closeAnim(); },disabled:s.busy},'Cancel'),
+            ce('button',{key:'s',className:'btn btn-primary btn-sm rc-fbtn',onClick:save,disabled:s.busy}, s.busy?'Recoding…':'Recode block')]}, body);
 }
 
 function BlockDetail(p){
@@ -1504,7 +1531,11 @@ function BlockDetail(p){
   var rcp=useRecodePeers(b); var peers=rcp[0], reloadPeers=rcp[1];
   var rcd=useState(null); var recoded=rcd[0],setRecoded=rcd[1];
   var dirtyR=React.useRef(false);   // a recode happened: parent list must reload on close
-  function closeDrawer(){ if(dirtyR.current&&p.onChanged) p.onChanged(); else p.onClose(); }
+  var dcl=useState(false); var dClosing=dcl[0],setDClosing=dcl[1]; var dClosingR=React.useRef(false);
+  function closeDrawer(){ if(dClosingR.current) return;
+    var fn=function(){ if(dirtyR.current&&p.onChanged) p.onChanged(); else p.onClose(); };
+    if(reducedMotion()){ fn(); return; }
+    dClosingR.current=true; setDClosing(true); setTimeout(fn, CLOSE_MS); }
   var aeroFed = b.aerobotics_area_ha==null ? null : Math.round(b.aerobotics_area_ha*2.38095*100)/100;
   var variance = (aeroFed!=null && b.total_area_fed>0) ? Math.round((aeroFed-b.total_area_fed)/b.total_area_fed*1000)/10 : null;
   var h=useState({loading:true,err:null,seasons:[]}); var hist=h[0],setHist=h[1];
@@ -1812,8 +1843,8 @@ function BlockDetail(p){
       )) : null;
 
   return ce('div',null,
-    ce('div',{className:'drawer-scrim',onClick:closeDrawer}),
-    ce('div',{className:'drawer',role:'dialog','aria-label':'Block detail'},
+    ce('div',{className:'drawer-scrim'+(dClosing?' is-closing':''),onClick:closeDrawer}),
+    ce('div',{className:'drawer'+(dClosing?' is-closing':''),role:'dialog','aria-label':'Block detail'},
       ce('div',{className:'drawer-head',style:{alignItems:'flex-start'}},
         ce('div',{style:{minWidth:0,flex:1}}, ce('h2',{className:'ar',dir:'auto',style:{margin:0}}, b.aydi_block_number), headChips),
         ce('button',{className:'drawer-x','aria-label':'Close',onClick:closeDrawer},'×')),
@@ -1827,9 +1858,10 @@ function BlockDetail(p){
           (lc!=='planned' && lc!=='fallow') ? ce('button',{className:'btn btn-secondary btn-sm',onClick:function(){setAction('split');}},'Split block') : null,
           lc!=='planned' ? ce('button',{className:'btn btn-secondary btn-sm',onClick:function(){setAction('replant');}},'Replant') : null,
           ce('button',{className:'btn btn-secondary btn-sm',onClick:function(){setAction('history');}},'History log'),
-          // Retire kept apart from the everyday actions
-          lc!=='planned' ? ce('span',{className:'rc-sep','aria-hidden':'true'}) : null,
-          lc!=='planned' ? ce('button',{className:'btn btn-secondary btn-sm',style:{color:'var(--red)',borderColor:'color-mix(in srgb,var(--red) 45%,var(--border))'},onClick:function(){setAction('retire');},title:'Retire this planting — irreversible'},'Retire') : null,
+          // Retire kept apart from the everyday actions; the divider wraps with it
+          lc!=='planned' ? ce('span',{className:'rc-retire-grp'},
+            ce('span',{className:'rc-sep','aria-hidden':'true'}),
+            ce('button',{className:'btn btn-secondary btn-sm',style:{color:'var(--red)',borderColor:'color-mix(in srgb,var(--red) 45%,var(--border))'},onClick:function(){setAction('retire');},title:'Retire this planting — irreversible'},'Retire')) : null,
           canRecode ? null : ce('div',{id:'rc-perm',className:'rc-perm'},'Recode: Admins and power users only.')
         ) : (canWrite ? ce('div',{className:'action-row',style:{margin:'0 0 16px',paddingBottom:14,borderBottom:'1px solid var(--border)'}},
           ce('button',{className:'btn btn-secondary btn-sm',onClick:function(){setAction('history');}},'History log')) : null),
@@ -3737,13 +3769,22 @@ function SeasonEntryScreen(ctx){
 function nul(v){ v=(v==null?'':String(v)).trim(); return v===''?null:v; }
 function numN(v){ if(v==null||String(v).trim()==='') return null; var n=Number(v); return isNaN(n)?null:n; }
 function mkObj(k,v){ var o={}; o[k]=v; return o; }
+// play the 0.15s close animation, then run `then` (skipped under reduced motion)
+var CLOSE_MS=150;
+function reducedMotion(){ try{ return window.matchMedia('(prefers-reduced-motion: reduce)').matches; }catch(e){ return false; } }
 function Modal(p){
-  useEffect(function(){ function esc(e){ if(e.key==='Escape'&&!p.busy) p.onClose(); } window.addEventListener('keydown',esc); return function(){window.removeEventListener('keydown',esc);}; },[p.busy]);
-  return ce('div',{className:'modal-scrim',onClick:function(e){ if(e.target===e.currentTarget && !p.busy) p.onClose(); }},
-    ce('div',{className:'modal-card'+(p.xwide?' xwide':(p.wide?' wide':''))},
+  var cl=useState(false); var closing=cl[0],setClosing=cl[1];
+  var closingR=React.useRef(false);
+  function animClose(then){ if(closingR.current) return; var fn=then||p.onClose;
+    if(reducedMotion()){ fn(); return; }
+    closingR.current=true; setClosing(true); setTimeout(fn, CLOSE_MS); }
+  if(p.closerRef) p.closerRef.current=animClose;   // lets a dialog animate Cancel / success too
+  useEffect(function(){ function esc(e){ if(e.key==='Escape'&&!p.busy) animClose(); } window.addEventListener('keydown',esc); return function(){window.removeEventListener('keydown',esc);}; },[p.busy]);
+  return ce('div',{className:'modal-scrim'+(closing?' is-closing':''),onClick:function(e){ if(e.target===e.currentTarget && !p.busy) animClose(); }},
+    ce('div',{className:'modal-card'+(p.xwide?' xwide':(p.wide?' wide':''))+(closing?' is-closing':'')},
       ce('div',{className:'modal-head'},
         ce('div',null, ce('h3',null,p.title), p.sub?ce('div',{className:'sub'},p.sub):null),
-        ce('button',{className:'drawer-x','aria-label':'Close',onClick:p.onClose,disabled:p.busy},'×')),
+        ce('button',{className:'drawer-x','aria-label':'Close',onClick:function(){ animClose(); },disabled:p.busy},'×')),
       ce('div',{className:'modal-body'}, p.children),
       p.footer?ce('div',{className:'modal-foot'}, p.footer):null));
 }
