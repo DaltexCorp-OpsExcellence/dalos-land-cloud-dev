@@ -245,18 +245,18 @@ function classify(){
   const P=W.parse,today=cairoToday(),cur=W.cur;W.today=today;
   const byBlock={};P.rows.forEach(r=>{r.dup=null;if(r.plot&&r.lvl!=='red')(byBlock[r.plot.id]=byBlock[r.plot.id]||[]).push(r)});
   Object.values(byBlock).forEach(rs=>{if(rs.length>1)rs.forEach(r=>r.dup=rs.map(x=>x.r).filter(x=>x!==r.r))});
-  const S={add:0,change:0,clear:0,same:0,past:0,errCells:0,redRows:0,amberRows:0,stale:0,undecided:0,plots:new Set(),kept:0};
+  const S={add:0,change:0,clear:0,same:0,past:0,errCells:0,redRows:0,amberRows:0,stale:0,undecided:0,plots:new Set(),kept:0,skipCells:0,skipRows:new Set()};
   const send=[],mass=[];
   for(const row of P.rows){row.out=[];
     const bad=!row.plot||row.lvl==='red'||row.dup;
-    if(bad){S.redRows++;continue}
+    if(bad){S.redRows++;S.skipRows.add(row.r);S.skipCells+=row.cells.filter(c=>!c.blank).length;continue}
     if(row.lvl==='amber')S.amberRows++;
     let clears=0,allBlank=true,curVals=false;
     for(const c of row.cells){const k=row.plot.id+'|'+c.day,sn=P.snap.get(k)||null,pre=sn?sn.t:null,cu=cur.get(k)||null;
       if(c.day>=today&&cu)curVals=true;
-      if(c.err){S.errCells++;row.out.push({kind:'err',day:c.day,raw:c.raw,err:c.err});continue}
+      if(c.err){S.errCells++;S.skipCells++;S.skipRows.add(row.r);row.out.push({kind:'err',day:c.day,raw:c.raw,err:c.err});continue}
       const v=c.blank?null:c.v;if(c.day>=today&&v!==null)allBlank=false;
-      if(v===pre){if(v!==null)S.same++;continue}                                           /* file == download → same, never sent */
+      if(v===pre){if(v===(cu?cu.t:null))S.same++;continue}                                  /* file == download → never sent; unchanged when it also equals the live value (blank = blank counts) */
       if(c.day<today){S.past++;row.out.push({kind:'past',day:c.day,v,pre});continue}
       const stale=(cu?cu.at:null)!==(sn?sn.at:null),op=computeOp(v,cu);   /* op is always against the LIVE value (cu) */
       if(!op){S.same++;continue}                                                           /* live value already equals the file */
@@ -282,13 +282,14 @@ function openWizard(){
   W={step:1,from:today<C.SEASON_LO?C.SEASON_LO:today,to:null,farms:new Set(C.PLOTS.map(p=>p.farm)),file:null,parse:null,cur:null,choice:new Map(),filter:'all',skipErr:false,massOk:false,busy:false,msg:null,serverMsg:null,token:null};
   const t=addDays(W.from,27);W.to=t>C.SEASON_HI?C.SEASON_HI:t;
   if(W.from>C.SEASON_HI){C.toast('This season has ended: no days left to plan');return}
-  C.modal(`<div class="mh"><div><h3>Upload plan</h3><div class="meta">Daily plan: Raw PK tonnes per plot per day, from one spreadsheet. Nothing is saved until you press Apply, and the whole upload can be undone.</div></div><button class="x" aria-label="Close">×</button></div>
+  C.modal(`<div class="mh"><div><h3>Upload plan</h3><div class="meta bkmeta">Daily plan: Raw PK tonnes per plot per day, from one spreadsheet. Nothing is saved until you press Apply, and the whole upload can be undone.</div></div><button class="x" aria-label="Close">×</button></div>
     <nav class="bk-steps" id="bkSteps" aria-label="Upload steps"></nav><div class="mb bk" id="bkBody"></div><div class="mf bk" id="bkFoot"></div><input id="bkDirty" style="display:none" aria-hidden="true" tabindex="-1">`);
-  const m=document.querySelector('#modalRoot .modal');if(m)m.classList.add('bkm');
+  const m=document.querySelector('#modalRoot .modal');if(m){m.classList.add('bkm');if(m.parentElement)m.parentElement.classList.add('bkovl')}
   draw()}
 function setDirty(on){const d=document.getElementById('bkDirty');if(d)d.value=on?'1':''}
 function draw(){const st=document.getElementById('bkSteps'),body=document.getElementById('bkBody'),foot=document.getElementById('bkFoot');if(!st||!body)return;
   clear(st);STEPS.forEach((s,i)=>st.appendChild(el('span',{class:'bk-step'+(i+1<W.step?' done':'')+(i+1===W.step?' cur':''),'aria-current':i+1===W.step?'step':null},el('i',null,i+1<W.step?'✓':String(i+1)),s)));
+  st.appendChild(el('span',{class:'bk-stepc','aria-current':'step'},`${W.step}/${STEPS.length} ${STEPS[W.step-1]}`));   /* phones: one compact line ("2/3 Review") instead of the 3 steps; CSS shows one or the other */
   clear(body);clear(foot);
   if(W.step===1)step1(body,foot);else if(W.step===2)step2(body,foot);else step3(body,foot);
   body.scrollTop=0}
@@ -310,8 +311,18 @@ function step1(body,foot){
     if(W.farms.has(f))W.farms.delete(f);else W.farms.add(f);e.currentTarget.classList.toggle('on',W.farms.has(f));e.currentTarget.setAttribute('aria-pressed',W.farms.has(f)?'true':'false');upd()}},f)));
   const allBtn=el('button',{type:'button',class:'btn',onclick:()=>{const all=W.farms.size===farms.length;W.farms=new Set(all?[]:farms);draw()}},W.farms.size===farms.length?'None':'All farms');
   const today=cairoToday(),minFrom=today<C.SEASON_LO?C.SEASON_LO:today;
-  const fIn=el('input',{type:'date',id:'bkFrom','data-nd':true,min:minFrom,max:C.SEASON_HI,value:W.from,onchange:e=>{let v=e.target.value;if(v&&v<minFrom){v=minFrom;e.target.value=v;C.toast('From cannot be in the past: set to today')}W.from=v;if(W.to&&W.to<v){W.to=v;tIn.value=v}tIn.min=v||minFrom;upd()}});
-  const tIn=el('input',{type:'date',id:'bkTo','data-nd':true,min:W.from,max:C.SEASON_HI,value:W.to,onchange:e=>{let v=e.target.value;if(v>C.SEASON_HI){v=C.SEASON_HI;e.target.value=v;C.toast('To cannot be after the season end')}W.to=v;upd()}});
+  /* While typing a date digit by digit the browser fires change/input with partial years (e.g. 0002-11-10), so typing only records the
+     value; the From/To rules (not in the past, To ≥ From, not after the season end) run on blur, and only on a complete valid date. */
+  const fullDate=v=>{if(!ISO.test(v||'')||+v.slice(0,4)<1900)return false;const t=new Date(v+'T00:00:00Z');return !isNaN(t)&&t.toISOString().slice(0,10)===v};
+  const typed=(e,key)=>{W[key]=e.target.value;upd()};
+  const fIn=el('input',{type:'date',id:'bkFrom','data-nd':true,min:minFrom,max:C.SEASON_HI,value:W.from,oninput:e=>typed(e,'from'),onchange:e=>typed(e,'from'),
+    onblur:e=>{let v=e.target.value;if(!fullDate(v))return;
+      if(v<minFrom){v=minFrom;e.target.value=v;C.toast('From cannot be in the past: set to today')}
+      W.from=v;if(W.to&&fullDate(W.to)&&W.to<v){W.to=v;tIn.value=v}tIn.min=v;upd()}});
+  const tIn=el('input',{type:'date',id:'bkTo','data-nd':true,min:W.from,max:C.SEASON_HI,value:W.to,oninput:e=>typed(e,'to'),onchange:e=>typed(e,'to'),
+    onblur:e=>{let v=e.target.value;if(!fullDate(v))return;
+      if(v>C.SEASON_HI){v=C.SEASON_HI;e.target.value=v;C.toast('To cannot be after the season end')}
+      W.to=v;upd()}});
   const seasonEnd=el('button',{type:'button',class:'btn',onclick:()=>{W.to=C.SEASON_HI;tIn.value=W.to;upd()}},'To season end');
   const dl=el('button',{type:'button',class:'btn pri',onclick:async e=>{const b=e.currentTarget;if(b.disabled)return;b.disabled=true;const t0=b.textContent;b.textContent='Building template…';
     try{const r=await buildTemplate();dlNote.textContent=`Downloaded ${r.name}: ${plural(r.plots,'plot')} × ${plural(r.days,'day')}, ${plural(r.prefilled,'current plan value')} filled in.`}
@@ -414,12 +425,15 @@ function step2(body,foot){const S=W.sum,P=W.parse;
   if(rows.length>LIM)body.appendChild(el('div',{class:'calc',style:'font-size:12px'},`Showing the first ${LIM} of ${rows.length} rows. Use the filters above to narrow.`));
   body.appendChild(el('div',{class:'legendrow',style:'margin-top:8px'},el('span',{class:'bk-c add'},'8'),' new value',el('span',{class:'bk-c chg'},el('s',null,'6'),' → 8'),' change',el('span',{class:'bk-c clr'},el('s',null,'6'),' → – ⌫'),' cleared (blank in file)',el('span',{class:'bk-c err'},'✖'),' error, skipped',el('span',{class:'bk-c lk'},'🔒'),' past day, locked'));
   if(S.errors){const cb=el('input',{type:'checkbox',id:'bkSkip',checked:W.skipErr,onchange:e=>{W.skipErr=e.target.checked;rerenderReview()}});
-    body.appendChild(el('label',{class:'bk-tick',for:'bkSkip'},cb,`Skip what has errors (${plural(S.redRows,'row')}, ${plural(S.errCells,'cell')}${P.colErrs.length?', '+plural(P.colErrs.length,'column'):''}): they are not uploaded and the plan stays as it is there.`))}
+    body.appendChild(el('label',{class:'bk-tick',for:'bkSkip'},cb,skipText(S,P)+': they are not uploaded and the plan stays as it is there.'))}
   /* footer */
-  const block=S.undecided?`Choose for ${plural(S.undecided,'cell')} changed since download`:S.errors&&!W.skipErr?'Fix the file, or tick “Skip what has errors”':S.sent>MAX_CELLS?'Too many cells: narrow the date range':!S.sent?'Nothing to upload':'';
+  const block=S.undecided?`Choose for ${plural(S.undecided,'cell')} changed since download`:S.errors&&!W.skipErr?'Fix the file, or tick “Skip … with errors”':S.sent>MAX_CELLS?'Too many cells: narrow the date range':!S.sent?'Nothing to upload':'';
   foot.appendChild(el('button',{type:'button',class:'btn',onclick:()=>{W.step=1;setDirty(false);draw()}},'← Back'));
   foot.appendChild(el('span',{class:'bk-info'},block||`${plural(S.sent,'cell')} to send on ${plural(S.plots.size,'plot')}`));
   foot.appendChild(el('button',{type:'button',class:'btn pri',disabled:!!block,onclick:()=>{W.step=3;W.massOk=false;draw()}},'Next: confirm →'))}
+/* "Skip 3 cells with errors (in 2 plots)" · column errors are added only when there are some */
+function skipText(S,P){const nc=P.colErrs.length;
+  return `Skip ${plural(S.skipCells,'cell')} with errors (in ${plural(S.skipRows.size,'plot')})`+(nc?` and ${plural(nc,'unreadable column')}`:'')}
 function allStale(){const out=[];W.parse.rows.forEach(r=>(r.out||[]).forEach(o=>{if(o.kind==='stale')out.push(o.k)}));return out}
 
 /* ---------- step 3: confirm + apply ---------- */
@@ -433,7 +447,7 @@ function step3(body,foot){const S=W.sum,P=W.parse;
       el('label',{class:'bk-tick',for:'bkMass'},cb,`I understand ${plural(n,'plan value')} will be deleted.`)))}
   body.appendChild(el('div',{class:'bk-grid3'},
     el('div',{class:'card bk-card'},el('b',null,'What will be written'),el('ul',null,el('li',null,`✚ ${S.add} new values`),el('li',null,`✎ ${S.change} values change (old value kept in the upload record)`),el('li',null,`⌫ ${S.clear} values cleared`),el('li',null,`＝ ${S.same} cells unchanged, not touched`))),
-    el('div',{class:'card bk-card'},el('b',null,'Not uploaded'),el('ul',null,el('li',null,`🔒 ${S.past} past-day cells (locked)`),el('li',null,`✖ ${S.redRows} rows and ${S.errCells} cells with errors`),S.stale?el('li',null,`⚠ ${S.kept} cells kept at the current value`):null)),
+    el('div',{class:'card bk-card'},el('b',null,'Not uploaded'),el('ul',null,el('li',null,`🔒 ${S.past} past-day cells (locked)`),el('li',null,`✖ ${plural(S.skipCells,'cell')} with errors (in ${plural(S.skipRows.size,'plot')})`),S.stale?el('li',null,`⚠ ${S.kept} cells kept at the current value`):null)),
     el('div',{class:'card bk-card'},el('b',null,'After you apply'),el('ul',null,el('li',null,'Colleagues see the new plan live.'),el('li',null,'It is one item in Changes → Plan uploads.'),el('li',null,'Undo restores the previous values, except cells edited after the upload and past days.')))));
   const out=el('div',{id:'bkApplyMsg'});body.appendChild(out);
   foot.appendChild(el('button',{type:'button',class:'btn',onclick:()=>{W.step=2;draw()}},'← Back'));
@@ -471,13 +485,29 @@ async function recheck(msg){try{await check()}catch(e){msg+=' (Could not re-read
 /* =====================================================================================================
    UNDO, banner, Plan uploads card
    ===================================================================================================== */
+/* in-page confirm (replaces the native confirm()): same dialog styles as the app's modals, focus kept inside, Escape = Cancel,
+   44px buttons; focus goes back to where it was. Text is set with textContent only. Resolves true (OK) / false (Cancel). */
+function askConfirm(title,text,okLabel){return new Promise(res=>{
+  const back=document.activeElement,tid='bkcT'+Date.now(),did='bkcD'+Date.now();
+  const cancel=el('button',{type:'button',class:'btn bkbtn'},'Cancel'),ok=el('button',{type:'button',class:'btn bkbtn bk-danger'},okLabel);
+  const dlg=el('div',{class:'modal sm bkconf',role:'alertdialog','aria-modal':'true','aria-labelledby':tid,'aria-describedby':did},
+    el('div',{class:'mh'},el('div',null,el('h3',{id:tid},title))),
+    el('div',{class:'mb'},el('p',{id:did,class:'bkconf-t'},text)),
+    el('div',{class:'mf'},cancel,ok));
+  const ovl=el('div',{class:'ovl bkconf-ovl'},dlg);
+  const end=v=>{document.removeEventListener('keydown',key,true);ovl.remove();try{back&&back.isConnected&&back.focus()}catch(e){}res(v)};
+  const key=e=>{if(e.key==='Escape'){e.preventDefault();e.stopPropagation();end(false);return}
+    if(e.key==='Tab'){const f=[cancel,ok],i=f.indexOf(document.activeElement);e.preventDefault();f[(i+(e.shiftKey?f.length-1:1))%f.length].focus()}};
+  cancel.addEventListener('click',()=>end(false));ok.addEventListener('click',()=>end(true));
+  ovl.addEventListener('click',e=>{if(e.target===ovl)end(false)});
+  document.addEventListener('keydown',key,true);document.body.appendChild(ovl);cancel.focus()})}
 async function undo(id,btn){
   if(btn){if(btn.disabled)return;btn.disabled=true}
   const done=()=>{if(btn)btn.disabled=false};
-  if(!confirm('Undo this plan upload? The previous values come back, except cells that were edited after the upload and past days.')){done();return}
+  if(!await askConfirm('Undo plan upload','Undo this plan upload? The previous values come back, except cells that were edited after the upload and past days.','↶ Undo upload')){done();return}
   let r=await C.SB.rpc('hp2_undo_plan_upload',{p_upload:id,p_keep_conflicts:false});
   if(!r.error&&r.data&&r.data.ok===false&&r.data.reason==='conflicts'){const d=r.data;
-    if(!confirm(`${plural(d.n_conflicts,'cell')} ${d.n_conflicts===1?'was':'were'} changed after the upload and will be kept${d.n_kept_past?`, and ${d.n_kept_past} past-day cells stay as they are`:''}.\n\nUndo the other ${d.n_restorable}?`)){done();return}
+    if(!await askConfirm('Undo plan upload',`${plural(d.n_conflicts,'cell')} ${d.n_conflicts===1?'was':'were'} changed after the upload and will be kept${d.n_kept_past?`, and ${d.n_kept_past} past-day cells stay as they are`:''}.\n\nUndo the other ${d.n_restorable}?`,`↶ Undo ${d.n_restorable}`)){done();return}
     r=await C.SB.rpc('hp2_undo_plan_upload',{p_upload:id,p_keep_conflicts:true})}
   if(r.error||!r.data||r.data.ok===false){done();C.errToast('Undo failed: '+((r.error&&r.error.message)||(r.data&&r.data.reason)||'no reply'));return}
   const d=r.data;try{await resyncPlan()}catch(e){}

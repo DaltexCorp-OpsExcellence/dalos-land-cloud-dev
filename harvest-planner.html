@@ -7,7 +7,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.110.8/dist/umd/supabase.js"></script>
 <script src="shell.js?cb=8"></script>
 <!-- daily plan bulk upload; lazy-loads SheetJS 0.20.3 (cdn.sheetjs.com) + ExcelJS 4.4.0 with SRI on first use -->
-<script src="harvest-bulk.js?cb=1"></script>
+<script src="harvest-bulk.js?cb=2"></script>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Mono:wght@400;500&family=Instrument+Sans:wght@400;500;600&family=Space+Grotesk:wght@400;500;600;700&family=Noto+Sans+Arabic:wght@400;500;600&display=swap">
 <style>
 /* Layout: Land Cloud shell — dark teal sidebar, sticky topbar + filter bar, dense plot tables. Tokens copied from dalos-land-cloud. */
@@ -479,6 +479,38 @@ body.present .page{padding:0 0 32px;gap:0}
 .btn.bk-danger{color:var(--red);border-color:var(--red-border)}
 .bk-upl td{white-space:normal;vertical-align:top}.bk-kids{background:var(--bg)}.bk-kid{font-size:12.5px;padding:3px 0}
 @media (max-width:480px){.mf.bk .btn{flex:1 1 auto}.mf .bk-info{flex-basis:100%}.bk-row>.field{flex:1 1 100%}.bk-row>.field input{width:100%}.bk-t td.bk-cells{min-width:200px}.bk-steps{padding:8px 12px}}
+/* upload dialog layout: header + steps fixed, body scrolls, footer always on screen (short or long content, every width) */
+.modal.bkm{display:flex;flex-direction:column;max-height:88vh;max-height:88dvh;min-width:0}   /* min-width:0: the review table's own width must not widen the dialog past the screen (it scrolls in .bk-tw) */
+.modal.bkm>.mh,.modal.bkm>.bk-steps,.modal.bkm>.mf{flex:none}
+.modal.bkm>.mb{flex:1 1 auto;min-height:0;min-width:0;overflow:auto;overscroll-behavior:contain}
+.bk-tw{max-width:100%;overflow-x:auto}
+.bkm .mh .x{width:44px;height:44px;flex:none;margin-left:auto}
+.modal.bkm>.mf{background:var(--card);border-radius:0 0 14px 14px;padding-bottom:max(12px,env(safe-area-inset-bottom))}
+.bk-stepc{display:none}
+.mh .meta.bkmeta{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;overflow:hidden}
+@media (max-width:700px){
+  .ovl.bkovl{padding:0;align-items:stretch;overflow:hidden}
+  .modal.bkm{width:100%;height:100vh;height:100dvh;max-height:100vh;max-height:100dvh;border-radius:0;border:0}
+  .modal.bkm>.mf{border-radius:0}
+  .modal.bkm>.mh{padding:8px 8px 8px 14px;align-items:center}
+  .modal.bkm>.mh h3{font-size:17px;line-height:1.2}
+  .mh .meta.bkmeta{-webkit-line-clamp:1}
+  .bk-steps{padding:6px 14px}.bk-step{display:none}
+  .bk-stepc{display:inline-block;font-size:13px;font-weight:600;color:var(--accent);line-height:22px}
+  .modal.bkm>.mb{padding:10px 14px}
+  .mf.bk{padding:8px 14px;gap:6px 8px}
+  .mf.bk .bk-info{order:-1;flex-basis:100%;font-size:12px;   /* status text first, then Back and Next together on one line */line-height:1.3;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}
+  .mf.bk .btn{flex:1 1 0;min-width:0;white-space:normal;text-align:center;line-height:1.2}   /* Back and Next stay side by side */
+}
+@media (max-width:420px){.mh .meta.bkmeta{display:none}}
+/* in-page confirm (Undo) */
+.ovl.bkconf-ovl{z-index:60;align-items:center}
+.modal.bkconf{min-width:0}
+.bkconf .bkconf-t{margin:0;font-size:14px;line-height:1.45;color:var(--text);white-space:pre-line}
+.bkconf .mf{flex-wrap:wrap}
+@media (max-width:480px){.bkconf .mf .btn{flex:1 1 0;min-width:0;white-space:normal}}
+/* phones/tablets: the page never scrolls sideways; wide tables scroll inside their own box (desktop unchanged) */
+@media (max-width:860px){.page>*{max-width:100%;min-width:0}.page .table-wrap{max-width:100%}}
 </style>
 
 <div class="app">
@@ -1030,8 +1062,16 @@ document.addEventListener('click',e=>{if(RD&&e.target.closest('[data-wk],[data-d
     const o=S.off||0,n=clampOff(o+v*7);if(n===o){toast('That is outside the '+DB.y1+'/'+String(DB.y1+1).slice(2)+' season');return}
     S.off=n;S.wk=Math.round(n/7);render()}
   const d=e.target.closest('[data-days]');if(d){S.days=+d.dataset.days;if(S.off)S.off=clampOff(S.off);render()}});
-// Enter in a plan cell or a Log harvest box moves to the same column one row down
+// Enter in a plan cell or a Log harvest box moves to the same column one row down.
+// Plan cell with a changed value: Enter saves it and stays on that cell (it never opens the plot below);
+// Enter again on that just-saved cell does nothing until the user types in it again.
+let ENTER_SAVED=null;
+document.addEventListener('input',e=>{if(e.target.matches?.('.dayin[data-plan]'))ENTER_SAVED=null},true);
+document.addEventListener('focusin',e=>{if(ENTER_SAVED&&e.target.dataset?.plan!==ENTER_SAVED)ENTER_SAVED=null},true);
 document.addEventListener('keydown',e=>{if(e.key!=='Enter'||e.shiftKey)return;const i=e.target;if(!i.matches||!i.matches('.dayin[data-plan],#lgrid .ain'))return;e.preventDefault();
+  if(i.dataset.plan){const k=i.dataset.plan,raw=i.value.trim(),x=raw===''?null:parseT(raw),old=k in PLAN?PLAN[k]:null;
+    if(x===null?old!==null:(isNaN(x)||r2(x)!==old)){ENTER_SAVED=k;i.dispatchEvent(new Event('change',{bubbles:true}));return}
+    if(ENTER_SAVED===k)return}
   const td=i.closest('td'),tr=td.parentElement,col=[...tr.children].indexOf(td);let n=tr.nextElementSibling;
   while(n){const c=n.children[col]?.querySelector('input');if(c){i.blur&&i.dispatchEvent(new Event('change',{bubbles:true}));const sel=c.dataset.plan?`[data-plan="${c.dataset.plan}"]`:null;setTimeout(()=>{(sel?document.querySelector(sel):c)?.focus();(sel?document.querySelector(sel):c)?.select?.()},0);return}n=n.nextElementSibling}});
 /* blank input = no plan (clears the cell); 0 = a real 0 t plan */
