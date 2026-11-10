@@ -491,7 +491,7 @@ async function apply(btn,out){
   /* success (or replay of the same click) */
   if(!d.upload_id){C.closeModal(true);C.toast('Nothing to change: the file matches the live plan');return}
   try{await resyncPlan()}catch(e){W.send.forEach(s=>{const k=s.block_id+'|'+s.day;if(s.value===null){delete C.PLAN[k];delete C.PLAN_AT[k]}else{C.PLAN[k]=s.value;C.PLAN_AT[k]=d.written_at}})}
-  LAST={id:d.upload_id,d,file:W.file.name,at:d.written_at||new Date().toISOString(),undone:false,same:W.sum.same};UPL=null;   /* unchanged cells are never sent, so the server's n_same is 0: keep the Review count */
+  LAST={id:d.upload_id,d,file:W.file.name,at:d.written_at||new Date().toISOString(),undone:false,same:W.sum.same,past:W.sum.past};UPL=null;   /* unchanged cells are never sent, so the server's n_same is 0: keep the Review count */
   C.closeModal(true);W=null;C.rerender();
   C.toast(`Plan uploaded: ${d.n_add} added · ${d.n_change} changed · ${d.n_clear} cleared`)}
 async function recheck(msg){try{await check()}catch(e){msg+=' (Could not re-read the live plan: '+((e&&e.message)||e)+')'}W.serverMsg=msg;W.step=2;draw()}
@@ -539,7 +539,7 @@ function fillBanner(){const host=document.getElementById('bkBanner');if(!host)re
   if(!LAST||LAST.undone)return;const d=LAST.d;
   host.appendChild(el('div',{class:'bk-box green bk-banner',role:'status'},el('span',{style:'font-size:18px','aria-hidden':'true'},'✓'),
     el('div',{class:'t'},el('b',null,`${LAST.kind==='paste'?'Pasted':'Plan uploaded'}: ${d.n_add} added · ${d.n_change} changed · ${d.n_clear} cleared`),' · ',el('span',{class:'bk-file',text:LAST.file,title:LAST.file}),LAST.kind==='paste'?'':' · '+cairoTs(LAST.at),
-      el('div',{class:'calc',style:'font-size:12px'},`${LAST.same||0} unchanged · ${d.n_skipped_past} past days skipped${d.replayed?' · this upload was already saved (repeat click)':''}`)),
+      el('div',{class:'calc',style:'font-size:12px'},`${LAST.same||0} unchanged · ${LAST.past||0} past days skipped${d.replayed?' · this upload was already saved (repeat click)':''}`)),
     el('button',{type:'button',class:'btn sm bkbtn',onclick:()=>{const t=document.querySelector('#tabs button[data-t="chg"]');if(t)t.click()}},'View in Changes'),
     el('button',{type:'button',class:'btn sm bkbtn bk-danger',onclick:e=>undo(LAST.id,e.currentTarget)},LAST.kind==='paste'?'↶ Undo this paste':'↶ Undo this upload'),
     el('button',{type:'button',class:'x','aria-label':'Dismiss',onclick:()=>{LAST=null;clear(host)}},'×')))}
@@ -564,7 +564,7 @@ function fillUploads(){const host=document.getElementById('bkUploads');if(!host)
     tb.appendChild(el('tr',null,el('td',null,exp),el('td',{class:'calc'},cairoTs(u.uploaded_at)),
       el('td',{style:'white-space:normal;min-width:160px;max-width:260px'},el('span',{class:'bk-file',text:u.file_name||'(no file name)',title:u.file_name||null})),
       el('td',null,who(u.uploaded_by)),
-      el('td',{class:'num'},`+${u.n_add} · ${u.n_change} changed · ${u.n_clear} cleared`,el('div',{class:'calc',style:'font-size:11px'},`${u.n_same} unchanged · ${u.n_skipped_past} past skipped`)),
+      el('td',{class:'num'},`+${u.n_add} · ${u.n_change} changed · ${u.n_clear} cleared`,(()=>{const x=[u.n_same>0?`${u.n_same} unchanged`:null,u.n_skipped_past>0?`${u.n_skipped_past} past skipped`:null].filter(Boolean);return x.length?el('div',{class:'calc',style:'font-size:11px'},x.join(' · ')):null})()),
       el('td',null,status),
       el('td',null,canUndo(u)?el('button',{type:'button',class:'btn sm bkbtn bk-danger',onclick:e=>undo(u.id,e.currentTarget)},'↶ Undo'):null)));
     if(op){const td=el('td',{colspan:'7',class:'bk-kids'});tb.appendChild(el('tr',null,td));
@@ -700,7 +700,7 @@ async function applyPaste(btn){const P=PS;if(!P||P.busy||!P.send.length)return;i
   P.ui.end(false);   /* close without refocusing: the grid is redrawn first, so the anchor cell never holds a stale value */
   if(!d.upload_id){C.rerender();refocus(P.k);C.toast('Nothing to change: the pasted values match the live plan');return}
   try{await resyncPlan()}catch(e){P.send.forEach(s=>{const k=s.block_id+'|'+s.day;if(s.value===null){delete C.PLAN[k];delete C.PLAN_AT[k]}else{C.PLAN[k]=s.value;C.PLAN_AT[k]=d.written_at}})}
-  LAST={id:d.upload_id,d,file:P.file,at:d.written_at||new Date().toISOString(),undone:false,kind:'paste',same:S.same};UPL=null;
+  LAST={id:d.upload_id,d,file:P.file,at:d.written_at||new Date().toISOString(),undone:false,kind:'paste',same:S.same,past:S.past};UPL=null;
   C.rerender();refocus(P.k);
   undoToast(d.n_add+d.n_change+d.n_clear,d.upload_id,d.replayed)}
 /* "Pasted N values · Undo": Undo opens the same in-app confirm as the Plan uploads card and calls hp2_undo_plan_upload */
