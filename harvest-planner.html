@@ -7,7 +7,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.110.8/dist/umd/supabase.js"></script>
 <script src="shell.js?cb=8"></script>
 <!-- daily plan bulk upload; lazy-loads SheetJS 0.20.3 (cdn.sheetjs.com) + ExcelJS 4.4.0 with SRI on first use -->
-<script src="harvest-bulk.js?cb=7"></script>
+<script src="harvest-bulk.js?cb=8"></script>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Mono:wght@400;500&family=Instrument+Sans:wght@400;500;600&family=Space+Grotesk:wght@400;500;600;700&family=Noto+Sans+Arabic:wght@400;500;600&display=swap">
 <style>
 /* Layout: Land Cloud shell — dark teal sidebar, sticky topbar + filter bar, dense plot tables. Tokens copied from dalos-land-cloud. */
@@ -1533,6 +1533,10 @@ const NAMES=DB.names||{};const nm=id=>NAMES[id]||'Someone';
 async function ensureName(id){if(!id||NAMES[id])return;try{const r=await SB.from('users').select('full_name,email').eq('id',id).maybeSingle();if(r.data)NAMES[id]=r.data.full_name||r.data.email}catch(e){}}
 const plotById=id=>PLOTS.find(p=>p.id===id);const pl=p=>p?`${p.farm} ${p.sector}-${p.plot}`:'a plot';
 let FLASH=[];const DEFER=[];let rT=null,nT=null,NOTES=[];
+/* plan cells this page is writing through its own Undo (harvest-bulk.js): a DELETE event carries no "who", so without this the
+   tester's own undo was shown as "Plan cleared" by colleagues. Marked per cell, for a short time only. */
+const OWN=new Map();const ownKey=k=>(OWN.get(k)||0)>Date.now();
+function markOwn(keys,ms){const t=Date.now()+ms;keys.forEach(k=>OWN.set(k,t))}
 function liveRender(){clearTimeout(rT);rT=setTimeout(()=>{rerenderKeep();const now=Date.now();FLASH=FLASH.filter(f=>now-f.t<3000);
   FLASH.forEach(f=>document.querySelectorAll(f.sel).forEach(el=>{const c=el.closest('td')||el;c.classList.remove('rflash');void c.offsetWidth;c.classList.add('rflash')}))},250)}
 function note(m){NOTES.push(m);clearTimeout(nT);nT=setTimeout(()=>{const t=document.createElement('div');t.className='toast live-n';
@@ -1544,7 +1548,7 @@ function applyRemote(ch){const t=ch.table,n=ch.new||{},o=ch.old||{},del=ch.event
   if(t==='hp2_plan_days'){const k=row.block_id+'|'+row.day;
     if(busyPlan(k)){DEFER.push(ch);document.querySelector(`[data-plan="${k}"]`)?.classList.add('remote-mark');return}
     const before=k in PLAN?PLAN[k]:null;if(del){delete PLAN[k];delete PLAN_AT[k]}else{PLAN[k]=Number(n.planned_t);PLAN_AT[k]=n.updated_at}
-    if((k in PLAN?PLAN[k]:null)!==before&&(del||n.updated_by!==DB.me.id)){FLASH.push({sel:`[data-plan="${k}"]`,t:Date.now()});note(`${del?'Plan cleared':nm(n.updated_by)+': plan '+n1(PLAN[k])+' t'} · ${pl(plotById(row.block_id))} ${fmtD(row.day)}`)}
+    if((k in PLAN?PLAN[k]:null)!==before&&(del||n.updated_by!==DB.me.id)&&!ownKey(k)){FLASH.push({sel:`[data-plan="${k}"]`,t:Date.now()});note(`${del?'Plan cleared':nm(n.updated_by)+': plan '+n1(PLAN[k])+' t'} · ${pl(plotById(row.block_id))} ${fmtD(row.day)}`)}
     liveRender();return}
   if(t==='hp2_actual_days'){const p=plotById(row.block_id);if(!p)return;
     if(modalOpen()){DEFER.push(ch);const r=document.querySelector(`[data-lrow="${p.id}"]`);if(r)r.classList.add('remote-mark');return}
@@ -1591,7 +1595,7 @@ document.body.insertAdjacentHTML('beforeend','<div style="text-align:center;padd
 render();
 /* daily plan bulk upload (harvest-bulk.js): the Upload plan button appears only when hp2_can_bulk_plan() is true */
 if(window.HP2Bulk)HP2Bulk.init({SB,DB,PLOTS,PLAN,PLAN_AT,SEASON_LO,SEASON_HI,est,total,toast,errToast,modal,closeModal,
-  rerender:()=>rerenderKeep(),ensureName,NAMES,paged}).then(ok=>{if(ok&&!S.present)rerenderKeep()});
+  rerender:()=>rerenderKeep(),ensureName,NAMES,paged,markOwn}).then(ok=>{if(ok&&!S.present)rerenderKeep()});
 }
 boot();
 </script>

@@ -519,15 +519,21 @@ async function undo(id,btn){
   if(btn){if(btn.disabled)return;btn.disabled=true}
   const done=()=>{if(btn)btn.disabled=false};
   if(!await askConfirm('Undo plan upload','Undo this plan upload? The previous values come back, except cells that were edited after the upload and past days.','↶ Undo upload')){done();return}
-  let r=await C.SB.rpc('hp2_undo_plan_upload',{p_upload:id,p_keep_conflicts:false});
+  /* the live-updates feed must not show this page's own undo as colleague changes (a DELETE event carries no "who"):
+     mark this upload's cells as own while the RPC runs, then for a few seconds for late events */
+  const own=await undoKeys(id),mark=ms=>{if(C.markOwn&&own.length)C.markOwn(own,ms)};
+  mark(60000);let r=await C.SB.rpc('hp2_undo_plan_upload',{p_upload:id,p_keep_conflicts:false});mark(5000);
   if(!r.error&&r.data&&r.data.ok===false&&r.data.reason==='conflicts'){const d=r.data;
     if(!await askConfirm('Undo plan upload',`${plural(d.n_conflicts,'cell')} ${d.n_conflicts===1?'was':'were'} changed after the upload and will be kept${d.n_kept_past?`, and ${d.n_kept_past} past-day cells stay as they are`:''}.\n\nUndo the other ${d.n_restorable}?`,`↶ Undo ${d.n_restorable}`)){done();return}
-    r=await C.SB.rpc('hp2_undo_plan_upload',{p_upload:id,p_keep_conflicts:true})}
+    mark(60000);r=await C.SB.rpc('hp2_undo_plan_upload',{p_upload:id,p_keep_conflicts:true});mark(5000)}
   if(r.error||!r.data||r.data.ok===false){done();C.errToast('Undo failed: '+((r.error&&r.error.message)||(r.data&&r.data.reason)||'no reply'));return}
   const d=r.data;try{await resyncPlan()}catch(e){}
   if(LAST&&LAST.id===id)LAST.undone=true;UPL=null;Object.keys(OPEN).forEach(k=>delete OPEN[k]);
   C.rerender();
   C.toast(`Upload undone: ${d.n_restored} restored`+(d.n_kept_conflict||d.n_kept_past?` · ${d.n_kept_conflict+d.n_kept_past} kept (${d.n_kept_conflict} edited since, ${d.n_kept_past} past days)`:''))}
+/* "block_id|day" keys of an upload's cells (same key as PLAN); [] if they cannot be read (then the feed behaves as before) */
+async function undoKeys(id){try{const rows=Array.isArray(OPEN[id])?OPEN[id]:await C.paged(()=>C.SB.from('hp2_plan_upload_cells').select('block_id,day').eq('upload_id',id).order('block_id').order('day'));
+  return rows.map(r=>r.block_id+'|'+r.day)}catch(e){return []}}
 function canUndo(u){return CAN&&!u.undone_at&&(u.uploaded_by===C.DB.me.id||C.DB.role==='admin')}
 function fillBanner(){const host=document.getElementById('bkBanner');if(!host)return;clear(host);
   if(!LAST||LAST.undone)return;const d=LAST.d;
