@@ -7,7 +7,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.110.8/dist/umd/supabase.js"></script>
 <script src="shell.js?cb=8"></script>
 <!-- daily plan bulk upload; lazy-loads SheetJS 0.20.3 (cdn.sheetjs.com) + ExcelJS 4.4.0 with SRI on first use -->
-<script src="harvest-bulk.js?cb=8"></script>
+<script src="harvest-bulk.js?cb=9"></script>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Mono:wght@400;500&family=Instrument+Sans:wght@400;500;600&family=Space+Grotesk:wght@400;500;600;700&family=Noto+Sans+Arabic:wght@400;500;600&display=swap">
 <style>
 /* Layout: Land Cloud shell — dark teal sidebar, sticky topbar + filter bar, dense plot tables. Tokens copied from dalos-land-cloud. */
@@ -1548,7 +1548,7 @@ function applyRemote(ch){const t=ch.table,n=ch.new||{},o=ch.old||{},del=ch.event
   if(t==='hp2_plan_days'){const k=row.block_id+'|'+row.day;
     if(busyPlan(k)){DEFER.push(ch);document.querySelector(`[data-plan="${k}"]`)?.classList.add('remote-mark');return}
     const before=k in PLAN?PLAN[k]:null;if(del){delete PLAN[k];delete PLAN_AT[k]}else{PLAN[k]=Number(n.planned_t);PLAN_AT[k]=n.updated_at}
-    if((k in PLAN?PLAN[k]:null)!==before&&(del||n.updated_by!==DB.me.id)&&!ownKey(k)){FLASH.push({sel:`[data-plan="${k}"]`,t:Date.now()});note(`${del?'Plan cleared':nm(n.updated_by)+': plan '+n1(PLAN[k])+' t'} · ${pl(plotById(row.block_id))} ${fmtD(row.day)}`)}
+    if((k in PLAN?PLAN[k]:null)!==before&&(del||n.updated_by!==DB.me.id)&&!(del&&ownKey(k))){FLASH.push({sel:`[data-plan="${k}"]`,t:Date.now()});note(`${del?'Plan cleared':nm(n.updated_by)+': plan '+n1(PLAN[k])+' t'} · ${pl(plotById(row.block_id))} ${fmtD(row.day)}`)}
     liveRender();return}
   if(t==='hp2_actual_days'){const p=plotById(row.block_id);if(!p)return;
     if(modalOpen()){DEFER.push(ch);const r=document.querySelector(`[data-lrow="${p.id}"]`);if(r)r.classList.add('remote-mark');return}
