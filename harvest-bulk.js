@@ -491,7 +491,7 @@ async function apply(btn,out){
   /* success (or replay of the same click) */
   if(!d.upload_id){C.closeModal(true);C.toast('Nothing to change: the file matches the live plan');return}
   try{await resyncPlan()}catch(e){W.send.forEach(s=>{const k=s.block_id+'|'+s.day;if(s.value===null){delete C.PLAN[k];delete C.PLAN_AT[k]}else{C.PLAN[k]=s.value;C.PLAN_AT[k]=d.written_at}})}
-  LAST={id:d.upload_id,d,file:W.file.name,at:d.written_at||new Date().toISOString(),undone:false};UPL=null;
+  LAST={id:d.upload_id,d,file:W.file.name,at:d.written_at||new Date().toISOString(),undone:false,same:W.sum.same};UPL=null;   /* unchanged cells are never sent, so the server's n_same is 0: keep the Review count */
   C.closeModal(true);W=null;C.rerender();
   C.toast(`Plan uploaded: ${d.n_add} added · ${d.n_change} changed · ${d.n_clear} cleared`)}
 async function recheck(msg){try{await check()}catch(e){msg+=' (Could not re-read the live plan: '+((e&&e.message)||e)+')'}W.serverMsg=msg;W.step=2;draw()}
@@ -539,7 +539,7 @@ function fillBanner(){const host=document.getElementById('bkBanner');if(!host)re
   if(!LAST||LAST.undone)return;const d=LAST.d;
   host.appendChild(el('div',{class:'bk-box green bk-banner',role:'status'},el('span',{style:'font-size:18px','aria-hidden':'true'},'✓'),
     el('div',{class:'t'},el('b',null,`${LAST.kind==='paste'?'Pasted':'Plan uploaded'}: ${d.n_add} added · ${d.n_change} changed · ${d.n_clear} cleared`),' · ',el('span',{class:'bk-file',text:LAST.file,title:LAST.file}),LAST.kind==='paste'?'':' · '+cairoTs(LAST.at),
-      el('div',{class:'calc',style:'font-size:12px'},`${LAST.kind==='paste'?(LAST.same||0):d.n_same} unchanged · ${d.n_skipped_past} past days skipped${d.replayed?' · this upload was already saved (repeat click)':''}`)),
+      el('div',{class:'calc',style:'font-size:12px'},`${LAST.same||0} unchanged · ${d.n_skipped_past} past days skipped${d.replayed?' · this upload was already saved (repeat click)':''}`)),
     el('button',{type:'button',class:'btn sm bkbtn',onclick:()=>{const t=document.querySelector('#tabs button[data-t="chg"]');if(t)t.click()}},'View in Changes'),
     el('button',{type:'button',class:'btn sm bkbtn bk-danger',onclick:e=>undo(LAST.id,e.currentTarget)},LAST.kind==='paste'?'↶ Undo this paste':'↶ Undo this upload'),
     el('button',{type:'button',class:'x','aria-label':'Dismiss',onclick:()=>{LAST=null;clear(host)}},'×')))}
