@@ -7,7 +7,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.110.8/dist/umd/supabase.js"></script>
 <script src="shell.js?cb=8"></script>
 <!-- daily plan bulk upload; lazy-loads SheetJS 0.20.3 (cdn.sheetjs.com) + ExcelJS 4.4.0 with SRI on first use -->
-<script src="harvest-bulk.js?cb=5"></script>
+<script src="harvest-bulk.js?cb=6"></script>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Mono:wght@400;500&family=Instrument+Sans:wght@400;500;600&family=Space+Grotesk:wght@400;500;600;700&family=Noto+Sans+Arabic:wght@400;500;600&display=swap">
 <style>
 /* Layout: Land Cloud shell — dark teal sidebar, sticky topbar + filter bar, dense plot tables. Tokens copied from dalos-land-cloud. */
@@ -540,6 +540,19 @@ body:has(#modalRoot .bkovl) .toast.err+.toast.err{top:auto;bottom:calc(var(--bk-
 .bkconf .bkconf-t{margin:0;font-size:14px;line-height:1.45;color:var(--text);white-space:pre-line}
 .bkconf .mf{flex-wrap:wrap}
 @media (max-width:480px){.bkconf .mf .btn{flex:1 1 0;min-width:0;white-space:normal}}
+/* paste preview (plan grid multi-cell paste): same dialog as the Undo confirm; body scrolls, header + buttons stay on screen */
+.modal.bkpaste{display:flex;flex-direction:column;max-height:88vh;max-height:88dvh}
+.modal.bkpaste>.mh,.modal.bkpaste>.mf{flex:none}
+.modal.bkpaste>.mb{flex:1 1 auto;min-height:0;overflow:auto;overscroll-behavior:contain;gap:8px}
+.bkpaste h3{overflow-wrap:anywhere}
+.bk-pcounts{display:flex;flex-wrap:wrap}
+.bk-pnote{font-size:12.5px;line-height:1.4}
+.bk-perr{margin:6px 0 0;padding-left:18px;font-size:12.5px;overflow-wrap:anywhere}
+.bkpaste .bk-seg{flex-wrap:wrap;display:flex;width:max-content;max-width:100%}
+.toast.bk-undo{display:flex;gap:6px;align-items:center;padding:4px 6px 4px 16px;max-width:calc(100vw - 24px)}
+.toast.bk-undo button{all:unset;cursor:pointer;min-height:40px;min-width:40px;padding:0 10px;box-sizing:border-box;display:inline-flex;align-items:center;justify-content:center;font-weight:700;border-radius:6px}
+.toast.bk-undo .bk-undo-b{text-decoration:underline}.toast.bk-undo button:focus-visible{outline:2px solid #fff}
+.toast.bk-undo .bk-undo-x{font-size:18px;font-weight:400}
 /* phones/tablets: the page never scrolls sideways; wide tables scroll inside their own box (desktop unchanged) */
 @media (max-width:860px){.page>*{max-width:100%;min-width:0}.page .table-wrap{max-width:100%}
   /* safety net: anything still wider than the screen is clipped instead of making the whole page scroll sideways
@@ -1079,7 +1092,7 @@ function viewEst(part){
     <div class="seg"><button data-days="7" class="${(S.days||7)===7?'on':''}">7 d</button><button data-days="14" class="${S.days===14?'on':''}">14 d</button></div>
     <button class="btn sm ${S.bd?'on':''}" data-bdtoggle aria-pressed="${S.bd?'true':'false'}" title="Show or hide the extra budget-sheet columns (trees, total plan, export plan, local sales, sorting %, plan yield)">Budget details ${S.bd?'▾':'▸'}</button>
     <span class="spacer"></span><span class="btnpair"><button class="btn sm" data-windows>Harvest windows</button>${window.HP2Bulk&&HP2Bulk.can()?'<button class="btn sm" data-bulkplan title="Download a plan template and upload it filled in (admins, power users, agronomy admins)">Upload plan ↑</button>':''}<button class="btn sm pri" data-logharvest>+ Log harvest</button></span>
-    <details class="howto" ${S.howto?'open':''}><summary>How this works</summary><p class="hint">Left: the estimate per plot. Click it to update by tonnes or t/fed; every change is saved with who, when and why (<b style="color:var(--amber)">● updates</b> = since the selected week). Right: Raw PK tonnes per day. Past days show the <b>actual</b> from the harvest log with the plan under it (green = above plan, red = below). Click a past day to enter or correct a plot's harvest, use <b>+ actual</b> under today, or <b>Log harvest</b> to enter a whole farm's day at once. Today and later are plan inputs: leave a cell blank for no plan; type 0 for a planned zero. <b>Left after plan</b> = remaining − plan ahead; red means the plan is more than the estimate. Hover Raw PK actual for everything picked by category.</p></details>
+    <details class="howto" ${S.howto?'open':''}><summary>How this works</summary><p class="hint">Left: the estimate per plot. Click it to update by tonnes or t/fed; every change is saved with who, when and why (<b style="color:var(--amber)">● updates</b> = since the selected week). Right: Raw PK tonnes per day. Past days show the <b>actual</b> from the harvest log with the plan under it (green = above plan, red = below). Click a past day to enter or correct a plot's harvest, use <b>+ actual</b> under today, or <b>Log harvest</b> to enter a whole farm's day at once. Today and later are plan inputs: leave a cell blank for no plan; type 0 for a planned zero. Planners can also paste a block of cells copied from a spreadsheet into a plan cell: it fills right and down from that cell, shows a preview first, and is saved as one upload you can undo. <b>Left after plan</b> = remaining − plan ahead; red means the plan is more than the estimate. Hover Raw PK actual for everything picked by category.</p></details>
   </div>
   ${dateRail(days)}
   <div class="table-wrap mg"><table>

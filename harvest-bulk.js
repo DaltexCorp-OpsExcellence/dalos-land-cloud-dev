@@ -1,5 +1,6 @@
 /* Harvest Planner — daily plan bulk upload (Land Cloud STAGING).
    Started from harvest-planner.html: HP2Bulk.init(ctx) inside startApp. Daily plan only; the Plan sheet is the only uploadable sheet.
+   Also: multi-cell paste from a spreadsheet into the plan grid → one upload through the same RPC (see PASTE below).
    DB (migration hp2_bulk_plan_upload_v1): hp2_can_bulk_plan() · hp2_bulk_save_plan(p_season,p_rows,p_file,p_client_token,p_expected)
    · hp2_undo_plan_upload(p_upload,p_keep_conflicts). Reads hp2_plan_days / hp2_plan_uploads / hp2_plan_upload_cells (RLS: hp2_can_use).
    Rules: 0 = a real 0 t plan · blank = no plan (clears only a value that was in the downloaded template) · past days (Cairo) locked.
@@ -464,16 +465,19 @@ function step3(body,foot){const S=W.sum,P=W.parse;
   foot.appendChild(el('span',{class:'bk-info',text:`Applying as ${C.DB.me.name}${C.DB.role?' · '+C.DB.role.replace('_',' '):''}`}));
   const ap=el('button',{type:'button',class:'btn pri',disabled:S.massClear&&!W.massOk,onclick:()=>apply(ap,out)},`Apply ${S.add+S.change} value${S.add+S.change===1?'':'s'}${S.clear?' · clear '+S.clear:''}`);
   foot.appendChild(ap)}
+/* one hp2_bulk_save_plan call with up to 2 retries on network/5xx errors (same token: the server replays instead of writing twice).
+   Shared by the file upload (apply) and the grid paste (applyPaste). */
+async function rpcBulk(rows,file,token,exp,onRetry){let r,tries=0;
+  for(;;){try{r=await C.SB.rpc('hp2_bulk_save_plan',{p_season:C.DB.seasonId,p_rows:rows,p_file:file,p_client_token:token,p_expected:exp})}catch(e){r={error:{message:(e&&e.message)||'network error'},status:0}}
+    const transient=r.error&&(!r.status||r.status>=500||/Failed to fetch|NetworkError|network|timeout/i.test(r.error.message||''))&&!/^(not allowed|cell |CONFLICT|too many|rows must|unknown season|client token|expected counts|a cell has|plot )/i.test(r.error.message||'');
+    if(transient&&tries<2){tries++;if(onRetry)onRetry(tries);await sleep(1500*tries);continue}return r}}
 async function apply(btn,out){
   if(W.busy)return;if(W.sum.massClear&&!W.massOk)return;
   W.busy=true;btn.disabled=true;const t0=btn.textContent;btn.textContent='Applying…';clear(out);
   const S=W.sum,exp={n_add:S.add,n_change:S.change,n_clear:S.clear};
   if(!W.token)W.token=(crypto.randomUUID?crypto.randomUUID():null);
   if(!W.token){W.busy=false;btn.disabled=false;btn.textContent=t0;out.appendChild(msgBox('red','This browser cannot make an upload id. Use a current Chrome, Edge, Safari or Firefox.'));return}
-  let r,tries=0;
-  for(;;){try{r=await C.SB.rpc('hp2_bulk_save_plan',{p_season:C.DB.seasonId,p_rows:W.send,p_file:W.file.name,p_client_token:W.token,p_expected:exp})}catch(e){r={error:{message:(e&&e.message)||'network error'},status:0}}
-    const transient=r.error&&(!r.status||r.status>=500||/Failed to fetch|NetworkError|network|timeout/i.test(r.error.message||''))&&!/^(not allowed|cell |CONFLICT|too many|rows must|unknown season|client token|expected counts|a cell has|plot )/i.test(r.error.message||'');
-    if(transient&&tries<2){tries++;btn.textContent=`Retrying (${tries})…`;await sleep(1500*tries);continue}break}   /* same token: the server replays instead of writing twice */
+  const r=await rpcBulk(W.send,W.file.name,W.token,exp,n=>{btn.textContent=`Retrying (${n})…`});
   W.busy=false;btn.textContent=t0;
   if(r.error){const m=r.error.message||'no reply';
     if(/CONFLICT/i.test(m)){W.token=null;await recheck(`The plan changed while you were applying (${m.replace(/^CONFLICT:\s*/,'')}). Nothing was written. Check the cells below and apply again.`);return}
@@ -528,10 +532,10 @@ function canUndo(u){return CAN&&!u.undone_at&&(u.uploaded_by===C.DB.me.id||C.DB.
 function fillBanner(){const host=document.getElementById('bkBanner');if(!host)return;clear(host);
   if(!LAST||LAST.undone)return;const d=LAST.d;
   host.appendChild(el('div',{class:'bk-box green bk-banner',role:'status'},el('span',{style:'font-size:18px','aria-hidden':'true'},'✓'),
-    el('div',{class:'t'},el('b',null,`Plan uploaded: ${d.n_add} added · ${d.n_change} changed · ${d.n_clear} cleared`),' · ',el('span',{class:'bk-file',text:LAST.file,title:LAST.file}),' · '+cairoTs(LAST.at),
+    el('div',{class:'t'},el('b',null,`${LAST.kind==='paste'?'Pasted':'Plan uploaded'}: ${d.n_add} added · ${d.n_change} changed · ${d.n_clear} cleared`),' · ',el('span',{class:'bk-file',text:LAST.file,title:LAST.file}),' · '+cairoTs(LAST.at),
       el('div',{class:'calc',style:'font-size:12px'},`${d.n_same} unchanged · ${d.n_skipped_past} past days skipped${d.replayed?' · this upload was already saved (repeat click)':''}`)),
     el('button',{type:'button',class:'btn sm bkbtn',onclick:()=>{const t=document.querySelector('#tabs button[data-t="chg"]');if(t)t.click()}},'View in Changes'),
-    el('button',{type:'button',class:'btn sm bkbtn bk-danger',onclick:e=>undo(LAST.id,e.currentTarget)},'↶ Undo this upload'),
+    el('button',{type:'button',class:'btn sm bkbtn bk-danger',onclick:e=>undo(LAST.id,e.currentTarget)},LAST.kind==='paste'?'↶ Undo this paste':'↶ Undo this upload'),
     el('button',{type:'button',class:'x','aria-label':'Dismiss',onclick:()=>{LAST=null;clear(host)}},'×')))}
 async function loadUploads(){if(UPL_LOADING)return;UPL_LOADING=true;
   try{const r=await C.SB.from('hp2_plan_uploads').select('id,uploaded_by,uploaded_at,file_name,n_add,n_change,n_clear,n_same,n_skipped_past,undone_at,undone_by,n_undo_restored,n_undo_kept_conflict,n_undo_kept_past').eq('season_id',C.DB.seasonId).order('uploaded_at',{ascending:false}).limit(50);
@@ -550,7 +554,7 @@ function fillUploads(){const host=document.getElementById('bkUploads');if(!host)
   const tb=el('tbody');
   UPL.forEach(u=>{const op=OPEN[u.id];
     const exp=el('button',{type:'button',class:'btn sm bkbtn','aria-expanded':op?'true':'false','aria-label':(op?'Collapse':'Expand')+' upload',onclick:()=>{if(OPEN[u.id]){delete OPEN[u.id];fillUploads()}else loadCells(u.id)}},op?'▾':'▸');
-    const status=u.undone_at?el('span',{class:'rchip none'},`Undone by ${who(u.undone_by)} · ${cairoTs(u.undone_at)} · ${u.n_undo_restored||0} restored${(u.n_undo_kept_conflict||0)+(u.n_undo_kept_past||0)?' · '+((u.n_undo_kept_conflict||0)+(u.n_undo_kept_past||0))+' kept':''}`):el('span',{class:'rchip'},'Bulk upload');
+    const status=u.undone_at?el('span',{class:'rchip none'},`Undone by ${who(u.undone_by)} · ${cairoTs(u.undone_at)} · ${u.n_undo_restored||0} restored${(u.n_undo_kept_conflict||0)+(u.n_undo_kept_past||0)?' · '+((u.n_undo_kept_conflict||0)+(u.n_undo_kept_past||0))+' kept':''}`):el('span',{class:'rchip'},isPasteName(u.file_name)?'Paste':'Bulk upload');
     tb.appendChild(el('tr',null,el('td',null,exp),el('td',{class:'calc'},cairoTs(u.uploaded_at)),
       el('td',{style:'white-space:normal;min-width:160px;max-width:260px'},el('span',{class:'bk-file',text:u.file_name||'(no file name)',title:u.file_name||null})),
       el('td',null,who(u.uploaded_by)),
@@ -569,16 +573,149 @@ function fillUploads(){const host=document.getElementById('bkUploads');if(!host)
   card.appendChild(el('div',{class:'table-wrap'},el('table',{class:'bk-upl'},el('thead',null,el('tr',null,el('th',null,''),el('th',null,'When (Cairo)'),el('th',null,'File'),el('th',null,'By'),el('th',{class:'num'},'Values'),el('th',null,'Status'),el('th',null,''))),tb)))}
 
 /* =====================================================================================================
+   PASTE from a spreadsheet into the daily plan grid (several cells) → ONE plan upload with Undo.
+   Same rules as the file upload: strictNum, blank = clear (only a cell that has a value), 0 = a real 0, past days (Cairo) locked,
+   expect_at conflict check, same RPCs (hp2_bulk_save_plan / hp2_undo_plan_upload), same role gate (CAN = hp2_can_bulk_plan()).
+   Snapshot = the plan values on the page at the moment of the paste; a cell whose live value changed since then is "changed by a
+   colleague" and needs an explicit choice (keep current / use pasted), like the bulk upload's stale cells.
+   Log harvest grid (#lgrid) is not touched: only .dayin[data-plan] inputs inside the plan grid (.mg) are intercepted.
+   ===================================================================================================== */
+const PASTE_SEL='.mg input.dayin[data-plan]', PASTE_PREFIX='Paste · ';
+const isPasteName=f=>typeof f==='string'&&f.indexOf(PASTE_PREFIX)===0;
+let PS=null;   /* the open paste dialog's state */
+const splitKey=k=>{const i=k.lastIndexOf('|');return [k.slice(0,i),k.slice(i+1)]};
+/* rows by \r?\n (one trailing empty line ignored, as spreadsheets add one), columns by \t */
+function parseClip(text){const rows=String(text).split(/\r?\n/);if(rows.length>1&&rows[rows.length-1]==='')rows.pop();return rows.map(r=>r.split('\t'))}
+/* the plan grid as it is on screen: plot rows in DOM order (current grouping/filters), editable day columns left → right */
+function gridGeom(){const rows=[],rowIx=new Map(),ds=new Set();
+  document.querySelectorAll(PASTE_SEL).forEach(i=>{const [b,d]=splitKey(i.dataset.plan);if(!rowIx.has(b)){rowIx.set(b,rows.length);rows.push(b)}ds.add(d)});
+  const days=[...ds].sort(),dayIx=new Map(days.map((d,i)=>[d,i]));return {rows,rowIx,days,dayIx}}
+/* updated_at equality that ignores format differences between PostgREST, realtime and RPC replies (Z vs +00:00, fraction length) */
+function tsKey(s){if(s==null)return null;const t=String(s).replace(' ','T'),m=t.match(/^(.*?T\d\d:\d\d:\d\d)(?:\.(\d+))?(.*)$/);if(!m)return t;
+  const ms=Date.parse(m[1]+(m[3]?m[3].replace(/^([+-]\d\d)$/,'$1:00'):'Z'));return isNaN(ms)?t:ms+'.'+((m[2]||'')+'000000').slice(0,6)}
+const sameAt=(a,b)=>tsKey(a)===tsKey(b);
+const plotLbl=bid=>{const p=C.byId[String(bid).toLowerCase()];return p?pidOf(p)+' '+p.variety:'?'};
+const dispVal=k=>k in C.PLAN?String(C.PLAN[k]):'';
+function refocus(k){const n=k&&document.querySelector(`${PASTE_SEL}[data-plan="${k}"]`);if(n)try{n.focus({preventScroll:true})}catch(e){}}
+
+function onPaste(e){const i=e.target;if(!C||!i||!i.matches||!i.matches(PASTE_SEL))return;
+  const cd=e.clipboardData||window.clipboardData;const text=cd&&cd.getData?(cd.getData('text/plain')||cd.getData('text')||''):'';
+  if(!/[\t\r\n]/.test(text))return;                                  /* one value: the browser pastes it into the cell as today */
+  const grid=parseClip(text);if(grid.length===1&&grid[0].length===1)return;   /* one copied spreadsheet cell ("12\r\n"): same as today */
+  e.preventDefault();e.stopPropagation();
+  if(!CAN){C.toast('Pasting several cells needs planner access (admins, power users, agronomy admins). Nothing was saved.');return}
+  if(PS||document.querySelector('.bkconf-ovl')||document.querySelector('#modalRoot .modal'))return;
+  const k=i.dataset.plan,[bid,day]=splitKey(k),G=gridGeom(),r0=G.rowIx.get(bid),c0=G.dayIx.get(day);if(r0==null||c0==null)return;
+  /* the paste replaces whatever was being typed in the anchor cell: put the stored value back and leave the cell, so its normal
+     change → single-cell save sees no change (v === stored) and nothing is saved twice */
+  i.value=dispVal(k);i.blur();
+  const cells=[],snap=new Map();let off=0;
+  grid.forEach((cols,ri)=>cols.forEach((raw,ci)=>{const r=r0+ri,c=c0+ci;if(r>=G.rows.length||c>=G.days.length){off++;return}
+    const b=G.rows[r],d=G.days[c],key=b+'|'+d,pv=strictNum(raw);
+    cells.push({k:key,block_id:b,day:d,raw,blank:!!pv.blank,v:pv.v,err:pv.err||null});
+    snap.set(key,key in C.PLAN?{t:r2(Number(C.PLAN[key])),at:C.PLAN_AT[key]||null}:null)}));
+  const days=cells.map(c=>c.day).sort();
+  PS={k,cells,snap,off,nPlots:new Set(cells.map(c=>c.block_id)).size,d1:days[0],d2:days[days.length-1],cur:null,sum:null,send:[],choice:null,token:null,file:null,busy:false,msg:null,err:null,ui:null};
+  openPaste();
+  checkPaste().catch(err=>{if(!PS)return;PS.err='Could not read the live plan: '+((err&&err.message)||err);drawPaste()})}
+async function checkPaste(msg){const P=PS;P.sum=null;P.err=null;drawPaste();
+  const cur=await fetchCur(P.d1,P.d2);if(P!==PS)return;
+  P.cur=cur;P.msg=msg||null;classifyPaste();drawPaste()}
+function classifyPaste(){const P=PS,today=cairoToday();
+  const S={add:0,change:0,clear:0,same:0,err:0,past:0,off:P.off,stale:0,errs:[],staleList:[],plots:new Set()},send=[];
+  for(const c of P.cells){
+    if(c.err){S.err++;S.errs.push(c);continue}
+    const v=c.blank?null:c.v,sn=P.snap.get(c.k)||null,cu=P.cur.get(c.k)||null,op=computeOp(v,cu);   /* op against the LIVE value */
+    if(!op){S.same++;continue}                                          /* blank on an empty cell, or the same value: no-op */
+    if(c.day<today){S.past++;continue}                                  /* past day (Cairo): locked, never sent */
+    if(!sameAt(cu?cu.at:null,sn?sn.at:null)){S.stale++;S.staleList.push({c,v,sn,cu});if(P.choice!=='file')continue}
+    S[op]++;S.plots.add(c.block_id);send.push({block_id:c.block_id,day:c.day,value:v,expect_at:cu?cu.at:null})}
+  P.sum=S;P.send=send}
+
+/* small in-app dialog, same styles as the Undo confirm (askConfirm): focus kept inside, Escape / backdrop = Cancel */
+function openPaste(){const P=PS,tid='bkpT'+Date.now();
+  const h3=el('h3',{id:tid}),body=el('div',{class:'mb'}),foot=el('div',{class:'mf'});
+  const dlg=el('div',{class:'modal sm bkconf bkpaste',role:'dialog','aria-modal':'true','aria-labelledby':tid},el('div',{class:'mh'},el('div',null,h3)),body,foot);
+  const ovl=el('div',{class:'ovl bkconf-ovl'},dlg);
+  const end=back=>{if(P.busy)return;document.removeEventListener('keydown',key,true);ovl.remove();if(PS===P)PS=null;if(back)refocus(P.k)};
+  const key=e=>{if(document.querySelector('.bkconf-ovl:not(.bkp-ovl)'))return;   /* an Undo confirm on top owns the keys */
+    if(e.key==='Escape'){e.preventDefault();e.stopPropagation();end(true);return}
+    if(e.key==='Tab'){const f=[...dlg.querySelectorAll('button:not([disabled])')];if(!f.length)return;const i=f.indexOf(document.activeElement);e.preventDefault();
+      f[i<0?0:(i+(e.shiftKey?f.length-1:1))%f.length].focus()}};
+  ovl.classList.add('bkp-ovl');ovl.addEventListener('click',e=>{if(e.target===ovl)end(true)});
+  P.ui={h3,body,foot,end};document.addEventListener('keydown',key,true);document.body.appendChild(ovl);drawPaste()}
+function drawPaste(){const P=PS;if(!P||!P.ui)return;const {h3,body,foot,end}=P.ui,S=P.sum;
+  const fo=document.activeElement&&P.ui.foot.contains(document.activeElement)?document.activeElement.dataset.f:null;
+  clear(body);clear(foot);
+  h3.textContent=`Paste ${plural(P.cells.length,'value')} into ${plural(P.nPlots,'plot')}`+(P.d1?(P.d1===P.d2?` (${fmtD(P.d1)})`:` (from ${fmtD(P.d1)} to ${fmtD(P.d2)})`):'');
+  if(P.msg)body.appendChild(msgBox('amber',P.msg));
+  if(P.err)body.appendChild(msgBox('red',P.err));
+  const cancel=el('button',{type:'button',class:'btn bkbtn','data-f':'c',onclick:()=>end(true)},'Cancel');
+  if(!S){if(!P.err)body.appendChild(el('p',{class:'bkconf-t calc'},'Checking against the live plan…'));foot.appendChild(cancel);cancel.focus();return}
+  body.appendChild(el('p',{class:'bkconf-t'},'Nothing is saved until you press Apply. It is saved as one plan upload, and you can undo it.'));
+  const n=(cls,lbl,v)=>el('span',{class:'bk-c '+cls},lbl+' ',el('b',null,v.toLocaleString('en-US')));
+  body.appendChild(el('div',{class:'bk-pcounts'},n('add','✚ New',S.add),n('chg','✎ Changed',S.change),n('clr','⌫ Cleared',S.clear),n('','＝ Unchanged',S.same),
+    n('err','✖ Errors',S.err),n('lk','🔒 Locked',S.past),n('lk','⇥ Off-grid',S.off)));
+  if(S.clear)body.appendChild(el('div',{class:'calc bk-pnote'},`${plural(S.clear,'blank pasted cell')} clear${S.clear===1?'s':''} a plan value. Paste 0 instead if you mean a planned 0 t.`));
+  if(S.past)body.appendChild(el('div',{class:'calc bk-pnote'},`🔒 ${plural(S.past,'cell')} on days before today (${fmtD(cairoToday())}, Cairo) ${S.past===1?'is':'are'} locked and skipped.`));
+  if(S.off)body.appendChild(el('div',{class:'calc bk-pnote'},`⇥ ${plural(S.off,'cell')} fell past the last plot row or the last day column on screen and ${S.off===1?'was':'were'} dropped.`));
+  if(S.err){const ul=el('ul',{class:'bk-perr'});S.errs.slice(0,5).forEach(c=>ul.appendChild(el('li',null,`${plotLbl(c.block_id)} · ${fmtD(c.day)}: "${c.raw.length>24?c.raw.slice(0,24)+'…':c.raw}" ${c.err}`)));
+    if(S.errs.length>5)ul.appendChild(el('li',{class:'calc'},`+ ${S.errs.length-5} more`));
+    body.appendChild(msgBox('red',el('b',null,`${plural(S.err,'cell')} with errors ${S.err===1?'is':'are'} skipped`),' (use numbers with a dot for decimals, 0 or more, up to '+MAX_T+' t):',ul))}
+  if(S.stale){const ex=S.staleList[0],now=ex.cu?`now ${fmtT(ex.cu.t)} t (${who(ex.cu.by)}, ${cairoTs(ex.cu.at)})`:'now empty';
+    const seg=(lbl,val)=>el('button',{type:'button','data-f':'s'+val,'aria-pressed':P.choice===val?'true':'false',onclick:()=>{P.choice=val;classifyPaste();drawPaste()}},lbl);
+    body.appendChild(msgBox('amber',el('b',null,`${plural(S.stale,'cell')} changed in Land Cloud since you pasted or opened the page. `),
+      `For example ${plotLbl(ex.c.block_id)} · ${fmtD(ex.c.day)}: you saw ${ex.sn?fmtT(ex.sn.t)+' t':'empty'}, ${now}, pasted ${ex.v===null?'blank':fmtT(ex.v)+' t'}. `,
+      P.choice?'':'Choose for '+(S.stale===1?'it':'all of them')+': ',
+      el('span',{class:'bk-seg',role:'group','aria-label':'Cells changed by a colleague',style:'margin-top:6px'},seg('Keep current','keep'),seg('Use pasted','file'))))}
+  const block=S.stale&&!P.choice?'choose':!P.send.length?'none':'';
+  const ap=el('button',{type:'button',class:'btn bkbtn pri','data-f':'a',disabled:!!block||P.busy,onclick:()=>applyPaste(ap)},
+    block==='none'?'Nothing to apply':block==='choose'?'Choose above':`Apply ${plural(P.send.length,'value')}`);
+  foot.appendChild(cancel);foot.appendChild(ap);
+  const f=fo&&foot.querySelector(`[data-f="${fo}"]`);(f&&!f.disabled?f:cancel).focus()}   /* Cancel by default (as askConfirm): Enter never applies by accident */
+async function applyPaste(btn){const P=PS;if(!P||P.busy||!P.send.length)return;if(P.sum.stale&&!P.choice)return;
+  P.busy=true;btn.disabled=true;const t0=btn.textContent;btn.textContent='Applying…';P.err=null;
+  const S=P.sum,exp={n_add:S.add,n_change:S.change,n_clear:S.clear};
+  if(!P.token){P.token=crypto.randomUUID?crypto.randomUUID():null;
+    P.file=PASTE_PREFIX+new Date().toLocaleString('en-GB',{timeZone:'Africa/Cairo',day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit',second:'2-digit'})}
+  if(!P.token){P.busy=false;P.err='This browser cannot make an upload id. Use a current Chrome, Edge, Safari or Firefox.';drawPaste();return}
+  const r=await rpcBulk(P.send,P.file,P.token,exp,n=>{btn.textContent=`Retrying (${n})…`});
+  P.busy=false;btn.textContent=t0;if(P!==PS)return;
+  const again=async m=>{P.token=null;P.choice=null;try{await checkPaste(m)}catch(e){P.err=m+' (Could not re-read the live plan: '+((e&&e.message)||e)+')';drawPaste()}};
+  if(r.error){const m=r.error.message||'no reply';
+    if(/CONFLICT/i.test(m)){await again(`The plan changed while you were applying (${m.replace(/^CONFLICT:\s*/,'')}). Nothing was written. Check the counts and apply again.`);return}
+    if(!/Failed to fetch|network|timeout/i.test(m))P.token=null;            /* network: keep the token so a retry cannot double-write */
+    P.err='Not saved: '+m+(/not allowed/i.test(m)?' — your role may have changed, or your sign-in expired (reload the page).':'');drawPaste();return}
+  const d=r.data||{};
+  if(d.ok===false){
+    if(d.reason==='conflict'){await again(`${plural(d.n_conflicts||0,'cell')} changed in Land Cloud just now (for example by ${(d.conflicts&&d.conflicts[0]&&d.conflicts[0].now_by_name)||'a colleague'}). Nothing was written. Choose for those cells and apply again.`);return}
+    if(d.reason==='counts changed'){const s=d.server||{},c=d.client||{};await again(`The server counted differently (server: +${s.n_add} new · ${s.n_change} changed · ${s.n_clear} cleared; this page: +${c.n_add} · ${c.n_change} · ${c.n_clear}), so nothing was written. Checked again: review and apply.`);return}
+    P.token=null;P.err='Not saved: '+(d.reason||'unknown reason');drawPaste();return}
+  P.ui.end(false);   /* close without refocusing: the grid is redrawn first, so the anchor cell never holds a stale value */
+  if(!d.upload_id){C.rerender();refocus(P.k);C.toast('Nothing to change: the pasted values match the live plan');return}
+  try{await resyncPlan()}catch(e){P.send.forEach(s=>{const k=s.block_id+'|'+s.day;if(s.value===null){delete C.PLAN[k];delete C.PLAN_AT[k]}else{C.PLAN[k]=s.value;C.PLAN_AT[k]=d.written_at}})}
+  LAST={id:d.upload_id,d,file:P.file,at:d.written_at||new Date().toISOString(),undone:false,kind:'paste'};UPL=null;
+  C.rerender();refocus(P.k);
+  undoToast(d.n_add+d.n_change+d.n_clear,d.upload_id,d.replayed)}
+/* "Pasted N values · Undo": Undo opens the same in-app confirm as the Plan uploads card and calls hp2_undo_plan_upload */
+function undoToast(n,id,replayed){document.querySelectorAll('.toast.bk-undo').forEach(t=>t.remove());
+  const t=el('div',{class:'toast bk-undo',role:'status'},el('span',null,`Pasted ${plural(n,'value')}${replayed?' (already saved)':''}`),
+    el('button',{type:'button',class:'bk-undo-b',onclick:()=>{t.remove();undo(id,null)}},'↶ Undo'),
+    el('button',{type:'button',class:'bk-undo-x','aria-label':'Dismiss',onclick:()=>t.remove()},'×'));
+  document.body.appendChild(t);setTimeout(()=>t.remove(),15000)}
+
+/* =====================================================================================================
    public API
    ===================================================================================================== */
 window.HP2Bulk={
   init(ctx){C=ctx;C.byId=Object.fromEntries(C.PLOTS.map(p=>[String(p.id).toLowerCase(),p]));
     document.addEventListener('click',e=>{if(e.target.closest&&e.target.closest('[data-bulkplan]')&&CAN)openWizard()});
+    document.addEventListener('paste',onPaste,true);   /* multi-cell paste into the plan grid (role gate inside) */
     return C.SB.rpc('hp2_can_bulk_plan').then(r=>{CAN=!r.error&&r.data===true;return CAN},()=>false)},
   can:()=>CAN,
   afterRender(tab){if(!C)return;if(tab==='est')fillBanner();if(tab==='chg')fillUploads()},
   listen(chan,seasonId){chan.on('postgres_changes',{event:'*',schema:'public',table:'hp2_plan_uploads',filter:'season_id=eq.'+seasonId},()=>{UPL=null;if(document.getElementById('bkUploads'))loadUploads()})},
   /* pure helpers exposed for tests */
-  _t:{strictNum,numChk,parseCell,computeOp,plotKey,buildTemplate,parseWorkbook,classify,state:(c,w)=>{if(c)C=c;if(w!==undefined)W=w;return {C,W}}}
+  _t:{parseClip,tsKey,sameAt,gridGeom,classifyPaste,paste:p=>{if(p!==undefined)PS=p;return PS},strictNum,numChk,parseCell,computeOp,plotKey,buildTemplate,parseWorkbook,classify,state:(c,w)=>{if(c)C=c;if(w!==undefined)W=w;return {C,W}}}
 };
 })();
