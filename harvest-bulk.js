@@ -391,7 +391,7 @@ function rowMatches(row,f){if(f==='all')return true;
 function rerenderReview(){classify();const b=document.getElementById('bkBody'),ft=document.getElementById('bkFoot');if(!b)return;const y=b.scrollTop;clear(b);clear(ft);step2(b,ft);b.scrollTop=y;footSoon()}
 function step2(body,foot){const S=W.sum,P=W.parse;
   body.appendChild(el('div',{class:'bk-filehead'},el('span',{class:'bk-ic',"aria-hidden":'true'},'XLSX'),
-    el('div',{style:'flex:1;min-width:0'},el('div',{class:'bk-file',text:P.file.name}),
+    el('div',{style:'flex:1;min-width:0'},el('div',{class:'bk-file',text:P.file.name,title:P.file.name}),
       el('div',{class:'calc',style:'font-size:12px'},`${Math.max(1,Math.round(P.file.size/1024))} KB · Plan sheet · ${plural(P.rows.length,'plot row')} · ${plural(P.dayCols.length,'day column')} (${fmtD(P.meta.from)} – ${fmtD(P.meta.to)}) · template made ${P.meta.generated?cairoTs(P.meta.generated):'?'}`)),
     el('button',{type:'button',class:'btn',onclick:()=>{W.step=1;setDirty(false);draw()}},'Replace file')));
   body.appendChild(msgBox('info',el('b',null,'Check only: nothing has been written. '),'Your file was compared with the plan you downloaded and with the live plan. Only cells you changed are sent.'));
@@ -431,7 +431,9 @@ function step2(body,foot){const S=W.sum,P=W.parse;
   if(!rows.length)body.appendChild(el('p',{class:'bk-empty calc'},W.filter==='all'?'Your file has no changes against the plan you downloaded.':'No rows in this filter.'));
   else body.appendChild(el('div',{class:'table-wrap bk-tw'},el('table',{class:'bk-t'},el('thead',null,el('tr',null,el('th',{class:'num'},'Row'),el('th',null,'Status'),el('th',null,'Plot'),el('th',null,'What changes · day values in t'))),tb)));
   if(rows.length>LIM)body.appendChild(el('div',{class:'calc',style:'font-size:12px'},`Showing the first ${LIM} of ${rows.length} rows. Use the filters above to narrow.`));
-  body.appendChild(el('div',{class:'legendrow',style:'margin-top:8px'},el('span',{class:'bk-c add'},'8'),' new value',el('span',{class:'bk-c chg'},el('s',null,'6'),' → 8'),' change',el('span',{class:'bk-c clr'},el('s',null,'6'),' → – ⌫'),' cleared (blank in file)',el('span',{class:'bk-c err'},'✖'),' error, skipped',el('span',{class:'bk-c lk'},'🔒'),' past day, locked'));
+  /* colour key: each swatch + its label is one nowrap unit, so a label never wraps away from its swatch */
+  const lg=(sw,t)=>el('span',{class:'bk-lg'},sw,t);
+  body.appendChild(el('div',{class:'legendrow',style:'margin-top:8px'},lg(el('span',{class:'bk-c add'},'8'),' new value'),lg(el('span',{class:'bk-c chg'},el('s',null,'6'),' → 8'),' change'),lg(el('span',{class:'bk-c clr'},el('s',null,'6'),' → – ⌫'),' cleared (blank in file)'),lg(el('span',{class:'bk-c err'},'✖'),' error, skipped'),lg(el('span',{class:'bk-c lk'},'🔒'),' past day, locked')));
   if(S.errors){const cb=el('input',{type:'checkbox',id:'bkSkip',checked:W.skipErr,onchange:e=>{W.skipErr=e.target.checked;rerenderReview()}});
     body.appendChild(el('label',{class:'bk-tick',for:'bkSkip'},cb,skipText(S,P)+': they are not uploaded and the plan stays as it is there.'))}
   /* footer */
@@ -447,7 +449,7 @@ function allStale(){const out=[];W.parse.rows.forEach(r=>(r.out||[]).forEach(o=>
 /* ---------- step 3: confirm + apply ---------- */
 function step3(body,foot){const S=W.sum,P=W.parse;
   body.appendChild(el('div',{class:'bk-box info bk-bigbox'},el('div',{class:'bk-big'},`Apply ${plural(S.sent,'plan value')} on ${plural(S.plots.size,'plot')}`),
-    el('div',{class:'calc'},`Daily plan · Citrus ${C.DB.season.name} · ${fmtD(P.meta.from)} – ${fmtD(P.meta.to)} · `,el('span',{class:'bk-file',text:P.file.name}))));
+    el('div',{class:'calc'},`Daily plan · Citrus ${C.DB.season.name} · ${fmtD(P.meta.from)} – ${fmtD(P.meta.to)} · `,el('span',{class:'bk-file',text:P.file.name,title:P.file.name}))));
   body.appendChild(el('div',{class:'bk-clrline'+(S.clear?' on':'')},el('b',null,`${plural(S.clear,'value')} will be cleared`),S.clear?' (blank in your file, so that day\'s plan is removed). Type 0 instead if you mean a planned 0 t.':''));
   if(S.massClear){const n=S.clear;const cb=el('input',{type:'checkbox',id:'bkMass',checked:W.massOk,onchange:e=>{W.massOk=e.target.checked;ap.disabled=!W.massOk||W.busy}});
     body.appendChild(msgBox('red',el('b',null,'Large clear. '),S.massRows.length?`${plural(S.massRows.length,'plot row')} that ${S.massRows.length===1?'has':'have'} plan values came back completely blank (${S.massRows.slice(0,6).map(r=>pidOf(r.plot)+' '+r.plot.variety).join(', ')}${S.massRows.length>6?' …':''}). `:'',
@@ -526,7 +528,7 @@ function canUndo(u){return CAN&&!u.undone_at&&(u.uploaded_by===C.DB.me.id||C.DB.
 function fillBanner(){const host=document.getElementById('bkBanner');if(!host)return;clear(host);
   if(!LAST||LAST.undone)return;const d=LAST.d;
   host.appendChild(el('div',{class:'bk-box green bk-banner',role:'status'},el('span',{style:'font-size:18px','aria-hidden':'true'},'✓'),
-    el('div',{class:'t'},el('b',null,`Plan uploaded: ${d.n_add} added · ${d.n_change} changed · ${d.n_clear} cleared`),' · ',el('span',{class:'bk-file',text:LAST.file}),' · '+cairoTs(LAST.at),
+    el('div',{class:'t'},el('b',null,`Plan uploaded: ${d.n_add} added · ${d.n_change} changed · ${d.n_clear} cleared`),' · ',el('span',{class:'bk-file',text:LAST.file,title:LAST.file}),' · '+cairoTs(LAST.at),
       el('div',{class:'calc',style:'font-size:12px'},`${d.n_same} unchanged · ${d.n_skipped_past} past days skipped${d.replayed?' · this upload was already saved (repeat click)':''}`)),
     el('button',{type:'button',class:'btn sm bkbtn',onclick:()=>{const t=document.querySelector('#tabs button[data-t="chg"]');if(t)t.click()}},'View in Changes'),
     el('button',{type:'button',class:'btn sm bkbtn bk-danger',onclick:e=>undo(LAST.id,e.currentTarget)},'↶ Undo this upload'),
@@ -550,7 +552,7 @@ function fillUploads(){const host=document.getElementById('bkUploads');if(!host)
     const exp=el('button',{type:'button',class:'btn sm bkbtn','aria-expanded':op?'true':'false','aria-label':(op?'Collapse':'Expand')+' upload',onclick:()=>{if(OPEN[u.id]){delete OPEN[u.id];fillUploads()}else loadCells(u.id)}},op?'▾':'▸');
     const status=u.undone_at?el('span',{class:'rchip none'},`Undone by ${who(u.undone_by)} · ${cairoTs(u.undone_at)} · ${u.n_undo_restored||0} restored${(u.n_undo_kept_conflict||0)+(u.n_undo_kept_past||0)?' · '+((u.n_undo_kept_conflict||0)+(u.n_undo_kept_past||0))+' kept':''}`):el('span',{class:'rchip'},'Bulk upload');
     tb.appendChild(el('tr',null,el('td',null,exp),el('td',{class:'calc'},cairoTs(u.uploaded_at)),
-      el('td',{style:'white-space:normal;min-width:160px'},el('span',{class:'bk-file',text:u.file_name||'(no file name)'})),
+      el('td',{style:'white-space:normal;min-width:160px;max-width:260px'},el('span',{class:'bk-file',text:u.file_name||'(no file name)',title:u.file_name||null})),
       el('td',null,who(u.uploaded_by)),
       el('td',{class:'num'},`+${u.n_add} · ${u.n_change} changed · ${u.n_clear} cleared`,el('div',{class:'calc',style:'font-size:11px'},`${u.n_same} unchanged · ${u.n_skipped_past} past skipped`)),
       el('td',null,status),

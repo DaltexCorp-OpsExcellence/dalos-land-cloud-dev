@@ -7,7 +7,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.110.8/dist/umd/supabase.js"></script>
 <script src="shell.js?cb=8"></script>
 <!-- daily plan bulk upload; lazy-loads SheetJS 0.20.3 (cdn.sheetjs.com) + ExcelJS 4.4.0 with SRI on first use -->
-<script src="harvest-bulk.js?cb=4"></script>
+<script src="harvest-bulk.js?cb=5"></script>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Mono:wght@400;500&family=Instrument+Sans:wght@400;500;600&family=Space+Grotesk:wght@400;500;600;700&family=Noto+Sans+Arabic:wght@400;500;600&display=swap">
 <style>
 /* Layout: Land Cloud shell — dark teal sidebar, sticky topbar + filter bar, dense plot tables. Tokens copied from dalos-land-cloud. */
@@ -446,7 +446,8 @@ body.present .page{padding:0 0 32px;gap:0}
 .bk-narrow{display:none}@media (max-width:700px){.bk-narrow{display:block}}
 .bk-filehead{display:flex;gap:12px;align-items:center;flex-wrap:wrap;border:1px solid var(--border2);border-radius:var(--r2);padding:10px 12px}
 .bk-ic{width:40px;height:40px;border-radius:8px;background:#1f6e4f;color:#fff;font-weight:700;display:grid;place-items:center;font-size:11px;flex:none}
-.bk-file{font-family:var(--font-mono);font-size:12px;word-break:break-all;color:var(--text)}
+.bk-file{font-family:var(--font-mono);font-size:12px;color:var(--text);display:inline-block;max-width:100%;min-width:0;vertical-align:bottom;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}   /* long names: one line + …, full name in title */
+.bk-lg{display:inline-flex;align-items:center;white-space:nowrap}.bk-lg .bk-c{margin-right:4px}   /* colour key: swatch + label stay together */
 .bk-sum{display:flex;gap:6px;flex-wrap:wrap}
 .bk-sc{all:unset;cursor:pointer;display:inline-flex;align-items:center;gap:6px;min-height:44px;box-sizing:border-box;padding:0 12px;border-radius:var(--r);border:1px solid var(--border2);background:var(--card);font-size:13px;font-weight:600;color:var(--text2)}
 .bk-sc b{font-family:var(--font-num);font-size:16px}
@@ -496,14 +497,13 @@ body:has(#modalRoot .bkovl) .toast.err+.toast.err{top:auto;bottom:calc(var(--bk-
 .bkm .mh .x{width:44px;height:44px;flex:none;margin-left:auto}
 .modal.bkm>.mf{background:var(--card);border-radius:0 0 14px 14px;padding-bottom:max(12px,env(safe-area-inset-bottom))}
 .bk-stepc{display:none}
-.mh .meta.bkmeta{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;overflow:hidden}
+.mh .meta.bkmeta{display:block;white-space:normal;overflow:visible}   /* subtitle wraps, never cut with … (hidden below 420px) */
 @media (max-width:768px){
   .ovl.bkovl{padding:0;align-items:stretch;overflow:hidden}
   .modal.bkm{width:100%;height:100vh;height:100dvh;max-height:100vh;max-height:100dvh;border-radius:0;border:0}
   .modal.bkm>.mf{border-radius:0}
   .modal.bkm>.mh{padding:8px 8px 8px 14px;align-items:center}
   .modal.bkm>.mh h3{font-size:17px;line-height:1.2}
-  .mh .meta.bkmeta{-webkit-line-clamp:1}
   .bk-steps{padding:6px 14px}.bk-step{display:none}
   .bk-stepc{display:inline-block;font-size:13px;font-weight:600;color:var(--accent);line-height:22px}
   .modal.bkm>.mb{padding:10px 14px}
@@ -515,8 +515,9 @@ body:has(#modalRoot .bkovl) .toast.err+.toast.err{top:auto;bottom:calc(var(--bk-
 /* review empty state: a normal wrapping paragraph outside the table, every width */
 .bk-empty{margin:4px 0 0;padding:14px;font-size:13px;line-height:1.45;border:1px solid var(--border);border-radius:var(--r2);background:var(--card);white-space:normal;overflow-wrap:anywhere}
 /* narrow phones: each review row is a card (plot on the first line, status + row number beside it, changes wrap underneath
-   at full card width); no sideways scroll inside the review area. 481px and wider keeps the table. */
-@media (max-width:480px){
+   at full card width); no sideways scroll inside the review area. 521px and wider keeps the table. */
+@media (max-width:640px){.bk-t td.bk-cells{min-width:200px;padding-right:6px}}   /* 521-640px: table fits its box, no sideways scrollbar */
+@media (max-width:520px){
   .table-wrap.bk-tw{overflow:visible;border:0;background:none;border-radius:0}
   .bk-t,.bk-t tbody{display:block;width:100%}
   .bk-t thead{display:none}
@@ -524,10 +525,10 @@ body:has(#modalRoot .bkovl) .toast.err+.toast.err{top:auto;bottom:calc(var(--bk-
   .bk-t tr.bk-r-err{box-shadow:inset 3px 0 0 var(--red)}.bk-t tr.bk-r-amb{box-shadow:inset 3px 0 0 var(--amber)}
   .bk-t tr.bk-r-err td:first-child,.bk-t tr.bk-r-amb td:first-child{box-shadow:none}
   .bk-t td{display:block;padding:0;border:0;min-width:0;white-space:normal;overflow-wrap:anywhere}
-  .bk-t td.bk-plotc{order:1;flex:1 1 140px}
-  .bk-t td.bk-stc{order:2;flex:none}
-  .bk-t td.bk-rn{order:3;flex:none;text-align:right;font-size:11.5px}.bk-t td.bk-rn::before{content:'Row '}
-  .bk-t td.bk-cells{order:4;flex:1 1 100%;min-width:0;padding-top:4px;border-top:1px solid var(--border)}
+  .bk-t td.bk-plotc{order:1;flex:1 1 0}   /* basis 0: the plot text wraps; status + row never drop to a second line */
+  .bk-t td.bk-stc{order:2;flex:none;white-space:nowrap}.bk-t td.bk-stc .bk-st{white-space:nowrap}
+  .bk-t td.bk-rn{order:3;flex:none;white-space:nowrap;text-align:right;font-size:11.5px}.bk-t td.bk-rn::before{content:'Row '}
+  .bk-t td.bk-cells{order:4;flex:1 1 100%;min-width:0;padding-top:4px;padding-right:0;border-top:1px solid var(--border)}
   .bk-t .bk-c{white-space:normal;overflow-wrap:anywhere;max-width:100%;box-sizing:border-box}
   .bk-t .bk-msg,.bk-t .bk-stale,.bk-t .bk-stale>span{overflow-wrap:anywhere;min-width:0;max-width:100%}
   .bk-t .bk-seg{flex-wrap:wrap}
