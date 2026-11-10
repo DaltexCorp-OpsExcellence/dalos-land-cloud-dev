@@ -7,7 +7,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.110.8/dist/umd/supabase.js"></script>
 <script src="shell.js?cb=8"></script>
 <!-- daily plan bulk upload; lazy-loads SheetJS 0.20.3 (cdn.sheetjs.com) + ExcelJS 4.4.0 with SRI on first use -->
-<script src="harvest-bulk.js?cb=3"></script>
+<script src="harvest-bulk.js?cb=4"></script>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Mono:wght@400;500&family=Instrument+Sans:wght@400;500;600&family=Space+Grotesk:wght@400;500;600;700&family=Noto+Sans+Arabic:wght@400;500;600&display=swap">
 <style>
 /* Layout: Land Cloud shell — dark teal sidebar, sticky topbar + filter bar, dense plot tables. Tokens copied from dalos-land-cloud. */
@@ -512,6 +512,27 @@ body:has(#modalRoot .bkovl) .toast.err+.toast.err{top:auto;bottom:calc(var(--bk-
   .mf.bk .btn{flex:1 1 0;min-width:0;white-space:normal;text-align:center;line-height:1.2}   /* Back and Next stay side by side */
 }
 @media (max-width:420px){.mh .meta.bkmeta{display:none}}
+/* review empty state: a normal wrapping paragraph outside the table, every width */
+.bk-empty{margin:4px 0 0;padding:14px;font-size:13px;line-height:1.45;border:1px solid var(--border);border-radius:var(--r2);background:var(--card);white-space:normal;overflow-wrap:anywhere}
+/* narrow phones: each review row is a card (plot on the first line, status + row number beside it, changes wrap underneath
+   at full card width); no sideways scroll inside the review area. 481px and wider keeps the table. */
+@media (max-width:480px){
+  .table-wrap.bk-tw{overflow:visible;border:0;background:none;border-radius:0}
+  .bk-t,.bk-t tbody{display:block;width:100%}
+  .bk-t thead{display:none}
+  .bk-t tr{display:flex;flex-wrap:wrap;align-items:flex-start;gap:4px 8px;padding:10px 12px;margin:0 0 8px;border:1px solid var(--border);border-radius:var(--r2);background:var(--card);min-width:0}
+  .bk-t tr.bk-r-err{box-shadow:inset 3px 0 0 var(--red)}.bk-t tr.bk-r-amb{box-shadow:inset 3px 0 0 var(--amber)}
+  .bk-t tr.bk-r-err td:first-child,.bk-t tr.bk-r-amb td:first-child{box-shadow:none}
+  .bk-t td{display:block;padding:0;border:0;min-width:0;white-space:normal;overflow-wrap:anywhere}
+  .bk-t td.bk-plotc{order:1;flex:1 1 140px}
+  .bk-t td.bk-stc{order:2;flex:none}
+  .bk-t td.bk-rn{order:3;flex:none;text-align:right;font-size:11.5px}.bk-t td.bk-rn::before{content:'Row '}
+  .bk-t td.bk-cells{order:4;flex:1 1 100%;min-width:0;padding-top:4px;border-top:1px solid var(--border)}
+  .bk-t .bk-c{white-space:normal;overflow-wrap:anywhere;max-width:100%;box-sizing:border-box}
+  .bk-t .bk-msg,.bk-t .bk-stale,.bk-t .bk-stale>span{overflow-wrap:anywhere;min-width:0;max-width:100%}
+  .bk-t .bk-seg{flex-wrap:wrap}
+  .bk-t .sel{width:100%}
+}
 /* in-page confirm (Undo) */
 .ovl.bkconf-ovl{z-index:60;align-items:center}
 .modal.bkconf{min-width:0}

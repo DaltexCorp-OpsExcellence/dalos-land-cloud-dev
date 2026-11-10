@@ -425,9 +425,11 @@ function step2(body,foot){const S=W.sum,P=W.parse;
     if(!(!row.plot||row.lvl==='red'||row.dup)){const sh=outs.slice(0,60);sh.forEach(o=>{const c=chip(o);if(c)cells.appendChild(c)});if(outs.length>60)cells.appendChild(el('span',{class:'calc'},` + ${outs.length-60} more`))}
     else{const n=row.cells.filter(c=>!c.blank).length;if(n)cells.appendChild(el('div',{class:'calc',style:'font-size:12px'},plural(n,'day value')+' in this row will be skipped.'))}
     st.forEach(o=>cells.appendChild(staleLine(o)));
-    tb.appendChild(el('tr',{class:'bk-r-'+cls},el('td',{class:'num calc'},String(row.r)),el('td',null,el('span',{class:'bk-st bk-c '+cls},lbl)),plotCell,cells))});
-  if(!rows.length)tb.appendChild(el('tr',null,el('td',{colspan:'4',class:'calc',style:'padding:14px'},W.filter==='all'?'Your file has no changes against the plan you downloaded.':'No rows in this filter.')));
-  body.appendChild(el('div',{class:'table-wrap bk-tw'},el('table',{class:'bk-t'},el('thead',null,el('tr',null,el('th',{class:'num'},'Row'),el('th',null,'Status'),el('th',null,'Plot'),el('th',null,'What changes · day values in t'))),tb)));
+    plotCell.className='bk-plotc';
+    tb.appendChild(el('tr',{class:'bk-r-'+cls},el('td',{class:'num calc bk-rn'},String(row.r)),el('td',{class:'bk-stc'},el('span',{class:'bk-st bk-c '+cls},lbl)),plotCell,cells))});
+  /* empty state: a plain wrapping paragraph, not a table row (no clipping on narrow phones) */
+  if(!rows.length)body.appendChild(el('p',{class:'bk-empty calc'},W.filter==='all'?'Your file has no changes against the plan you downloaded.':'No rows in this filter.'));
+  else body.appendChild(el('div',{class:'table-wrap bk-tw'},el('table',{class:'bk-t'},el('thead',null,el('tr',null,el('th',{class:'num'},'Row'),el('th',null,'Status'),el('th',null,'Plot'),el('th',null,'What changes · day values in t'))),tb)));
   if(rows.length>LIM)body.appendChild(el('div',{class:'calc',style:'font-size:12px'},`Showing the first ${LIM} of ${rows.length} rows. Use the filters above to narrow.`));
   body.appendChild(el('div',{class:'legendrow',style:'margin-top:8px'},el('span',{class:'bk-c add'},'8'),' new value',el('span',{class:'bk-c chg'},el('s',null,'6'),' → 8'),' change',el('span',{class:'bk-c clr'},el('s',null,'6'),' → – ⌫'),' cleared (blank in file)',el('span',{class:'bk-c err'},'✖'),' error, skipped',el('span',{class:'bk-c lk'},'🔒'),' past day, locked'));
   if(S.errors){const cb=el('input',{type:'checkbox',id:'bkSkip',checked:W.skipErr,onchange:e=>{W.skipErr=e.target.checked;rerenderReview()}});
