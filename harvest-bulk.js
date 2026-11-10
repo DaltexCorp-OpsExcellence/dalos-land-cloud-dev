@@ -285,14 +285,20 @@ function openWizard(){
   C.modal(`<div class="mh"><div><h3>Upload plan</h3><div class="meta bkmeta">Daily plan: Raw PK tonnes per plot per day, from one spreadsheet. Nothing is saved until you press Apply, and the whole upload can be undone.</div></div><button class="x" aria-label="Close">×</button></div>
     <nav class="bk-steps" id="bkSteps" aria-label="Upload steps"></nav><div class="mb bk" id="bkBody"></div><div class="mf bk" id="bkFoot"></div><input id="bkDirty" style="display:none" aria-hidden="true" tabindex="-1">`);
   const m=document.querySelector('#modalRoot .modal');if(m){m.classList.add('bkm');if(m.parentElement)m.parentElement.classList.add('bkovl')}
+  if(m&&window.ResizeObserver){const ro=new ResizeObserver(()=>{if(!m.isConnected){ro.disconnect();return}footSoon()});ro.observe(m)}
   draw()}
+/* toasts sit just above the dialog footer while the dialog is open (CSS reads --bk-foot): distance from the footer top to the screen bottom */
+function placeToasts(){const f=document.getElementById('bkFoot');if(!f)return;
+  document.documentElement.style.setProperty('--bk-foot',Math.max(0,Math.round(innerHeight-f.getBoundingClientRect().top))+'px')}
+let ftT=0;function footSoon(){if(!ftT)ftT=requestAnimationFrame(()=>{ftT=0;placeToasts()})}
+addEventListener('resize',footSoon);
 function setDirty(on){const d=document.getElementById('bkDirty');if(d)d.value=on?'1':''}
 function draw(){const st=document.getElementById('bkSteps'),body=document.getElementById('bkBody'),foot=document.getElementById('bkFoot');if(!st||!body)return;
   clear(st);STEPS.forEach((s,i)=>st.appendChild(el('span',{class:'bk-step'+(i+1<W.step?' done':'')+(i+1===W.step?' cur':''),'aria-current':i+1===W.step?'step':null},el('i',null,i+1<W.step?'✓':String(i+1)),s)));
   st.appendChild(el('span',{class:'bk-stepc','aria-current':'step'},`${W.step}/${STEPS.length} ${STEPS[W.step-1]}`));   /* phones: one compact line ("2/3 Review") instead of the 3 steps; CSS shows one or the other */
   clear(body);clear(foot);
   if(W.step===1)step1(body,foot);else if(W.step===2)step2(body,foot);else step3(body,foot);
-  body.scrollTop=0}
+  body.scrollTop=0;footSoon()}
 function msgBox(lvl,...kids){return el('div',{class:'bk-box '+lvl,role:lvl==='red'?'alert':'status'},...kids)}
 
 /* ---------- step 1 ---------- */
@@ -382,7 +388,7 @@ function rowMatches(row,f){if(f==='all')return true;
   if(f==='stale')return row.out.some(o=>o.kind==='stale');
   if(f==='past')return row.out.some(o=>o.kind==='past');
   return row.out.some(o=>o.kind===f)}
-function rerenderReview(){classify();const b=document.getElementById('bkBody'),ft=document.getElementById('bkFoot');if(!b)return;const y=b.scrollTop;clear(b);clear(ft);step2(b,ft);b.scrollTop=y}
+function rerenderReview(){classify();const b=document.getElementById('bkBody'),ft=document.getElementById('bkFoot');if(!b)return;const y=b.scrollTop;clear(b);clear(ft);step2(b,ft);b.scrollTop=y;footSoon()}
 function step2(body,foot){const S=W.sum,P=W.parse;
   body.appendChild(el('div',{class:'bk-filehead'},el('span',{class:'bk-ic',"aria-hidden":'true'},'XLSX'),
     el('div',{style:'flex:1;min-width:0'},el('div',{class:'bk-file',text:P.file.name}),

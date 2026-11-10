@@ -7,7 +7,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.110.8/dist/umd/supabase.js"></script>
 <script src="shell.js?cb=8"></script>
 <!-- daily plan bulk upload; lazy-loads SheetJS 0.20.3 (cdn.sheetjs.com) + ExcelJS 4.4.0 with SRI on first use -->
-<script src="harvest-bulk.js?cb=2"></script>
+<script src="harvest-bulk.js?cb=3"></script>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Mono:wght@400;500&family=Instrument+Sans:wght@400;500;600&family=Space+Grotesk:wght@400;500;600;700&family=Noto+Sans+Arabic:wght@400;500;600&display=swap">
 <style>
 /* Layout: Land Cloud shell — dark teal sidebar, sticky topbar + filter bar, dense plot tables. Tokens copied from dalos-land-cloud. */
@@ -461,7 +461,7 @@ body.present .page{padding:0 0 32px;gap:0}
 .bk-sc.err,.bk-c.err{background:var(--red-bg);color:var(--red);border-color:var(--red-border)}
 .bk-sc.lk,.bk-c.lk{background:var(--bg2);color:var(--text3)}
 .bk-st{font-family:var(--font-body);font-weight:700;font-size:11px}
-.bk-tw{max-height:52vh;margin-top:4px}
+.bk-tw{margin-top:4px}
 .bk-t td{white-space:normal;vertical-align:top}.bk-t td.bk-cells{min-width:260px}
 .bk-t tr.bk-r-err td:first-child{box-shadow:inset 3px 0 0 var(--red)}.bk-t tr.bk-r-amb td:first-child{box-shadow:inset 3px 0 0 var(--amber)}
 .bk-msg{font-size:12.5px;margin:2px 0 4px;font-family:var(--font-body)}.bk-msg.red{color:var(--red);font-weight:600}.bk-msg.amber{color:var(--amber);font-weight:600}
@@ -483,12 +483,21 @@ body.present .page{padding:0 0 32px;gap:0}
 .modal.bkm{display:flex;flex-direction:column;max-height:88vh;max-height:88dvh;min-width:0}   /* min-width:0: the review table's own width must not widen the dialog past the screen (it scrolls in .bk-tw) */
 .modal.bkm>.mh,.modal.bkm>.bk-steps,.modal.bkm>.mf{flex:none}
 .modal.bkm>.mb{flex:1 1 auto;min-height:0;min-width:0;overflow:auto;overscroll-behavior:contain}
-.bk-tw{max-width:100%;overflow-x:auto}
+/* review table: grows to its content and scrolls with the dialog body (no nested vertical scroll box); only its sideways scroll stays
+   inside its own wrapper. Every body child keeps its natural height (flex-shrink:0), so nothing is squeezed when the body is short. */
+.modal.bkm>.mb>*{flex-shrink:0}
+.table-wrap.bk-tw{max-width:100%;max-height:none;overflow-x:auto;overflow-y:hidden}
+/* page behind the open upload dialog does not scroll */
+body:has(#modalRoot .bkovl){overflow:hidden}
+/* while the upload dialog is open every toast sits at the bottom, just above the dialog footer (--bk-foot, set by harvest-bulk.js),
+   so it never covers the dialog header or the Back / Next / Apply buttons */
+body:has(#modalRoot .bkovl) .toast,body:has(#modalRoot .bkovl) .toast.live-n,body:has(#modalRoot .bkovl) .toast.err{top:auto;bottom:calc(var(--bk-foot,96px) + 10px);left:50%;right:auto;transform:translateX(-50%);max-width:min(640px,calc(100vw - 24px));width:max-content}
+body:has(#modalRoot .bkovl) .toast.err+.toast.err{top:auto;bottom:calc(var(--bk-foot,96px) + 66px)}
 .bkm .mh .x{width:44px;height:44px;flex:none;margin-left:auto}
 .modal.bkm>.mf{background:var(--card);border-radius:0 0 14px 14px;padding-bottom:max(12px,env(safe-area-inset-bottom))}
 .bk-stepc{display:none}
 .mh .meta.bkmeta{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;overflow:hidden}
-@media (max-width:700px){
+@media (max-width:768px){
   .ovl.bkovl{padding:0;align-items:stretch;overflow:hidden}
   .modal.bkm{width:100%;height:100vh;height:100dvh;max-height:100vh;max-height:100dvh;border-radius:0;border:0}
   .modal.bkm>.mf{border-radius:0}
@@ -510,7 +519,10 @@ body.present .page{padding:0 0 32px;gap:0}
 .bkconf .mf{flex-wrap:wrap}
 @media (max-width:480px){.bkconf .mf .btn{flex:1 1 0;min-width:0;white-space:normal}}
 /* phones/tablets: the page never scrolls sideways; wide tables scroll inside their own box (desktop unchanged) */
-@media (max-width:860px){.page>*{max-width:100%;min-width:0}.page .table-wrap{max-width:100%}}
+@media (max-width:860px){.page>*{max-width:100%;min-width:0}.page .table-wrap{max-width:100%}
+  /* safety net: anything still wider than the screen is clipped instead of making the whole page scroll sideways
+     (clip, not hidden: no new scroll box, so sticky headers keep working) */
+  .main{overflow-x:clip}}
 </style>
 
 <div class="app">
@@ -895,7 +907,11 @@ function alignRail(){const rl=document.getElementById('drail'),m=document.queryS
     if(R-L<mt)L=R-mt;
     rl.style.marginLeft=Math.max(0,L-2*bw-base)+'px';rl.style.width=(R-L+2*bw)+'px';rl.style.visibility='';placeLbl(rl);return}
   if(R-L<120){L=minL;R=maxR}
-  rl.style.marginLeft=Math.max(0,L-bw-base)+'px';rl.style.width=Math.max(160,R-L+2*bw)+'px';rl.style.visibility='';placeLbl(rl)}
+  /* the right chevron sits 44px right of the last visible day; when the days reach the grid's right edge (tablets, where the grid scrolls)
+     that pushed the rail past the page and the whole page scrolled sideways. Never let the rail end past the page's content edge.
+     No-op whenever the rail already fits (wide desktop). */
+  const ml=Math.max(0,L-bw-base),pg=rl.parentElement,pr=pg?pg.getBoundingClientRect().right-(parseFloat(getComputedStyle(pg).paddingRight)||0):Infinity;
+  rl.style.marginLeft=ml+'px';rl.style.width=Math.max(160,Math.min(R-L+2*bw,pr-base-ml))+'px';rl.style.visibility='';placeLbl(rl)}
 /* label starts at the track (as before); only if the track is narrower than the label does it slide left over the chevrons, never past the rail's right end */
 function placeLbl(rl){const lb=rl.querySelector('.drail-lbl'),tr=rl.querySelector('.drail-track');if(!lb||!tr)return;
   lb.style.left=Math.max(0,Math.min(tr.offsetLeft,rl.clientWidth-lb.offsetWidth))+'px'}
