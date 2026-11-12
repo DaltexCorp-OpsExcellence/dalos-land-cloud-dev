@@ -208,7 +208,18 @@
   const canClearPlot = (p) => limits().clear_enabled === true && !!p && !!p.existing && !!seenVersion(p) && !isLockedPlot(p);
   const unlockedCards = () => S.cards.filter((c) => !cardLocked(c));
   const isEmptyCard = (c) => !c.blockId && !c.clear && FIELDS.every((f) => normDigits(c.vals[f]) === '');
-  const sendable = () => unlockedCards().filter((c) => !isEmptyCard(c));
+  // An auto-added existing card whose four numbers still match the server is left out of
+  // /submit and the footer (✏️ replaces only the edited entry; the others stay as they are).
+  function sameAsExisting(c) {
+    if (c.clear || !c.blockId) return false;
+    const p = plotOf(c.blockId);
+    if (!p || !p.existing) return false;
+    return FIELDS.every((f) => {
+      const q = parseQty(c.vals[f]);
+      return !q.blank && !q.bad && isNum(q.n) && isNum(p.existing[f]) && r2(p.existing[f]) === r2(q.n);
+    });
+  }
+  const sendable = () => unlockedCards().filter((c) => !isEmptyCard(c) && !sameAsExisting(c));
   function unusedPlots(except) {
     const f = curFarm();
     if (!f) return [];
@@ -516,7 +527,7 @@
     }
 
     const badges = h('div', 'badge-row');
-    if (p && p.existing) badges.appendChild(h('span', 'pill warn', 'مسجل قبل كده · هيتم الاستبدال'));
+    if (p && p.existing) badges.appendChild(h('span', 'pill warn js-replace-pill', 'مسجل قبل كده · هيتم الاستبدال'));
     if (c.stale) badges.appendChild(h('span', 'pill err', 'الأرقام اتغيرت'));
     if (badges.childNodes.length) sec.appendChild(badges);
     add(sec, [h('div', 'card-head', h('h2', null, attr(h('label', null, 'حوشة ' + idx), { for: pre + '-p' }))), removeBtn]);
@@ -608,6 +619,13 @@
       c.el.inputs[f].disabled = c.clear || S.submitting;
     });
     c.el.sel.disabled = S.submitting;
+    const pill = c.el.sec.querySelector('.js-replace-pill');
+    if (pill && p && p.existing && !c.clear) {
+      const keep = sameAsExisting(c);
+      pill.className = (keep ? 'pill ok' : 'pill warn') + ' js-replace-pill';
+      clearEl(pill);
+      pill.appendChild(document.createTextNode(keep ? 'مسجل قبل كده' : 'مسجل قبل كده · هيتم الاستبدال'));
+    }
     const n = c.el.notes;
     clearEl(n);
     if (c.clear) {
@@ -619,6 +637,9 @@
     if (srv) srv.notes.forEach((x) => n.appendChild(h('div', 'note red', x.msg, x.code ? h('span', 'code', x.code) : null)));
     if (r.warn != null) {
       n.appendChild(h('div', 'note amber', 'هالك أعلى من ' + fmt(wastePct()) + '٪ (', num(Math.round(r.warn) + '%'), ' من إجمالي اليوم).'));
+    }
+    if (sameAsExisting(c) && !c.stale) {
+      n.appendChild(h('div', 'note quiet', 'نفس الأرقام المسجلة، مش هتتبعت. غيّر رقم عشان تستبدل.'));
     }
   }
 
@@ -633,7 +654,7 @@
       if (b.retry) body.appendChild(button('btn-retry', 'حاول تاني', () => { onSend(); }));
       box.appendChild(attr(h('div', 'banner ' + b.kind, h('div', 'ico', '!'), body), { role: b.kind === 'red' ? 'alert' : 'status' }));
     }
-    const repl = unlockedCards().filter((c) => { const p = plotOf(c.blockId); return p && p.existing && !c.clear; });
+    const repl = sendable().filter((c) => { const p = plotOf(c.blockId); return p && p.existing && !c.clear; });
     if (repl.length) {
       const today = cairoToday();
       const isToday = S.form.day === today;
