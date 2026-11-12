@@ -4,7 +4,23 @@
    Token: read once from #t=, kept in memory, stripped from the address bar. No logging of any kind.
    DOM: createElement / textContent only. */
 (() => {
+  // Frame guard (Ash): if this page is embedded, render a blank body and make no network calls.
+  // Accessing window.top can throw in some cross-origin iframes; treat that as framed too.
+  function isFramed() {
+    try { return window.top !== window.self; } catch (e) { return true; }
+  }
+  if (isFramed()) {
+    try { history.replaceState(null, '', location.pathname); } catch (e) {}
+    const blank = function () { if (document.body) document.body.replaceChildren(); };
+    if (document.body) blank();
+    else document.addEventListener('DOMContentLoaded', blank);
+    return;
+  }
+
   // ───────── token: capture first, strip from the address bar ─────────
+  // Shape matches the deployed harvest-link edge function (TOKEN_RE / newToken):
+  // 32-byte secret as base64url with no padding → exactly 43 chars, [A-Za-z0-9_-].
+  const TOKEN_RE = /^[A-Za-z0-9_-]{43}$/;
   let TOKEN = '';
   function captureToken() {
     const raw = location.hash || '';
@@ -12,7 +28,7 @@
     let t = '';
     try { t = new URLSearchParams(raw.slice(1)).get('t') || ''; } catch (e) { t = ''; }
     history.replaceState(null, '', location.pathname);
-    TOKEN = t.slice(0, 128);
+    TOKEN = TOKEN_RE.test(t) ? t : '';
     return true;
   }
   captureToken();
@@ -404,6 +420,7 @@
     renderForm();
   }
   async function openForm(day) {
+    if (!TOKEN_RE.test(TOKEN)) { showLinkGone(); return; }
     const my = ++loadSeq;
     showLoading();
     const body = { token: TOKEN };
@@ -774,6 +791,7 @@
   }
 
   async function onSend() {
+    if (!TOKEN_RE.test(TOKEN)) { showLinkGone(); return; }
     if (S.submitting || !S.form) return;
     const send = sendable();
     const evals = send.map((c) => ({ c, r: evalCard(c) }));
@@ -942,14 +960,17 @@
   }
 
   // ───────── boot ─────────
+  // Missing, empty, or wrong-shape tokens never reach /form; show the generic expired screen.
+  function startForm() {
+    S.farmId = null;
+    S.cards = [];
+    S.sent = null;
+    S.banner = null;
+    if (!TOKEN_RE.test(TOKEN)) showLinkGone();
+    else openForm(null);
+  }
   window.addEventListener('hashchange', () => {
-    if (captureToken()) {
-      S.farmId = null;
-      S.cards = [];
-      S.sent = null;
-      S.banner = null;
-      openForm(null);
-    }
+    if (captureToken()) startForm();
   });
-  openForm(null);
+  startForm();
 })();
