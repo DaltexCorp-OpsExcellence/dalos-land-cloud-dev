@@ -607,7 +607,7 @@
           if (S.submitting) return;
           dialog({
             kicker: 'تأكيد تاني', title: 'مسح يوم الحوشة', danger: true, ok: 'امسح',
-            body: ['متأكد إنك عايز تمسح تسجيل ', code(plotLabel(p)), ' ليوم ', dayNodes(S.form.day, false, false), '؟'],
+            body: ['متأكد إنك عايز تمسح تسجيل', attr(h('span', 'code plot-name', plotLabel(p)), { dir: 'ltr' }), ['ليوم ', dayNodes(S.form.day, false, false), '؟']],
           }, () => { c.clear = true; c.edited = true; c.srv = null; c.stale = false; renderForm(); });
         }));
       }

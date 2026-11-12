@@ -11,7 +11,7 @@
   --bg:#eef1f0;--bg2:#e0e8e6;--bg3:#cedad7;
   --sidebar:#0e3a3d;--sidebar2:#164c4f;--sidebar-text:#bdd8d6;--sidebar-muted:#5f8583;
   --accent:#0d6a68;--accent2:#159490;--accent-bg:#dcefed;
-  --amber:#b87820;--amber-bg:#fdf3e0;--amber-border:#e8c87a;
+  --amber:#b87820;--amber-bg:#fdf3e0;--amber-border:#e8c87a;--amber-ink:#7a4e12;
   --red:#b03030;--red-bg:#faeaea;--red-border:#e8a0a0;
   --green:#1e6b3a;--green-bg:#e8f5ec;--green-border:#8ecba4;
   --text:#111f1f;--text2:#3b4b4a;--text3:#5a6968;--skel-a:#e0e8e6;--skel-b:#cedad7;--past-mix:45%;--grp-bg:#cfe3e0;--grp-fg:#0e3a3d;--grp-line:#9fc4bf;--act-c:#0b6b5f;--plan-c:#6a2fb8;
@@ -25,23 +25,24 @@
 }
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
   --bg:#0f1b1c;--bg2:#172728;--bg3:#203436;--accent:#2a9a96;--accent2:#3bb3ae;--accent-bg:#173a3a;
-  --amber:#e0a54a;--amber-bg:#33280f;--amber-border:#6b5320;--red:#e27a7a;--red-bg:#3a1c1c;--red-border:#743434;
+  --amber:#e0a54a;--amber-bg:#33280f;--amber-border:#6b5320;--amber-ink:#e0a54a;--red:#e27a7a;--red-bg:#3a1c1c;--red-border:#743434;
   --green:#6cc58e;--green-bg:#15301f;--green-border:#2f6a44;--text:#e6efee;--text2:#bfcfcd;--text3:#8a9d9b;
   --border:#2a3e3f;--border2:#3a5355;--card:#142223;--subtot:#232a26;--subtot-text:#cfc9bb;--shadow:0 10px 30px rgba(0,0,0,.5);--skel-a:#1f3436;--skel-b:#2d4749;--past-mix:75%;--grp-bg:#1d4446;--grp-fg:#e6f3f1;--grp-line:#2f6264;--act-c:#5fd3bf;--plan-c:#cfaaff;color-scheme:dark}}
 :root[data-theme="dark"]{
   --bg:#0f1b1c;--bg2:#172728;--bg3:#203436;--accent:#2a9a96;--accent2:#3bb3ae;--accent-bg:#173a3a;
-  --amber:#e0a54a;--amber-bg:#33280f;--amber-border:#6b5320;--red:#e27a7a;--red-bg:#3a1c1c;--red-border:#743434;
+  --amber:#e0a54a;--amber-bg:#33280f;--amber-border:#6b5320;--amber-ink:#e0a54a;--red:#e27a7a;--red-bg:#3a1c1c;--red-border:#743434;
   --green:#6cc58e;--green-bg:#15301f;--green-border:#2f6a44;--text:#e6efee;--text2:#bfcfcd;--text3:#8a9d9b;
   --border:#2a3e3f;--border2:#3a5355;--card:#142223;--subtot:#232a26;--subtot-text:#cfc9bb;--shadow:0 10px 30px rgba(0,0,0,.5);--skel-a:#1f3436;--skel-b:#2d4749;--past-mix:75%;--grp-bg:#1d4446;--grp-fg:#e6f3f1;--grp-line:#2f6264;--act-c:#5fd3bf;--plan-c:#cfaaff;color-scheme:dark}
 
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; margin: 0; padding: 0; }
 [hidden] { display: none !important; }
 
-html { background: var(--bg); }
-body {
-  min-height: 100vh;
-  min-height: 100dvh;
+html, body {
+  height: 100%;
+  overflow: hidden;
   background: var(--bg);
+}
+body {
   color: var(--text);
   font-family: var(--font-body);
   font-size: 14px;
@@ -73,8 +74,9 @@ input, select { min-width: 0; max-width: 100%; }
 .app {
   display: flex;
   flex-direction: column;
-  min-height: 100vh;
-  min-height: 100dvh;
+  height: 100dvh;
+  max-height: 100%;
+  overflow: hidden;
   max-width: 560px;
   margin-inline: auto;
   background: var(--bg);
@@ -135,13 +137,13 @@ input, select { min-width: 0; max-width: 100%; }
   width: 100%;
   height: 44px;
   font-family: var(--font-body);
-  font-size: 13px;
+  font-size: 16px;
   font-weight: 600;
   color: #fff;
   background-color: var(--sidebar2);
   border: 1px solid rgba(189, 216, 214, 0.28);
   border-radius: var(--r);
-  padding-inline: 10px 28px;
+  padding-inline: 8px 26px;
   appearance: none;
   -webkit-appearance: none;
 }
@@ -151,11 +153,11 @@ input, select { min-width: 0; max-width: 100%; }
   background-position: left 10px center;
 }
 .field-mini input[type="date"] {
-  padding-inline: 10px;
+  padding-inline: 8px;
   color-scheme: dark;
   display: flex;
   align-items: center;
-  line-height: 42px;
+  line-height: 1.2;
 }
 .field-mini .date-box {
   display: flex;
@@ -168,13 +170,19 @@ input, select { min-width: 0; max-width: 100%; }
 .field-mini select:disabled, .field-mini input:disabled { opacity: 0.7; }
 
 .form-main {
-  flex: 1 1 auto;
-  padding: 8px 12px 12px;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 8px 12px 16px;
 }
 
 /* ===== Loading / status ===== */
 .center-body {
-  flex: 1 1 auto;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
   padding: 14px 12px 24px;
 }
 .center-body.mid {
@@ -376,7 +384,7 @@ select.plot.bad, .qty-box.bad {
   padding: 1px 7px;
   line-height: 1.4;
 }
-.pill.warn { background: var(--amber-bg); color: var(--amber); border: 1px solid var(--amber-border); }
+.pill.warn { background: var(--amber-bg); color: var(--amber-ink); border: 1px solid var(--amber-border); }
 .pill.ok { background: var(--green-bg); color: var(--green); border: 1px solid var(--green-border); }
 .pill.err { background: var(--red-bg); color: var(--red); border: 1px solid var(--red-border); }
 .pill.lock {
@@ -423,7 +431,9 @@ select.plot.bad, .qty-box.bad {
   flex: 1 1 auto;
   min-width: 0;
   width: 100%;
-  height: 40px;
+  height: 44px;
+  min-height: 44px;
+  margin-block: -1px -3px;
   border: 0;
   background: transparent;
   font-family: var(--font-num);
@@ -450,7 +460,7 @@ select.plot.bad, .qty-box.bad {
   font-weight: 600;
   line-height: 1.35;
 }
-.note.amber { background: var(--amber-bg); color: var(--amber); border: 1px solid var(--amber-border); }
+.note.amber { background: var(--amber-bg); color: var(--amber-ink); border: 1px solid var(--amber-border); }
 .note.red { background: var(--red-bg); color: var(--red); border: 1px solid var(--red-border); }
 .note.ok { background: var(--green-bg); color: var(--green); border: 1px solid var(--green-border); }
 .note.quiet {
@@ -496,7 +506,7 @@ select.plot.bad, .qty-box.bad {
   padding: 8px 10px;
   margin-block-end: 8px;
 }
-.replace-banner, .banner.amber { background: var(--amber-bg); border: 1px solid var(--amber-border); color: var(--amber); }
+.replace-banner, .banner.amber { background: var(--amber-bg); border: 1px solid var(--amber-border); color: var(--amber-ink); }
 .banner.red { background: var(--red-bg); border: 1px solid var(--red-border); color: var(--red); }
 .banner.ok { background: var(--green-bg); border: 1px solid var(--green-border); color: var(--green); }
 .replace-banner .ico, .banner .ico {
@@ -538,10 +548,9 @@ select.plot.bad, .qty-box.bad {
   font-weight: 600;
 }
 
-/* ===== Sticky footer (review step) ===== */
+/* ===== Footer (non-overlapping sibling of .form-main) ===== */
 .sticky {
-  position: sticky;
-  bottom: 0;
+  position: relative;
   z-index: 5;
   flex: 0 0 auto;
   background: var(--bg);
@@ -557,7 +566,7 @@ select.plot.bad, .qty-box.bad {
 .sticky-warn {
   font-size: 12px;
   font-weight: 600;
-  color: var(--amber);
+  color: var(--amber-ink);
   margin-block-end: 7px;
   line-height: 1.4;
   max-height: 30vh;
@@ -594,8 +603,8 @@ select.plot.bad, .qty-box.bad {
 .btn.pri .num { padding-inline: 0.12em; }
 .btn.pri.is-disabled, .btn.pri:disabled {
   background: var(--bg3);
-  border-color: var(--bg3);
-  color: var(--text3);
+  border-color: var(--border2);
+  color: var(--text2);
 }
 .btn.ghost {
   width: 100%;
@@ -732,6 +741,20 @@ select.plot.bad, .qty-box.bad {
 .dialog .kicker.info { color: var(--accent); }
 .dialog h3 { font-size: 15.5px; font-weight: 600; color: var(--text); margin-block-end: 6px; line-height: 1.35; }
 .dialog p { font-size: 13px; font-weight: 500; color: var(--text2); line-height: 1.5; }
+.dialog .plot-name {
+  display: block;
+  direction: ltr;
+  unicode-bidi: isolate;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+  margin-block: 4px;
+  font-family: var(--font-mono);
+  font-weight: 500;
+  color: var(--text);
+  text-align: start;
+}
 .dialog-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-block-start: 12px; }
 .dialog .btn {
   height: 44px;
