@@ -576,6 +576,8 @@ select.plot.bad, .qty-box.bad {
 .sticky-warn .row { font-weight: 500; color: var(--text2); font-size: 11.5px; margin-block-start: 2px; }
 .sticky-warn .row .code { font-size: 11px; }
 .sticky-warn .gone { color: var(--red); font-weight: 600; }
+/* P3: keep the number and ط together in the replace-footer old→new row at 360px. */
+.sticky-warn .row .qty-unit { white-space: nowrap; }
 
 .btn {
   border-radius: var(--r);

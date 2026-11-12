@@ -193,7 +193,7 @@
 
   // ───────── state ─────────
   const S = {
-    form: null, farms: [], farmId: null, cards: [], seq: 0,
+    form: null, farms: [], farmId: null, lockedFarm: null, cards: [], seq: 0,
     attempted: false, submitting: false, banner: null, submissions: [], sent: null,
     els: null,
   };
@@ -406,7 +406,11 @@
     S.submitting = false;
     S.farms = normFarms(d);
     S.submissions = Array.isArray(d.submissions) ? d.submissions.filter((x) => x && typeof x === 'object') : [];
-    if (!S.farms.some((f) => f.id === S.farmId)) {
+    const lf = d.farm && typeof d.farm === 'object' && typeof d.farm.farm_id === 'string' ? d.farm : null;
+    S.lockedFarm = lf ? { id: lf.farm_id, name: typeof lf.name === 'string' ? lf.name : '' } : null;
+    if (S.lockedFarm) {
+      S.farmId = S.lockedFarm.id;
+    } else if (!S.farms.some((f) => f.id === S.farmId)) {
       const firstWithPlots = S.farms.find((f) => f.plots.length);
       S.farmId = firstWithPlots ? firstWithPlots.id : (S.farms[0] ? S.farms[0].id : null);
     }
@@ -439,20 +443,28 @@
       return;
     }
     const farmSel = attr(h('select'), { id: 'farm' });
-    S.farms.forEach((f) => {
-      const o = attr(h('option', null, f.name || '—'), { value: f.id });
-      if (f.id === S.farmId) o.selected = true;
+    if (S.lockedFarm) {
+      const o = attr(h('option', null, S.lockedFarm.name || '—'), { value: S.lockedFarm.id });
+      o.selected = true;
       farmSel.appendChild(o);
-    });
-    farmSel.addEventListener('change', () => {
-      const v = farmSel.value;
-      if (v === S.farmId) return;
-      const go = () => { S.farmId = v; S.banner = null; initCards(); renderForm(); };
-      if (isDirty()) {
-        dialog({ kicker: 'تغيير المزرعة', title: 'هتغيّر المزرعة؟', body: 'الأرقام اللي كتبتها هتتمسح.', ok: 'غيّر' },
-          go, () => { farmSel.value = S.farmId; });
-      } else go();
-    });
+      farmSel.disabled = true;
+      attr(farmSel, { 'aria-disabled': 'true' });
+    } else {
+      S.farms.forEach((f) => {
+        const o = attr(h('option', null, f.name || '—'), { value: f.id });
+        if (f.id === S.farmId) o.selected = true;
+        farmSel.appendChild(o);
+      });
+      farmSel.addEventListener('change', () => {
+        const v = farmSel.value;
+        if (v === S.farmId) return;
+        const go = () => { S.farmId = v; S.banner = null; initCards(); renderForm(); };
+        if (isDirty()) {
+          dialog({ kicker: 'تغيير المزرعة', title: 'هتغيّر المزرعة؟', body: 'الأرقام اللي كتبتها هتتمسح.', ok: 'غيّر' },
+            go, () => { farmSel.value = S.farmId; });
+        } else go();
+      });
+    }
     const day = typeof S.form.day === 'string' ? S.form.day : '';
     const dayIn = attr(h('input'), {
       id: 'day', type: 'date',
@@ -480,7 +492,10 @@
     const bannerBox = h('div', 'banners');
     const cardsBox = h('div', 'cards');
     const farm = curFarm();
-    if (farm && !farm.plots.length) cardsBox.appendChild(h('div', 'note quiet', 'مفيش حوش في المزرعة دي، اختار مزرعة تانية.'));
+    if (farm && !farm.plots.length) {
+      cardsBox.appendChild(h('div', 'note quiet',
+        S.lockedFarm ? 'مفيش حوش في المزرعة دي، كلّم المسؤول.' : 'مفيش حوش في المزرعة دي، اختار مزرعة تانية.'));
+    }
     S.cards.forEach((c, i) => cardsBox.appendChild(buildCard(c, i + 1)));
     const addBtn = button('btn-add', '+ حوشة تانية', () => {
       if (addBtn.disabled || S.submitting) return;
@@ -703,7 +718,7 @@
           if (!ch.length) row.appendChild(document.createTextNode('نفس الأرقام'));
           ch.forEach((f, i) => {
             if (i) row.appendChild(document.createTextNode(' · '));
-            add(row, [FIELD_AR[f] + ' كان ', num(isNum(p.existing[f]) ? fmt(p.existing[f]) : '—'), ' ط، هيبقى ', num(fmt(r.nums[f])), ' ط']);
+            add(row, [FIELD_AR[f] + ' كان ', h('span', 'qty-unit', num(isNum(p.existing[f]) ? fmt(p.existing[f]) : '—'), ' ط'), '، هيبقى ', h('span', 'qty-unit', num(fmt(r.nums[f])), ' ط')]);
           });
         } else {
           row.appendChild(document.createTextNode('الأرقام مش كاملة'));
@@ -963,6 +978,7 @@
   // Missing, empty, or wrong-shape tokens never reach /form; show the generic expired screen.
   function startForm() {
     S.farmId = null;
+    S.lockedFarm = null;
     S.cards = [];
     S.sent = null;
     S.banner = null;
