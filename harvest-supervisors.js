@@ -9,7 +9,13 @@
   // ---------------------------------------------------------------- rules (must match the RPCs)
   var E164_RE=/^\+[1-9][0-9]{7,14}$/;
   var UUID_RE=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-  var NAME_MAX=80, FARMS_MAX=30, CAP_MIN=1, CAP_MAX=50, CAP_DEFAULT=6;
+  var NAME_MAX=80, FARMS_MAX=30, CAP_MIN=1, CAP_MAX=50, CAP_DEFAULT=6, NOTE_MAX=500;
+
+  // Client copy of the protected-owner id hard-coded in the v0.2 hl_admin_supervisors_update /
+  // hl_admin_supervisors_set_active RPCs. hl_admin_supervisors_list does not expose a "protected" flag yet,
+  // so the page mirrors this one documented UUID only to disable controls; the RPC is still the authority.
+  // Replace with a list field once the contract has one. Never hard-code the owner's phone or name here.
+  var PROTECTED_OWNER_ID='2a0aef1a-ff3f-4e8d-b203-54ce562a83c7';
 
   var MESSAGES={
     not_admin:'Only Land Cloud admins can manage harvest supervisors.',
@@ -17,8 +23,9 @@
     bad_name:'Enter a display name of 1 to 80 characters.',
     bad_farms:'Pick between 1 and 30 farms, all from the active farm list.',
     bad_cap:'Daily limit must be a whole number from 1 to 50.',
-    bad_note:'The note was not accepted.',
+    bad_note:'The note must be at most 500 characters.',
     duplicate_phone:'Another supervisor already uses this phone number.',
+    protected_owner:'This supervisor is protected: the phone cannot be changed and they cannot be turned off.',
     not_found:'This supervisor was not found. Refresh the list and try again.',
     bad_request:'The request was not valid. Refresh the page and try again.',
     rpc_missing:'The supervisor admin functions are not available on the database yet. Nothing has been changed.',
@@ -67,6 +74,40 @@
     return {ok:true,phone:phone,name:name,farmIds:ids.slice(),cap:cap};
   }
 
+  // noteForSave(text) -> {ok:true, note:string|null} | {ok:false, code:'bad_note'}
+  // The note is per-change: it is stored only on the audit row of the write that sends it.
+  // Empty / whitespace -> null (omit p_note). Length counted in characters (code points), max 500.
+  function noteForSave(text){
+    if(text==null) return {ok:true, note:null};
+    if(typeof text!=='string') return {ok:false, code:'bad_note'};
+    var t=text.trim();
+    if(!t) return {ok:true, note:null};
+    if(Array.from(t).length>NOTE_MAX) return {ok:false, code:'bad_note'};
+    return {ok:true, note:t};
+  }
+
+  // isProtectedOwner(row | id) — case-insensitive compare against PROTECTED_OWNER_ID
+  function isProtectedOwner(x){
+    var id=isObj(x)?x.id:x;
+    if(typeof id!=='string') return false;
+    return lc(id.trim())===PROTECTED_OWNER_ID;
+  }
+
+  // duplicateOffer(result, selfId) -> null | {id, active:true|false|null, canRevive}
+  // A duplicate_phone failure that names a *different* existing supervisor, so the page can offer
+  // "Edit existing" / "Turn back on" instead of a dead-end field error. Old shape (no id) -> null.
+  function duplicateOffer(r, selfId){
+    if(!isObj(r) || r.ok===true || r.code!=='duplicate_phone') return null;
+    if(r.id==null || r.id==='') return null;
+    var id=String(r.id);
+    if(selfId!=null && lc(id)===lc(String(selfId))) return null;
+    var active=r.active===true?true:(r.active===false?false:null);
+    return {id:id, active:active, canRevive:active===false};
+  }
+
+  // After a successful list, a failed *quiet* reload keeps the table instead of emptying it.
+  function shouldKeepListOnReloadFailure(prevLoaded, quiet){ return !!(prevLoaded && quiet); }
+
   function errorMessage(code, fallback){
     if(typeof code==='string' && Object.prototype.hasOwnProperty.call(MESSAGES,code)) return MESSAGES[code];
     return (typeof fallback==='string' && fallback) ? fallback : GENERIC;
@@ -84,12 +125,20 @@
     return false;
   }
 
+  var NOT_ADMIN_RE=/(^|[^a-z0-9_])not_admin([^a-z0-9_]|$)/i;
+
+  // Thrown errors / supabase-js res.error -> 'rpc_missing' | 'not_admin' | 'network' | 'unexpected'.
+  // v0.2 raises not_admin as SQLSTATE 42501 (PostgREST usually answers HTTP 403).
   function classifyError(err){
+    if(typeof err==='string') err={message:err};
+    if(!err || typeof err!=='object') return 'unexpected';
     if(isRpcMissing(err)) return 'rpc_missing';
-    var code=err && err.code!=null ? String(err.code) : '';
-    if(code==='42501') return 'not_admin';               // permission denied for function
-    var msg=err && typeof err.message==='string' ? err.message : '';
-    if((err && err.name==='TypeError') || /failed to fetch|networkerror|network request failed|load failed/i.test(msg)) return 'network';
+    var code=err.code!=null ? String(err.code) : '';
+    if(code==='42501' || lc(code)==='not_admin') return 'not_admin';
+    var txt=[err.message,err.details,err.hint].filter(function(x){return typeof x==='string';}).join(' ');
+    if(NOT_ADMIN_RE.test(txt)) return 'not_admin';
+    var msg=typeof err.message==='string' ? err.message : '';
+    if(err.name==='TypeError' || /failed to fetch|networkerror|network request failed|load failed/i.test(msg)) return 'network';
     return 'unexpected';
   }
 
@@ -99,6 +148,21 @@
     if(typeof d==='string'){ try{ d=JSON.parse(d); }catch(e){ return null; } }
     if(isObj(d) && !('ok' in d) && fn && isObj(d[fn])) d=d[fn];
     return isObj(d)?d:null;
+  }
+
+  // rpcResult({data,error}, fn) -> the {ok:true,...} body, or {ok:false, code, ...extra body fields}.
+  // When res.error is set the body is not inspected: the code comes from classifyError only.
+  function rpcResult(res, fn){
+    if(!isObj(res)) return {ok:false, code:'unexpected'};
+    if(res.error) return {ok:false, code:classifyError(res.error)};
+    var d=unwrapRpc(res.data, fn);
+    if(!d) return {ok:false, code:'unexpected'};
+    if(d.ok===true) return d;
+    var out={};
+    Object.keys(d).forEach(function(k){ out[k]=d[k]; });   // keep id / active (duplicate_phone) and any other fields
+    out.ok=false;
+    out.code=(typeof d.code==='string' && d.code) ? d.code : 'unexpected';
+    return out;
   }
 
   var CAIRO_FMT=null;
@@ -174,13 +238,22 @@
       return b;
     }
     btn('Edit', 'edit', 'Edit '+who);
-    btn(active?'Turn off':'Turn on', 'toggle', (active?'Turn off ':'Turn on ')+who);
+    if(isProtectedOwner(row) && active){
+      // protected owner cannot be turned off (RPC returns protected_owner); show why instead of a button
+      var lk=doc.createElement('span');
+      lk.className='lock';
+      lk.setAttribute('title', MESSAGES.protected_owner);
+      fillText(lk, 'Protected');
+      pair.appendChild(lk);
+    } else {
+      btn(active?'Turn off':'Turn on', 'toggle', (active?'Turn off ':'Turn on ')+who);
+    }
     return tr;
   }
 
   // ---------------------------------------------------------------- page (only runs after boot())
-  var S={sb:null, home:'/', rows:[], farms:[], loaded:false, missing:null, loadErr:null, busy:false};
-  var modalSeq=0;
+  var S={sb:null, home:'/', rows:[], farms:[], loaded:false, missing:null, loadErr:null, staleErr:null, busy:false};
+  var modalSeq=0, loadSeq=0;
 
   function $(id){ return global.document.getElementById(id); }
   function el(tag, cls, text){
@@ -254,25 +327,30 @@
     var res;
     try{ res=await S.sb.rpc(fn, args||{}); }
     catch(e){ return {ok:false, code:classifyError(e)}; }
-    if(!res) return {ok:false, code:'unexpected'};
-    if(res.error) return {ok:false, code:classifyError(res.error)};
-    var d=unwrapRpc(res.data, fn);
-    if(!d) return {ok:false, code:'unexpected'};
-    if(d.ok!==true) return {ok:false, code:(typeof d.code==='string' && d.code)?d.code:'unexpected'};
-    return d;
+    return rpcResult(res, fn);
   }
 
   async function load(quiet){
+    var seq=++loadSeq;
     if(!quiet) showLoading();
     var r=await call('hl_admin_supervisors_list', {});
+    if(seq!==loadSeq) return;                         // a newer load superseded this one
     if(!r.ok){
-      S.loaded=false; S.rows=[]; S.farms=[];
+      if(shouldKeepListOnReloadFailure(S.loaded, !!quiet)){
+        // quiet refresh after a write: keep the table (incl. the patched row) and show a non-destructive notice
+        S.loadErr=null;
+        if(r.code==='rpc_missing'){ S.missing='write'; S.staleErr=null; }
+        else { S.staleErr=r.code; }
+        renderPage();
+        return;
+      }
+      S.loaded=false; S.rows=[]; S.farms=[]; S.staleErr=null;
       if(r.code==='rpc_missing'){ S.missing='list'; S.loadErr=null; }
       else S.loadErr=r.code;
       renderPage();
       return;
     }
-    S.loaded=true; S.missing=null; S.loadErr=null;
+    S.loaded=true; S.missing=null; S.loadErr=null; S.staleErr=null;
     S.rows=Array.isArray(r.supervisors)?r.supervisors.filter(isObj):[];
     S.farms=Array.isArray(r.farms)?r.farms.filter(function(f){ return isObj(f) && typeof f.id==='string' && f.active!==false; }):[];
     renderPage();
@@ -300,6 +378,18 @@
     parent.appendChild(b);
   }
 
+  // non-destructive: the table stays; Retry is a quiet reload so it never blanks the page
+  function staleNotice(parent, code){
+    var b=el('div','banner warn'); b.setAttribute('role','status');
+    var msg='Could not refresh the list. What you see may be out of date. Nothing already saved was undone.';
+    if(code && code!=='unexpected') msg+=' '+errorMessage(code);
+    b.appendChild(el('span','t',msg));
+    var r=el('button','btn sm','Retry'); r.type='button';
+    r.onclick=function(){ r.disabled=true; r.textContent='Retrying…'; load(true); };
+    b.appendChild(r);
+    parent.appendChild(b);
+  }
+
   var COLS=[['Name',''],['Phone',''],['Farms',''],['Daily limit','num'],['Status','c'],['Open links','num'],['Updated',''],['Actions','acts']];
 
   function renderPage(){
@@ -313,6 +403,7 @@
     if(S.missing==='list') banner(page,'The supervisor admin functions are not available on the database yet. The list cannot be loaded. Nothing has been changed.',false);
     else if(S.missing==='write') banner(page,'The supervisor admin functions are not available on the database yet. Nothing has been changed. Editing is turned off on this page.',false);
     else if(S.loadErr) banner(page,'Could not load supervisors. '+errorMessage(S.loadErr),true);
+    else if(S.staleErr) staleNotice(page, S.staleErr);
 
     var card=el('div','card');
     card.appendChild(el('h2',null,'Supervisors'));
@@ -425,7 +516,10 @@
         onClose:function(){ fin(false); },
         actions:[
           {key:'cancel', label:'Cancel', onClick:function(api){ fin(false, api); }},
-          {key:'ok', label:o.okLabel||'Confirm', cls:o.danger?'pri danger':'pri', onClick:function(api){ fin(true, api); }}
+          {key:'ok', label:o.okLabel||'Confirm', cls:o.danger?'pri danger':'pri', onClick:function(api){
+            if(o.check && !o.check(api)) return;            // e.g. invalid optional note: keep the dialog open
+            fin(true, api);
+          }}
         ]
       });
     });
@@ -441,7 +535,7 @@
   }
 
   // ---------------------------------------------------------------- add / edit
-  var FIELD_FOR={bad_phone:'phone', duplicate_phone:'phone', bad_name:'name', bad_farms:'farms', bad_cap:'cap'};
+  var FIELD_FOR={bad_phone:'phone', duplicate_phone:'phone', protected_owner:'phone', bad_name:'name', bad_farms:'farms', bad_cap:'cap', bad_note:'note'};
 
   function field(labelText, input, hintText, id){
     var f=el('div','field');
@@ -455,9 +549,26 @@
     return {wrap:f, input:input, err:er};
   }
 
-  function openEditor(row){
+  // Optional per-change note. Never prefilled: it is stored only on this change's audit row.
+  function noteField(id){
+    var t=el('textarea','txt'); t.rows=2; t.maxLength=NOTE_MAX;
+    t.setAttribute('dir','auto'); t.setAttribute('autocomplete','off');
+    t.value='';
+    return field('Note for this change (optional)', t, 'Saved only on the audit record for this change. It does not stay on the supervisor. Up to 500 characters.', id);
+  }
+
+  function fieldErr(f, code){
+    f.err.textContent=errorMessage(code); f.err.hidden=false; f.err.setAttribute('role','alert');
+    f.input.classList.add('bad'); f.input.setAttribute('aria-invalid','true');
+    if(f.input.focus) f.input.focus();
+  }
+
+  // openEditor(row[, {partial}]) — partial: row came from a duplicate_phone result and is not in the loaded list
+  function openEditor(row, eopts){
     if(!canAct()) return;
+    eopts=eopts||{};
     var isEdit=!!row;
+    var prot=isEdit && isProtectedOwner(row);
     var catalog=S.farms.slice();
     var activeSet=activeIdSet(catalog);
     var current=isEdit && Array.isArray(row.farms) ? row.farms.filter(function(f){ return isObj(f) && f.id!=null; }) : [];
@@ -472,7 +583,19 @@
     var phoneI=el('input'); phoneI.type='tel'; phoneI.className='txt ltr'; phoneI.setAttribute('dir','ltr'); phoneI.setAttribute('inputmode','tel'); phoneI.setAttribute('autocomplete','off');
     phoneI.placeholder='+2010…';
     phoneI.value=isEdit ? String(row.phone_wa||'') : '';
-    var fPhone=field('WhatsApp phone', phoneI, 'E.164, e.g. +201015947791', 'svPhone');
+    if(prot){ phoneI.readOnly=true; phoneI.classList.add('ro'); }
+    var fPhone=field('WhatsApp phone', phoneI,
+      prot ? 'This supervisor is protected: the phone cannot be changed and they cannot be turned off. Name, farms and daily limit can still be edited.'
+           : 'E.164, e.g. +201015947791', 'svPhone');
+
+    // duplicate_phone offer (Edit existing / Turn back on), filled with textContent only
+    var dupBox=el('div','note amber dup'); dupBox.id='svPhone-dup'; dupBox.hidden=true; dupBox.setAttribute('role','alert');
+    fPhone.wrap.appendChild(dupBox);
+    phoneI.addEventListener('input', function(){
+      if(dupBox.hidden) return;
+      dupBox.hidden=true; dupBox.textContent='';
+      phoneI.classList.remove('bad'); phoneI.removeAttribute('aria-invalid');
+    });
 
     // farms
     var fs=el('fieldset','field ffs');
@@ -524,13 +647,58 @@
     capI.value=isEdit ? (row.max_links_per_day==null?'':String(row.max_links_per_day)) : String(CAP_DEFAULT);
     var fCap=field('Daily limit', capI, 'Most harvest links this supervisor can get per day (1–50).', 'svCap');
 
+    var fNote=noteField('svNote');
+
     var gerr=el('p','ferr'); gerr.hidden=true; gerr.setAttribute('role','alert');
 
-    var F={name:fName, phone:fPhone, cap:fCap, farms:{wrap:fs, input:list, err:farmErr}};
+    var partialNote=null;
+    if(eopts.partial){
+      partialNote=el('div','note amber');
+      partialNote.textContent='This supervisor’s details could not be loaded. Saving will replace their name, farms and daily limit with what you enter here.';
+    }
+
+    var F={name:fName, phone:fPhone, cap:fCap, note:fNote, farms:{wrap:fs, input:list, err:farmErr}};
 
     function clearErrs(){
       Object.keys(F).forEach(function(k){ F[k].err.hidden=true; F[k].err.textContent=''; F[k].input.classList.remove('bad'); F[k].input.removeAttribute('aria-invalid'); });
       gerr.hidden=true; gerr.textContent='';
+      dupBox.hidden=true; dupBox.textContent='';
+    }
+
+    function showDup(offer){
+      var existing=findRow(offer.id);
+      var who=existing && (existing.display_name || existing.phone_wa);
+      var off=offer.active===false;
+      dupBox.textContent='';
+      dupBox.appendChild(who
+        ? para(null,['A supervisor with this phone already exists: ',{name:who},off?' (turned off).':'.'])
+        : para(null,['A supervisor with this phone already exists'+(off?' and is turned off.':'.')]));
+      var acts=el('div','dupacts');
+      var eb=el('button','btn sm','Edit existing'); eb.type='button';
+      eb.onclick=function(){ if(!m.locked) goExisting(offer, 'edit'); };
+      acts.appendChild(eb);
+      if(offer.canRevive){
+        var tb=el('button','btn sm pri','Turn back on'); tb.type='button';
+        tb.onclick=function(){ if(!m.locked) goExisting(offer, 'revive'); };
+        acts.appendChild(tb);
+      }
+      dupBox.appendChild(acts);
+      dupBox.hidden=false;
+      phoneI.classList.add('bad'); phoneI.setAttribute('aria-invalid','true');
+      eb.focus();
+    }
+
+    async function goExisting(offer, mode){
+      var typed=phoneI.value.trim();
+      m.close();
+      var target=findRow(offer.id), partial=false;
+      if(!target){ await load(true); target=findRow(offer.id); }
+      if(!target){ target={id:offer.id, phone_wa:typed, active:offer.active===true}; partial=true; }
+      if(mode==='revive'){
+        var copy={}; Object.keys(target).forEach(function(k){ copy[k]=target[k]; });
+        copy.active=false;                                   // server said it is off; confirm a turn-on
+        toggleActive(copy);
+      } else openEditor(target, {partial:partial});
     }
     function showErr(code){
       var k=FIELD_FOR[code], msg=errorMessage(code);
@@ -546,7 +714,7 @@
     var m=openModal({
       title:isEdit?'Edit supervisor':'Add supervisor',
       meta:isEdit?(row.display_name||row.phone_wa||''):'New supervisors start active.',
-      body:[fName.wrap, fPhone.wrap, fs, fCap.wrap, gerr],
+      body:[partialNote, fName.wrap, fPhone.wrap, fs, fCap.wrap, fNote.wrap, gerr],
       focusEl:nameI,
       actions:[
         {label:'Cancel', onClick:function(api){ api.close(); }},
@@ -567,8 +735,11 @@
       if(m.locked || m.closed) return;
       clearErrs();
       var ids=boxes.filter(function(b){ return b.checked; }).map(function(b){ return b.value; });
-      var v=validate({phone:phoneI.value, name:nameI.value, farmIds:ids, cap:capI.value}, S.farms);
+      // protected owner: the phone cannot change, so always send the stored one
+      var v=validate({phone:prot?String(row.phone_wa||''):phoneI.value, name:nameI.value, farmIds:ids, cap:capI.value}, S.farms);
       if(!v.ok){ showErr(v.code); return; }
+      var nv=noteForSave(fNote.input.value);
+      if(!nv.ok){ fieldErr(fNote, nv.code); return; }
 
       if(isEdit){
         var newSet=Object.create(null); v.farmIds.forEach(function(id){ newSet[lc(id)]=true; });
@@ -578,7 +749,7 @@
         var nameChanged=v.name!==String(row.display_name||'');
         var capChanged=v.cap!==Number(row.max_links_per_day);
         if(!phoneChanged && !nameChanged && !capChanged && !removed.length && !added.length){
-          m.close(); toast('No changes to save.'); return;
+          m.close(); toast(nv.note ? 'No changes to save. The note was not saved because nothing changed.' : 'No changes to save.'); return;
         }
         var n=openCount(row);
         if(n>0 && (phoneChanged || removed.length)){
@@ -599,10 +770,14 @@
       setSaving(true);
       var args={p_phone_wa:v.phone, p_display_name:v.name, p_farm_ids:v.farmIds, p_max_links_per_day:v.cap};
       if(isEdit) args.p_id=row.id;
+      if(nv.note!==null) args.p_note=nv.note;              // per-change; omitted when empty
       var r=await call(isEdit?'hl_admin_supervisors_update':'hl_admin_supervisors_add', args);
       if(!r.ok){
         setSaving(false);
+        if(m.closed) return;
         if(r.code==='rpc_missing'){ m.close(); setMissing(); toast(errorMessage('rpc_missing'), true); return; }
+        var offer=duplicateOffer(r, isEdit?row.id:null);
+        if(offer){ showDup(offer); return; }
         showErr(r.code);
         return;
       }
@@ -620,6 +795,7 @@
   async function toggleActive(row){
     if(!canAct()) return;
     var turnOff=row.active===true, n=openCount(row);
+    if(turnOff && isProtectedOwner(row)){ toast(errorMessage('protected_owner'), true); return; }
     var who=row.display_name || row.phone_wa || 'this supervisor';
     var body=[para(null,[turnOff?'Turn off ':'Turn on ',{name:who},'?'])];
     if(turnOff){
@@ -628,15 +804,24 @@
     } else {
       body.push(para(null,['They will be able to receive harvest links again. No links are sent or restored by this step.']));
     }
+    var fNote=noteField('svToggleNote'), note=null;
+    body.push(fNote.wrap);
     var ok=await confirmDialog({
       title:turnOff?'Turn off supervisor':'Turn on supervisor',
       body:body,
       okLabel:turnOff?(n>0?'Turn off and revoke links':'Turn off'):'Turn on',
-      danger:turnOff
+      danger:turnOff,
+      check:function(){
+        var nv=noteForSave(fNote.input.value);
+        if(!nv.ok){ fieldErr(fNote, nv.code); return false; }
+        note=nv.note; return true;
+      }
     });
     if(!ok || !canAct()) return;
     S.busy=true; renderPage();
-    var r=await call('hl_admin_supervisors_set_active', {p_id:row.id, p_active:!turnOff});
+    var args={p_id:row.id, p_active:!turnOff};
+    if(note!==null) args.p_note=note;                    // per-change; omitted when empty
+    var r=await call('hl_admin_supervisors_set_active', args);
     S.busy=false;
     if(!r.ok){
       if(r.code==='rpc_missing'){ setMissing(); toast(errorMessage('rpc_missing'), true); return; }
@@ -691,11 +876,17 @@
     isRpcMissing:isRpcMissing,
     classifyError:classifyError,
     unwrapRpc:unwrapRpc,
+    rpcResult:rpcResult,
     formatCairo:formatCairo,
     fillText:fillText,
     renderFarmChips:renderFarmChips,
     renderSupervisorRow:renderSupervisorRow,
+    noteForSave:noteForSave,
+    isProtectedOwner:isProtectedOwner,
+    PROTECTED_OWNER_ID:PROTECTED_OWNER_ID,
+    duplicateOffer:duplicateOffer,
+    shouldKeepListOnReloadFailure:shouldKeepListOnReloadFailure,
     boot:boot,
-    LIMITS:{NAME_MAX:NAME_MAX, FARMS_MAX:FARMS_MAX, CAP_MIN:CAP_MIN, CAP_MAX:CAP_MAX, CAP_DEFAULT:CAP_DEFAULT}
+    LIMITS:{NAME_MAX:NAME_MAX, FARMS_MAX:FARMS_MAX, CAP_MIN:CAP_MIN, CAP_MAX:CAP_MAX, CAP_DEFAULT:CAP_DEFAULT, NOTE_MAX:NOTE_MAX}
   };
 })(typeof window!=='undefined'?window:this);

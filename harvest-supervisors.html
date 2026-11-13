@@ -174,6 +174,14 @@ fieldset.ffs legend{padding:0;margin-bottom:4px}
 .btn.danger{color:var(--red);border-color:var(--red-border)}
 .btn.pri.danger{background:var(--red);border-color:var(--red);color:#fff}
 .mb p{margin:0}
+.banner.warn{border-color:var(--amber-border);background:var(--amber-bg)}
+.field textarea.txt{font-family:var(--font-body);font-size:14px;resize:vertical;min-height:56px}
+.field textarea:focus-visible{outline:2px solid var(--accent2);outline-offset:1px}
+.field input.ro{background:var(--bg2);color:var(--text3);cursor:not-allowed}
+.note.dup{display:flex;flex-direction:column;gap:8px}
+.note.dup[hidden]{display:none}
+.dupacts{display:flex;gap:8px;flex-wrap:wrap}
+.lock{align-self:center;font-size:11px;font-weight:600;color:var(--text3);padding:0 4px;cursor:help}
 @media (max-width:480px){.mf .btn{flex:1 1 0;min-width:0;text-align:center;white-space:normal}}
 </style>
 
@@ -205,7 +213,7 @@ fieldset.ffs legend{padding:0;margin-bottom:4px}
 </script>
 <div id="modalRoot"></div>
 
-<script src="harvest-supervisors.js?cb=1"></script>
+<script src="harvest-supervisors.js?cb=2"></script>
 <script>
 const SB_URL='https://sfyjvgjwvtwkrnqrvqyc.supabase.co', SB_ANON='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNmeWp2Z2p3dnR3a3JucXJ2cXljIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ4NzIxNjYsImV4cCI6MjA5MDQ0ODE2Nn0.FjA75XZsp0Kx5Xam_rrnYoAHX4JHKey6vEFCH_zlMuQ';
 const SBC=window.supabase?window.supabase.createClient(SB_URL,SB_ANON):null;
