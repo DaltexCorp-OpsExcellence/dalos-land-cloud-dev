@@ -19,9 +19,13 @@
   // Replace with a list field once the contract has one. Never hard-code the owner's phone or name here.
   var PROTECTED_OWNER_ID='2a0aef1a-ff3f-4e8d-b203-54ce562a83c7';
 
+  // Dummy example only (X = digit). Never put a real subscriber number in source.
+  var DUMMY_PHONE='+2010XXXXXXXX';
+  var PHONE_HINT='E.164, e.g. '+DUMMY_PHONE;
+
   var MESSAGES={
     not_admin:'Only Land Cloud admins can manage harvest supervisors.',
-    bad_phone:'Enter the phone in E.164 format: + then country code and number, digits only (e.g. +201015947791).',
+    bad_phone:'Enter the phone in E.164 format: + then country code and number, digits only (e.g. '+DUMMY_PHONE+').',
     bad_name:'Enter a display name of 1 to 80 characters.',
     bad_farms:'Pick between 1 and 30 farms, all from the active farm list.',
     bad_cap:'Daily limit must be a whole number from 1 to 50.',
@@ -136,6 +140,18 @@
     return {id:id, active:active, canRevive:active===false};
   }
 
+  // farmsForEditor(catalog, selectedIds) -> a new array: catalog farms whose id is selected first, then the rest,
+  // each group in catalog order. Display order only (the Edit checkbox list); save order is unaffected.
+  // Selected ids that are not in the catalog are ignored. Not used for the protected owner (received order kept).
+  function farmsForEditor(catalog, selectedIds){
+    var list=Array.isArray(catalog)?catalog.filter(isObj):[];
+    var sel=Object.create(null);
+    (Array.isArray(selectedIds)?selectedIds:[]).forEach(function(id){ if(id!=null) sel[lc(String(id))]=true; });
+    var first=[], rest=[];
+    list.forEach(function(f){ (f.id!=null && sel[lc(String(f.id))] ? first : rest).push(f); });
+    return first.concat(rest);
+  }
+
   // After a successful list, a failed *quiet* reload keeps the table instead of emptying it.
   function shouldKeepListOnReloadFailure(prevLoaded, quiet){ return !!(prevLoaded && quiet); }
 
@@ -245,17 +261,19 @@
     var active=row.active===true;
     if(row.id!=null) tr.setAttribute('data-id', String(row.id));
     tr.className=active?'':'off';
-    function td(cls){ var c=doc.createElement('td'); if(cls) c.className=cls; tr.appendChild(c); return c; }
+    // data-label feeds the stacked-card layout (<=900px) via CSS attr(); static strings only
+    function td(cls, label){ var c=doc.createElement('td'); if(cls) c.className=cls; if(label) c.setAttribute('data-label', label); tr.appendChild(c); return c; }
 
-    var nm=td('vname'); nm.setAttribute('dir','auto'); fillText(nm, row.display_name || '—');
-    var ph=td('phone'); ph.setAttribute('dir','ltr'); fillText(ph, row.phone_wa || '—');
-    var fc=td('farms'); var chips=doc.createElement('div'); chips.className='chips'; fc.appendChild(chips); renderFarmChips(chips, row.farms);
-    fillText(td('num'), row.max_links_per_day==null ? '—' : row.max_links_per_day);
-    var st=td('c'); var pill=doc.createElement('span'); pill.className=active?'pill p':'pill np'; fillText(pill, active?'Active':'Inactive'); st.appendChild(pill);
-    fillText(td('num'), openCount(row));
-    fillText(td('when'), formatCairo(row.updated_at));
+    // the cell stays LTR/start-aligned; only the name span is bidi-isolated so an Arabic name does not flip the cell
+    var nm=td('vname', 'Name'); var nmText=doc.createElement('span'); nmText.setAttribute('dir','auto'); fillText(nmText, row.display_name || '—'); nm.appendChild(nmText);
+    var ph=td('phone', 'Phone'); ph.setAttribute('dir','ltr'); fillText(ph, row.phone_wa || '—');
+    var fc=td('farms', 'Farms'); var chips=doc.createElement('div'); chips.className='chips'; fc.appendChild(chips); renderFarmChips(chips, row.farms);
+    fillText(td('num cap', 'Daily limit'), row.max_links_per_day==null ? '—' : row.max_links_per_day);
+    var st=td('c st', 'Status'); var pill=doc.createElement('span'); pill.className=active?'pill p':'pill np'; fillText(pill, active?'Active':'Inactive'); st.appendChild(pill);
+    fillText(td('num open', 'Open links'), openCount(row));
+    fillText(td('when', 'Updated'), formatCairo(row.updated_at));
 
-    var ac=td('acts'); var pair=doc.createElement('div'); pair.className='btnpair'; ac.appendChild(pair);
+    var ac=td('acts', 'Actions'); var pair=doc.createElement('div'); pair.className='btnpair'; ac.appendChild(pair);
     var who=row.display_name || row.phone_wa || 'supervisor';
     function btn(label, act, aria){
       var b=doc.createElement('button');
@@ -310,11 +328,17 @@
     setTimeout(function(){ t.remove(); }, isErr?8000:3200);
   }
 
+  // Every open/close path (hamburger, overlay, × button, Escape) goes through here, so aria-expanded and the
+  // label on the page-owned #menuBtn always match the drawer. The desktop rail button keeps its own aria-expanded.
   function setSide(open){
+    open=!!open;
     global.document.body.classList.toggle('side-open', open);
     var ov=$('sideOv'), mb=$('menuBtn');
     if(ov) ov.hidden=!open;
-    if(mb) mb.setAttribute('aria-expanded', String(open));
+    if(mb){
+      mb.setAttribute('aria-expanded', String(open));
+      mb.setAttribute('aria-label', open?'Close menu':'Open menu');
+    }
   }
 
   function wireChrome(){
@@ -448,7 +472,7 @@
     if(!S.rows.length){
       card.appendChild(el('p','empty', S.loaded ? 'No supervisors yet. Use “Add supervisor” to add the first one.' : 'No supervisors to show.'));
     } else {
-      var wrap=el('div','table-wrap');
+      var wrap=el('div','table-wrap sv-wrap');
       var tbl=el('table','sv');
       var cap=el('caption','sr','Harvest supervisors'); tbl.appendChild(cap);
       var thead=el('thead'), hr=el('tr');
@@ -569,6 +593,15 @@
   // protected_owner covers phone, farms and cap, so it is shown as a general form error
   var FIELD_FOR={bad_phone:'phone', duplicate_phone:'phone', bad_name:'name', bad_farms:'farms', bad_cap:'cap', bad_note:'note'};
 
+  // Visible "Locked" mark (static text + CSS padlock), DOM-built. aria-hidden: the control itself carries
+  // readOnly/disabled + aria-readonly and the "Cannot be changed" hint.
+  function lockMark(){
+    var s=el('span','lockmark'); s.setAttribute('aria-hidden','true');
+    s.appendChild(el('span','lockico'));
+    s.appendChild(global.document.createTextNode('Locked'));
+    return s;
+  }
+
   function field(labelText, input, hintText, id){
     var f=el('div','field');
     var l=el('label','lbl',labelText); l.setAttribute('for', id);
@@ -616,8 +649,9 @@
     var phoneI=el('input'); phoneI.type='tel'; phoneI.className='txt ltr'; phoneI.setAttribute('dir','ltr'); phoneI.setAttribute('inputmode','tel'); phoneI.setAttribute('autocomplete','off');
     phoneI.placeholder='+2010…';
     phoneI.value=isEdit ? String(row.phone_wa||'') : '';
-    if(prot){ phoneI.readOnly=true; phoneI.classList.add('ro'); }
-    var fPhone=field('WhatsApp phone', phoneI, prot ? 'Cannot be changed for this supervisor.' : 'E.164, e.g. +201015947791', 'svPhone');
+    if(prot){ phoneI.readOnly=true; phoneI.classList.add('ro'); phoneI.setAttribute('aria-readonly','true'); }
+    var fPhone=field('WhatsApp phone', phoneI, prot ? 'Cannot be changed for this supervisor.' : PHONE_HINT, 'svPhone');
+    if(prot) fPhone.wrap.querySelector('label').appendChild(lockMark());
 
     var protNote=null;
     if(prot){
@@ -636,7 +670,9 @@
 
     // farms
     var fs=el('fieldset','field ffs');
-    fs.appendChild(el('legend','lbl','Farms'));
+    var legend=el('legend','lbl','Farms');
+    if(prot) legend.appendChild(lockMark());
+    fs.appendChild(legend);
     var tools=el('div','ftools');
     var selAll=el('button','btn sm','Select all active farms'); selAll.type='button';
     var clr=el('button','btn sm','Clear'); clr.type='button';
@@ -653,11 +689,12 @@
     if(prot){
       // read-only: the row's farms in received order, inactive ones included and never dropped
       selAll.disabled=true; clr.disabled=true; tools.hidden=true;
+      list.classList.add('ro'); fs.classList.add('ro');
       if(!current.length) list.appendChild(el('p','empty sm','No farms.'));
       current.forEach(function(f){
         var off=!activeSet[lc(f.id)];
         var lab=el('label','fopt ro'+(off?' stale':''));
-        var cb=el('input'); cb.type='checkbox'; cb.value=String(f.id); cb.checked=true; cb.disabled=true;
+        var cb=el('input'); cb.type='checkbox'; cb.value=String(f.id); cb.checked=true; cb.disabled=true; cb.setAttribute('aria-readonly','true');
         var nm=el('span','fname', f.name || f.farm_code || '—'); nm.setAttribute('dir','auto');
         lab.appendChild(cb); lab.appendChild(nm);
         var code=(f.farm_code!=null && f.farm_code!=='') ? String(f.farm_code) : '';
@@ -667,14 +704,19 @@
       });
     }
     if(!prot && !catalog.length) list.appendChild(el('p','empty sm','There are no active farms in the catalog.'));
-    if(!prot) catalog.forEach(function(f){
-      var lab=el('label','fopt');
-      var cb=el('input'); cb.type='checkbox'; cb.value=String(f.id); cb.checked=!!oldSet[lc(f.id)];
-      var nm=el('span','fname', f.name || f.farm_code || '—'); nm.setAttribute('dir','auto');
-      lab.appendChild(cb); lab.appendChild(nm);
-      if(f.farm_code!=null && f.farm_code!=='') lab.appendChild(el('span','fcode', f.farm_code));
-      list.appendChild(lab); boxes.push(cb);
-    });
+    if(!prot){
+      // boxes stay in catalog order (that is the order sent on save); only the display is selected-first
+      var labFor=Object.create(null);
+      catalog.forEach(function(f){
+        var lab=el('label','fopt');
+        var cb=el('input'); cb.type='checkbox'; cb.value=String(f.id); cb.checked=!!oldSet[lc(f.id)];
+        var nm=el('span','fname', f.name || f.farm_code || '—'); nm.setAttribute('dir','auto');
+        lab.appendChild(cb); lab.appendChild(nm);
+        if(f.farm_code!=null && f.farm_code!=='') lab.appendChild(el('span','fcode', f.farm_code));
+        labFor[lc(f.id)]=lab; boxes.push(cb);
+      });
+      farmsForEditor(catalog, oldIds).forEach(function(f){ list.appendChild(labFor[lc(f.id)]); });
+    }
     if(!prot) stale.forEach(function(f){
       var lab=el('label','fopt stale');
       var cb=el('input'); cb.type='checkbox'; cb.checked=true; cb.disabled=true;
@@ -700,8 +742,9 @@
 
     var capI=el('input'); capI.type='number'; capI.min=String(CAP_MIN); capI.max=String(CAP_MAX); capI.step='1'; capI.setAttribute('inputmode','numeric');
     capI.value=isEdit ? (row.max_links_per_day==null?'':String(row.max_links_per_day)) : String(CAP_DEFAULT);
-    if(prot){ capI.readOnly=true; capI.classList.add('ro'); }
+    if(prot){ capI.readOnly=true; capI.classList.add('ro'); capI.setAttribute('aria-readonly','true'); }
     var fCap=field('Daily limit', capI, prot ? 'Cannot be changed for this supervisor.' : 'Most harvest links this supervisor can get per day (1–50).', 'svCap');
+    if(prot) fCap.wrap.querySelector('label').appendChild(lockMark());
 
     var fNote=noteField('svNote');
 
@@ -762,7 +805,7 @@
         F[k].err.textContent=msg; F[k].err.hidden=false;
         F[k].err.setAttribute('role','alert');
         F[k].input.classList.add('bad'); F[k].input.setAttribute('aria-invalid','true');
-        var foc=k==='farms' ? (boxes[0]||selAll) : F[k].input;
+        var foc=k==='farms' ? (list.querySelector('input:not([disabled])')||selAll) : F[k].input;   // first box as displayed
         if(foc && foc.focus) foc.focus();
       } else { gerr.textContent=msg; gerr.hidden=false; }
     }
@@ -960,6 +1003,10 @@
     PROTECTED_OWNER_ID:PROTECTED_OWNER_ID,
     duplicateOffer:duplicateOffer,
     shouldKeepListOnReloadFailure:shouldKeepListOnReloadFailure,
+    farmsForEditor:farmsForEditor,
+    setSide:setSide,
+    DUMMY_PHONE:DUMMY_PHONE,
+    PHONE_HINT:PHONE_HINT,
     boot:boot,
     LIMITS:{NAME_MAX:NAME_MAX, FARMS_MAX:FARMS_MAX, CAP_MIN:CAP_MIN, CAP_MAX:CAP_MAX, CAP_DEFAULT:CAP_DEFAULT, NOTE_MAX:NOTE_MAX}
   };

@@ -64,15 +64,21 @@ td{font-size:13px;color:var(--text2);padding:5px 9px;border-bottom:1px solid var
 .pill.p{background:var(--green-bg);color:var(--green)}
 .pill.np{background:var(--bg2);color:var(--text3)}
 th{text-align:left}th.num{text-align:right}th.c,td.c{text-align:center}
-.ovl{position:fixed;inset:0;background:rgba(10,30,32,.45);z-index:50;display:flex;align-items:flex-start;justify-content:center;padding:6vh 16px;overflow:auto}
-.modal{background:var(--card);border-radius:14px;box-shadow:var(--shadow);width:min(760px,100%);border:1px solid var(--border)}
+/* Dialogs at every width: the overlay never scrolls; the dialog is capped to the viewport; header and footer
+   stay put and the body (.mb) is the only scroll area. max-height (not height) so short dialogs size to content. */
+.ovl{position:fixed;inset:0;background:rgba(10,30,32,.45);z-index:50;display:flex;align-items:center;justify-content:center;overflow:hidden;
+  padding:12px;padding:max(12px,env(safe-area-inset-top,0px)) max(12px,env(safe-area-inset-right,0px)) max(12px,env(safe-area-inset-bottom,0px)) max(12px,env(safe-area-inset-left,0px))}
+.modal{background:var(--card);border-radius:14px;box-shadow:var(--shadow);width:min(760px,100%);border:1px solid var(--border);
+  display:flex;flex-direction:column;min-height:0;overflow:hidden;
+  max-height:calc(100vh - 24px);max-height:calc(100dvh - 24px);
+  max-height:calc(100dvh - max(12px,env(safe-area-inset-top,0px)) - max(12px,env(safe-area-inset-bottom,0px)))}
 .modal.sm{width:min(520px,100%)}
-.mh{display:flex;align-items:flex-start;gap:10px;padding:16px 18px;border-bottom:1px solid var(--border)}
+.mh{flex:none;display:flex;align-items:flex-start;gap:10px;padding:16px 18px;border-bottom:1px solid var(--border)}
 .mh h3{font-family:var(--font-display);font-weight:400;font-size:20px;margin:0}
 .mh .meta{font-size:12px;color:var(--text3)}
-.mb{padding:14px 18px;display:flex;flex-direction:column;gap:12px}
-.mf{display:flex;gap:8px;justify-content:flex-end;padding:12px 18px;border-top:1px solid var(--border)}
-@media (max-width:700px){.modal{max-height:calc(100dvh - 24px);display:flex;flex-direction:column}.modal .mb{overflow:auto;flex:1;min-height:0}.modal .mf{flex:none;background:var(--card);border-radius:0 0 14px 14px}}
+.mb{flex:1 1 auto;min-height:0;overflow:auto;overscroll-behavior:contain;padding:14px 18px;display:flex;flex-direction:column;gap:12px}
+.mb>*{flex:none}
+.mf{flex:none;display:flex;gap:8px;justify-content:flex-end;padding:12px 18px;border-top:1px solid var(--border);background:var(--card)}
 .toast.err{top:16px;bottom:auto;background:var(--red,#b42318);display:flex;gap:12px;align-items:center;max-width:min(640px,92vw);z-index:80}
 .toast.err button{all:unset;cursor:pointer;font-size:18px;line-height:1;padding:0 4px}
 .toast.err+.toast.err{top:70px}
@@ -162,13 +168,15 @@ fieldset.ffs{border:0;margin:0;padding:0;min-width:0}
 fieldset.ffs legend{padding:0;margin-bottom:4px}
 .ftools{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .fcount{font-size:12px;color:var(--text3);margin-left:auto}
-.flist{max-height:240px;overflow:auto;border:1px solid var(--border2);border-radius:var(--r);padding:4px;background:var(--card)}
+/* no inner scroller: the farm list grows inside .mb, which is the dialog's one scroll area */
+.flist{border:1px solid var(--border2);border-radius:var(--r);padding:4px;background:var(--card)}
 .flist.bad{outline-offset:1px}
-.fopt{display:flex;align-items:center;gap:10px;padding:6px 8px;min-height:36px;border-radius:6px;cursor:pointer;font-size:13px;color:var(--text)}
+.fopt{display:flex;align-items:center;gap:10px;padding:6px 8px;min-height:44px;border-radius:6px;cursor:pointer;font-size:13px;color:var(--text)}
 .fopt:hover{background:var(--bg)}
 .fopt input{width:18px;height:18px;flex:none;margin:0;accent-color:var(--accent)}
 .fopt input:focus-visible{outline:2px solid var(--accent2);outline-offset:2px}
-.fopt .fcode{margin-left:auto;font-family:var(--font-mono);font-size:11px;color:var(--text3)}
+.fopt .fname{min-width:0;overflow-wrap:anywhere}
+.fopt .fcode{margin-left:-2px;font-family:var(--font-mono);font-size:11px;color:var(--text3);white-space:nowrap}   /* code sits right after the name */
 .fopt.stale{cursor:default;color:var(--text3);background:var(--amber-bg)}
 .fopt.ro{cursor:default}
 .fopt.ro:not(.stale):hover{background:none}
@@ -180,12 +188,72 @@ fieldset.ffs legend{padding:0;margin-bottom:4px}
 .banner.warn{border-color:var(--amber-border);background:var(--amber-bg)}
 .field textarea.txt{font-family:var(--font-body);font-size:14px;resize:vertical;min-height:56px}
 .field textarea:focus-visible{outline:2px solid var(--accent2);outline-offset:1px}
-.field input.ro{background:var(--bg2);color:var(--text3);cursor:not-allowed}
+/* read-only (protected owner): a different surface + dashed border + muted text, clearly unlike an editable input in both themes */
+.field input.ro{background:var(--bg3);color:var(--text3);border-style:dashed;border-color:var(--text3);cursor:not-allowed}
+.field input.ro:focus-visible{outline-style:dashed}
+.flist.ro{background:var(--bg2);border-style:dashed;border-color:var(--text3)}
+.lockmark{display:inline-flex;align-items:center;gap:4px;margin-left:8px;padding:0 7px;border-radius:10px;border:1px solid var(--border2);background:var(--bg2);color:var(--text2);font-size:10px;letter-spacing:.06em;text-transform:uppercase;vertical-align:middle;line-height:16px}
+.lockico{position:relative;display:inline-block;width:8px;height:6px;margin-top:4px;border-radius:1.5px;background:currentColor;flex:none}   /* padlock body */
+.lockico::before{content:'';position:absolute;left:1.5px;bottom:5px;width:5px;height:4px;border:1.5px solid currentColor;border-bottom:0;border-radius:3px 3px 0 0;box-sizing:border-box}   /* shackle */
 .note.dup{display:flex;flex-direction:column;gap:8px}
 .note.dup[hidden]{display:none}
 .dupacts{display:flex;gap:8px;flex-wrap:wrap}
 .lock{align-self:center;font-size:11px;font-weight:600;color:var(--text3);padding:0 4px;cursor:help}
 @media (max-width:480px){.mf .btn{flex:1 1 0;min-width:0;text-align:center;white-space:normal}}
+
+/* ---------- tap targets (>=44px) — page-scoped, shell.js untouched ---------- */
+.btn{box-sizing:border-box}
+#addBtn,table.sv .btn.sm,.mf .btn,.ftools .btn,.dupacts .btn{min-height:44px;min-width:44px;display:inline-flex;align-items:center;justify-content:center;text-align:center}
+#addBtn{white-space:nowrap;flex:none;padding:8px 14px;font-size:13px}
+table.sv .btn.sm{padding:8px 14px;font-size:13px}
+.btnpair{gap:10px;align-items:center}
+.lock{display:inline-flex;align-items:center;min-height:44px}
+.menubtn{width:44px;height:44px;flex:none}
+.menubtn svg{width:18px;height:18px}
+.x{width:44px;height:44px}
+.mh{align-items:center}
+/* drawer rows come from shell.js; .sidebar prefix outranks the shell's own rules on this page only */
+.sidebar .lcsb-item,.sidebar .lcsb-ws,.sidebar .lcsb-signout{min-height:44px}
+.side-close{top:4px;right:4px;width:44px;height:44px;display:grid;place-items:center;padding:0}
+
+/* ---------- topbar: one row at every width (title shrinks with an ellipsis) ---------- */
+.topbar{flex-wrap:nowrap}
+.topbar h1{flex:0 1 auto;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.topbar .spacer{flex:1 1 0;min-width:0}
+@media (max-width:480px){.topbar{padding:8px 12px;gap:8px}.topbar h1{font-size:15px}}
+
+/* ---------- list ---------- */
+table.sv td.vname{text-align:start}
+table.sv td.vname>span{unicode-bidi:isolate}
+@media (min-width:901px){
+  table.sv th{padding:7px 7px}
+  table.sv td{padding:4px 7px}
+  table.sv th:first-child,table.sv td:first-child{padding-left:14px}
+  table.sv th:last-child,table.sv td:last-child{padding-right:14px}
+  table.sv td.farms{min-width:180px}
+}
+/* phone + tablet: each supervisor is a stacked card (same idea as the planner's bulk Review cards); no sideways scroll */
+@media (max-width:900px){
+  .card .table-wrap.sv-wrap{overflow:visible;max-height:none;padding:10px;border-top:1px solid var(--border);border-radius:0 0 var(--r2) var(--r2);background:var(--bg)}
+  table.sv,table.sv tbody{display:block;width:100%}
+  table.sv thead{display:none}
+  table.sv tr{display:flex;flex-wrap:wrap;align-items:flex-start;gap:10px 18px;padding:12px 14px;margin:0 0 10px;border:1px solid var(--border);border-radius:var(--r2);background:var(--card);min-width:0}
+  table.sv tr:last-child{margin-bottom:0}
+  table.sv td{display:block;padding:0;border:0;min-width:0;white-space:normal;overflow-wrap:anywhere;text-align:start}
+  table.sv td[data-label]::before{content:attr(data-label);display:block;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);font-family:var(--font-body);margin-bottom:2px}
+  table.sv td.vname::before,table.sv td.acts::before{display:none!important}
+  table.sv td.vname{order:1;flex:1 1 100%;font-size:15px}
+  table.sv td.phone{order:2;flex:0 1 auto}
+  table.sv td.st{order:3;flex:0 1 auto}
+  table.sv td.cap{order:4;flex:0 1 auto}
+  table.sv td.open{order:5;flex:0 1 auto}
+  table.sv td.when{order:6;flex:0 1 auto}
+  table.sv td.farms{order:7;flex:1 1 100%;min-width:0}
+  table.sv td.farms .chip{white-space:normal;max-width:100%;overflow-wrap:anywhere}
+  table.sv td.acts{order:8;flex:1 1 100%;padding-top:10px;border-top:1px solid var(--border)}
+  table.sv td.acts .btnpair{display:flex;flex-wrap:wrap;gap:10px}
+  table.sv td.num{font-size:13px}
+}
 </style>
 
 <div class="app">
@@ -216,7 +284,7 @@ fieldset.ffs legend{padding:0;margin-bottom:4px}
 </script>
 <div id="modalRoot"></div>
 
-<script src="harvest-supervisors.js?cb=3"></script>
+<script src="harvest-supervisors.js?cb=4"></script>
 <script>
 const SB_URL='https://sfyjvgjwvtwkrnqrvqyc.supabase.co', SB_ANON='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNmeWp2Z2p3dnR3a3JucXJ2cXljIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ4NzIxNjYsImV4cCI6MjA5MDQ0ODE2Nn0.FjA75XZsp0Kx5Xam_rrnYoAHX4JHKey6vEFCH_zlMuQ';
 const SBC=window.supabase?window.supabase.createClient(SB_URL,SB_ANON):null;
