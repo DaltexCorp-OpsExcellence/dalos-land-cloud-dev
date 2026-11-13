@@ -170,6 +170,9 @@ fieldset.ffs legend{padding:0;margin-bottom:4px}
 .fopt input:focus-visible{outline:2px solid var(--accent2);outline-offset:2px}
 .fopt .fcode{margin-left:auto;font-family:var(--font-mono);font-size:11px;color:var(--text3)}
 .fopt.stale{cursor:default;color:var(--text3);background:var(--amber-bg)}
+.fopt.ro{cursor:default}
+.fopt.ro:not(.stale):hover{background:none}
+.ftools[hidden]{display:none}
 .ovl.top{z-index:60;align-items:center}
 .btn.danger{color:var(--red);border-color:var(--red-border)}
 .btn.pri.danger{background:var(--red);border-color:var(--red);color:#fff}
@@ -213,7 +216,7 @@ fieldset.ffs legend{padding:0;margin-bottom:4px}
 </script>
 <div id="modalRoot"></div>
 
-<script src="harvest-supervisors.js?cb=2"></script>
+<script src="harvest-supervisors.js?cb=3"></script>
 <script>
 const SB_URL='https://sfyjvgjwvtwkrnqrvqyc.supabase.co', SB_ANON='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNmeWp2Z2p3dnR3a3JucXJ2cXljIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ4NzIxNjYsImV4cCI6MjA5MDQ0ODE2Nn0.FjA75XZsp0Kx5Xam_rrnYoAHX4JHKey6vEFCH_zlMuQ';
 const SBC=window.supabase?window.supabase.createClient(SB_URL,SB_ANON):null;

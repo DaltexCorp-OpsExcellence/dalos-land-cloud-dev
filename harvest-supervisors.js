@@ -11,9 +11,11 @@
   var UUID_RE=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   var NAME_MAX=80, FARMS_MAX=30, CAP_MIN=1, CAP_MAX=50, CAP_DEFAULT=6, NOTE_MAX=500;
 
-  // Client copy of the protected-owner id hard-coded in the v0.2 hl_admin_supervisors_update /
+  // Client copy of the protected-owner id hard-coded in the v0.3.1 hl_admin_supervisors_update /
   // hl_admin_supervisors_set_active RPCs. hl_admin_supervisors_list does not expose a "protected" flag yet,
   // so the page mirrors this one documented UUID only to disable controls; the RPC is still the authority.
+  // v0.3.1: phone, farm_ids and max_links_per_day cannot change for this id (set compare on farms); name and
+  // the per-change note can. Turn off is refused by set_active.
   // Replace with a list field once the contract has one. Never hard-code the owner's phone or name here.
   var PROTECTED_OWNER_ID='2a0aef1a-ff3f-4e8d-b203-54ce562a83c7';
 
@@ -25,7 +27,7 @@
     bad_cap:'Daily limit must be a whole number from 1 to 50.',
     bad_note:'The note must be at most 500 characters.',
     duplicate_phone:'Another supervisor already uses this phone number.',
-    protected_owner:'This supervisor is protected: the phone cannot be changed and they cannot be turned off.',
+    protected_owner:'This supervisor is protected: their phone, farms and daily limit cannot be changed, and they cannot be turned off. Their name and a note for this change can still be edited.',
     not_found:'This supervisor was not found. Refresh the list and try again.',
     bad_request:'The request was not valid. Refresh the page and try again.',
     rpc_missing:'The supervisor admin functions are not available on the database yet. Nothing has been changed.',
@@ -74,14 +76,25 @@
     return {ok:true,phone:phone,name:name,farmIds:ids.slice(),cap:cap};
   }
 
+  // pgBtrim(s) — PostgreSQL one-argument btrim(text): strips only ASCII space (U+0020) from both ends.
+  // Tabs, newlines, NBSP and other Unicode whitespace are kept (unlike String.prototype.trim).
+  function pgBtrim(s){
+    var a=0, b=s.length;
+    while(a<b && s.charCodeAt(a)===32) a++;
+    while(b>a && s.charCodeAt(b-1)===32) b--;
+    return s.slice(a, b);
+  }
+
   // noteForSave(text) -> {ok:true, note:string|null} | {ok:false, code:'bad_note'}
   // The note is per-change: it is stored only on the audit row of the write that sends it.
-  // Empty / whitespace -> null (omit p_note). Length counted in characters (code points), max 500.
+  // Mirrors v0.3.1: v_note := nullif(btrim(coalesce(p_note,'')),''); char_length(v_note) > 500 -> bad_note.
+  // null/undefined -> no note; ASCII-spaces-only -> no note (omit p_note); length in code points, max 500.
+  // Anything that is not a string cannot be coerced safely and is bad_note.
   function noteForSave(text){
     if(text==null) return {ok:true, note:null};
     if(typeof text!=='string') return {ok:false, code:'bad_note'};
-    var t=text.trim();
-    if(!t) return {ok:true, note:null};
+    var t=pgBtrim(text);
+    if(t==='') return {ok:true, note:null};
     if(Array.from(t).length>NOTE_MAX) return {ok:false, code:'bad_note'};
     return {ok:true, note:t};
   }
@@ -91,6 +104,24 @@
     var id=isObj(x)?x.id:x;
     if(typeof id!=='string') return false;
     return lc(id.trim())===PROTECTED_OWNER_ID;
+  }
+
+  // protectedUpdateArgs(row, nameText, noteText) -> {ok:true, args, name, note} | {ok:false, code}
+  // Update args for the protected owner: only the name (and the per-change note) come from the form.
+  // Phone, farm ids and cap are sent back exactly as received on the list row (farm ids in the same order,
+  // inactive farms included, no active-catalog filter) so the RPC sees them unchanged.
+  function protectedUpdateArgs(row, nameText, noteText){
+    if(!isObj(row) || row.id==null) return {ok:false, code:'bad_request'};
+    var name=typeof nameText==='string'?nameText.trim():'';
+    if(name.length<1 || name.length>NAME_MAX) return {ok:false, code:'bad_name'};
+    var nv=noteForSave(noteText);
+    if(!nv.ok) return {ok:false, code:nv.code};
+    var farmIds=(Array.isArray(row.farms)?row.farms:[])
+      .filter(function(f){ return isObj(f) && f.id!=null; })
+      .map(function(f){ return String(f.id); });
+    var args={p_id:row.id, p_phone_wa:row.phone_wa, p_display_name:name, p_farm_ids:farmIds, p_max_links_per_day:row.max_links_per_day};
+    if(nv.note!==null) args.p_note=nv.note;
+    return {ok:true, args:args, name:name, note:nv.note};
   }
 
   // duplicateOffer(result, selfId) -> null | {id, active:true|false|null, canRevive}
@@ -535,7 +566,8 @@
   }
 
   // ---------------------------------------------------------------- add / edit
-  var FIELD_FOR={bad_phone:'phone', duplicate_phone:'phone', protected_owner:'phone', bad_name:'name', bad_farms:'farms', bad_cap:'cap', bad_note:'note'};
+  // protected_owner covers phone, farms and cap, so it is shown as a general form error
+  var FIELD_FOR={bad_phone:'phone', duplicate_phone:'phone', bad_name:'name', bad_farms:'farms', bad_cap:'cap', bad_note:'note'};
 
   function field(labelText, input, hintText, id){
     var f=el('div','field');
@@ -551,7 +583,8 @@
 
   // Optional per-change note. Never prefilled: it is stored only on this change's audit row.
   function noteField(id){
-    var t=el('textarea','txt'); t.rows=2; t.maxLength=NOTE_MAX;
+    // no maxLength: it counts UTF-16 units and could block a valid 500-code-point note; noteForSave checks on save
+    var t=el('textarea','txt'); t.rows=2;
     t.setAttribute('dir','auto'); t.setAttribute('autocomplete','off');
     t.value='';
     return field('Note for this change (optional)', t, 'Saved only on the audit record for this change. It does not stay on the supervisor. Up to 500 characters.', id);
@@ -584,9 +617,13 @@
     phoneI.placeholder='+2010…';
     phoneI.value=isEdit ? String(row.phone_wa||'') : '';
     if(prot){ phoneI.readOnly=true; phoneI.classList.add('ro'); }
-    var fPhone=field('WhatsApp phone', phoneI,
-      prot ? 'This supervisor is protected: the phone cannot be changed and they cannot be turned off. Name, farms and daily limit can still be edited.'
-           : 'E.164, e.g. +201015947791', 'svPhone');
+    var fPhone=field('WhatsApp phone', phoneI, prot ? 'Cannot be changed for this supervisor.' : 'E.164, e.g. +201015947791', 'svPhone');
+
+    var protNote=null;
+    if(prot){
+      protNote=el('div','note');
+      protNote.textContent=MESSAGES.protected_owner;
+    }
 
     // duplicate_phone offer (Edit existing / Turn back on), filled with textContent only
     var dupBox=el('div','note amber dup'); dupBox.id='svPhone-dup'; dupBox.hidden=true; dupBox.setAttribute('role','alert');
@@ -606,13 +643,31 @@
     var cnt=el('span','fcount'); cnt.setAttribute('aria-live','polite');
     tools.appendChild(selAll); tools.appendChild(clr); tools.appendChild(cnt);
     fs.appendChild(tools);
-    var fHint=el('p','fhint','“Select all” ticks every farm that is active right now. It is a one-time selection: farms added later are not added to this supervisor automatically.');
+    var fHint=el('p','fhint', prot
+      ? 'Cannot be changed for this supervisor. Farms that are no longer active are shown too and are kept as they are.'
+      : '“Select all” ticks every farm that is active right now. It is a one-time selection: farms added later are not added to this supervisor automatically.');
     fHint.id='svFarms-hint';
     fs.appendChild(fHint);
-    var list=el('div','flist'); list.setAttribute('role','group'); list.setAttribute('aria-label','Active farms');
+    var list=el('div','flist'); list.setAttribute('role','group'); list.setAttribute('aria-label', prot?'Farms (cannot be changed)':'Active farms');
     var boxes=[];
-    if(!catalog.length) list.appendChild(el('p','empty sm','There are no active farms in the catalog.'));
-    catalog.forEach(function(f){
+    if(prot){
+      // read-only: the row's farms in received order, inactive ones included and never dropped
+      selAll.disabled=true; clr.disabled=true; tools.hidden=true;
+      if(!current.length) list.appendChild(el('p','empty sm','No farms.'));
+      current.forEach(function(f){
+        var off=!activeSet[lc(f.id)];
+        var lab=el('label','fopt ro'+(off?' stale':''));
+        var cb=el('input'); cb.type='checkbox'; cb.value=String(f.id); cb.checked=true; cb.disabled=true;
+        var nm=el('span','fname', f.name || f.farm_code || '—'); nm.setAttribute('dir','auto');
+        lab.appendChild(cb); lab.appendChild(nm);
+        var code=(f.farm_code!=null && f.farm_code!=='') ? String(f.farm_code) : '';
+        if(off) code=code ? code+' · not active' : 'not active';
+        if(code) lab.appendChild(el('span','fcode', code));
+        list.appendChild(lab);
+      });
+    }
+    if(!prot && !catalog.length) list.appendChild(el('p','empty sm','There are no active farms in the catalog.'));
+    if(!prot) catalog.forEach(function(f){
       var lab=el('label','fopt');
       var cb=el('input'); cb.type='checkbox'; cb.value=String(f.id); cb.checked=!!oldSet[lc(f.id)];
       var nm=el('span','fname', f.name || f.farm_code || '—'); nm.setAttribute('dir','auto');
@@ -620,7 +675,7 @@
       if(f.farm_code!=null && f.farm_code!=='') lab.appendChild(el('span','fcode', f.farm_code));
       list.appendChild(lab); boxes.push(cb);
     });
-    stale.forEach(function(f){
+    if(!prot) stale.forEach(function(f){
       var lab=el('label','fopt stale');
       var cb=el('input'); cb.type='checkbox'; cb.checked=true; cb.disabled=true;
       var nm=el('span','fname', f.name || f.farm_code || '—'); nm.setAttribute('dir','auto');
@@ -628,7 +683,7 @@
       list.appendChild(lab);
     });
     fs.appendChild(list);
-    if(stale.length){
+    if(!prot && stale.length){
       var names=stale.map(function(f){ return f.name || f.farm_code || String(f.id); }).join(', ');
       var w=el('div','note amber');
       w.setAttribute('dir','auto');
@@ -645,7 +700,8 @@
 
     var capI=el('input'); capI.type='number'; capI.min=String(CAP_MIN); capI.max=String(CAP_MAX); capI.step='1'; capI.setAttribute('inputmode','numeric');
     capI.value=isEdit ? (row.max_links_per_day==null?'':String(row.max_links_per_day)) : String(CAP_DEFAULT);
-    var fCap=field('Daily limit', capI, 'Most harvest links this supervisor can get per day (1–50).', 'svCap');
+    if(prot){ capI.readOnly=true; capI.classList.add('ro'); }
+    var fCap=field('Daily limit', capI, prot ? 'Cannot be changed for this supervisor.' : 'Most harvest links this supervisor can get per day (1–50).', 'svCap');
 
     var fNote=noteField('svNote');
 
@@ -714,7 +770,7 @@
     var m=openModal({
       title:isEdit?'Edit supervisor':'Add supervisor',
       meta:isEdit?(row.display_name||row.phone_wa||''):'New supervisors start active.',
-      body:[partialNote, fName.wrap, fPhone.wrap, fs, fCap.wrap, fNote.wrap, gerr],
+      body:[partialNote, protNote, fName.wrap, fPhone.wrap, fs, fCap.wrap, fNote.wrap, gerr],
       focusEl:nameI,
       actions:[
         {label:'Cancel', onClick:function(api){ api.close(); }},
@@ -731,12 +787,45 @@
       if(b){ b.disabled=on; b.textContent=on?'Saving…':(isEdit?'Save changes':'Add supervisor'); }
     }
 
+    // Protected owner: only the name and the per-change note come from the form. Phone, farm ids (received
+    // order, inactive included) and cap are resent exactly as received; no active-catalog check and no
+    // revoke confirm, since none of those can change.
+    async function saveProtected(){
+      var pv=protectedUpdateArgs(row, nameI.value, fNote.input.value);
+      if(!pv.ok){ showErr(pv.code); return; }             // bad_name -> name field, bad_note -> note field
+      if(pv.name===String(row.display_name||'')){
+        m.close(); toast(pv.note ? 'No changes to save. The note was not saved because nothing changed.' : 'No changes to save.'); return;
+      }
+      await submit('hl_admin_supervisors_update', pv.args, pv.name);
+    }
+
+    async function submit(fn, args, fallbackName){
+      setSaving(true);
+      var r=await call(fn, args);
+      if(!r.ok){
+        setSaving(false);
+        if(m.closed) return;
+        if(r.code==='rpc_missing'){ m.close(); setMissing(); toast(errorMessage('rpc_missing'), true); return; }
+        var offer=duplicateOffer(r, isEdit?row.id:null);
+        if(offer){ showDup(offer); return; }
+        showErr(r.code);
+        return;
+      }
+      m.close();
+      var rev=Number(r.revoked_links)||0;
+      var who=(isObj(r.supervisor) && r.supervisor.display_name) || fallbackName;
+      toast((isEdit?'Saved changes for ':'Added ')+who+'.'+(rev>0?' Revoked '+plural(rev,'open link','open links')+'.':''));
+      patchRow(r.supervisor);
+      renderPage();
+      load(true);
+    }
+
     async function save(){
       if(m.locked || m.closed) return;
       clearErrs();
+      if(prot){ await saveProtected(); return; }
       var ids=boxes.filter(function(b){ return b.checked; }).map(function(b){ return b.value; });
-      // protected owner: the phone cannot change, so always send the stored one
-      var v=validate({phone:prot?String(row.phone_wa||''):phoneI.value, name:nameI.value, farmIds:ids, cap:capI.value}, S.farms);
+      var v=validate({phone:phoneI.value, name:nameI.value, farmIds:ids, cap:capI.value}, S.farms);
       if(!v.ok){ showErr(v.code); return; }
       var nv=noteForSave(fNote.input.value);
       if(!nv.ok){ fieldErr(fNote, nv.code); return; }
@@ -767,27 +856,10 @@
         }
       }
 
-      setSaving(true);
       var args={p_phone_wa:v.phone, p_display_name:v.name, p_farm_ids:v.farmIds, p_max_links_per_day:v.cap};
       if(isEdit) args.p_id=row.id;
       if(nv.note!==null) args.p_note=nv.note;              // per-change; omitted when empty
-      var r=await call(isEdit?'hl_admin_supervisors_update':'hl_admin_supervisors_add', args);
-      if(!r.ok){
-        setSaving(false);
-        if(m.closed) return;
-        if(r.code==='rpc_missing'){ m.close(); setMissing(); toast(errorMessage('rpc_missing'), true); return; }
-        var offer=duplicateOffer(r, isEdit?row.id:null);
-        if(offer){ showDup(offer); return; }
-        showErr(r.code);
-        return;
-      }
-      m.close();
-      var rev=Number(r.revoked_links)||0;
-      var who=(isObj(r.supervisor) && r.supervisor.display_name) || v.name;
-      toast((isEdit?'Saved changes for ':'Added ')+who+'.'+(rev>0?' Revoked '+plural(rev,'open link','open links')+'.':''));
-      patchRow(r.supervisor);
-      renderPage();
-      load(true);
+      await submit(isEdit?'hl_admin_supervisors_update':'hl_admin_supervisors_add', args, v.name);
     }
   }
 
@@ -882,7 +954,9 @@
     renderFarmChips:renderFarmChips,
     renderSupervisorRow:renderSupervisorRow,
     noteForSave:noteForSave,
+    pgBtrim:pgBtrim,
     isProtectedOwner:isProtectedOwner,
+    protectedUpdateArgs:protectedUpdateArgs,
     PROTECTED_OWNER_ID:PROTECTED_OWNER_ID,
     duplicateOffer:duplicateOffer,
     shouldKeepListOnReloadFailure:shouldKeepListOnReloadFailure,
