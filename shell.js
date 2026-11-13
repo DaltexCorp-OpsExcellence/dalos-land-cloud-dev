@@ -6,7 +6,7 @@
    opts = { active, account:{name,role}, role, onNav(item), onWorkspace, onSignOut,
             workspaceUrl }  — onNav optional (defaults to navigating item.to). */
 (function(){
-  var BUILD = 'v0.8.1 (2026.08.12)';
+  var BUILD = 'v0.8.2 (2026.11.13)';
   var WORKSPACE_URL = 'https://daltexcorp-opsexcellence.github.io/dalos-workspace-dev/';
 
   // icon path sets — identical to index.html's IC (viewBox 0 0 24 24, stroked)
@@ -23,7 +23,8 @@
     import:   ['M12 3v12','M8 11l4 4 4-4','M4 21h16'],
     recon:    ['M3 6h18','M3 12h12','M3 18h7','M18 5v6','M15 8h6'],
     health:   ['M12 2l9 4v6c0 5-3.8 9.3-9 10-5.2-.7-9-5-9-10V6z','M9 12l2 2 4-4'],
-    reference:['M4 5a2 2 0 0 1 2-2h13v18H6a2 2 0 0 1-2-2z','M9 7h7','M9 11h7']
+    reference:['M4 5a2 2 0 0 1 2-2h13v18H6a2 2 0 0 1-2-2z','M9 7h7','M9 11h7'],
+    supervisors:['M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2','M9 3a4 4 0 1 0 0 8 4 4 0 0 0 0-8z','M22 21v-2a4 4 0 0 0-3-3.87','M16 3.13a4 4 0 0 1 0 7.75']
   };
 
   var NAV = [
@@ -40,10 +41,13 @@
       {k:'import',    label:'Bulk Import',        to:'index.html#import'},
       {k:'recon',     label:'Reconciliation',     to:'index.html#recon'},
       {k:'health',    label:'Data Health',        to:'index.html#health'},
-      {k:'reference', label:'Reference Data',     to:'index.html#reference', need:'admin'}]}
+      {k:'reference', label:'Reference Data',     to:'index.html#reference', need:'admin'}]},
+    {sec:'Admin', items:[
+      {k:'supervisors', label:'Harvest Supervisors', to:'harvest-supervisors.html', need:'admin_only'}]}
   ];
 
   function visible(it, role){
+    if(it.need==='admin_only') return role==='admin';
     if(it.need==='pu') return ['admin','power_user'].indexOf(role)>=0;
     if(it.need==='hp2') return ['admin','power_user','agronomy_admin'].indexOf(role)>=0;
     if(it.need==='admin') return ['admin','power_user','agronomy_admin','agronomy_viewer'].indexOf(role)>=0;
@@ -121,6 +125,7 @@
         return '<button class="lcsb-item'+(active===it.k?' active':'')+'" data-k="'+it.k+'" title="'+esc(it.label)+'">'+svgIcon(ICP[it.k]||[])+'<span>'+esc(it.label)+'</span></button>';
       }).join('');
       var sub = (g.sec==='Explore') ? '<div class="lcsb-navsub" id="lc-navsub"></div>' : '';
+      if(!items && !sub) return ''; // e.g. the Admin group for non-admins: no empty section header
       return '<div><div class="lcsb-sec">'+esc(g.sec)+'</div>'+items+sub+'</div>';
     }).join('');
     container.innerHTML =
@@ -143,7 +148,8 @@
     container.querySelectorAll('.lcsb-item').forEach(function(btn){
       btn.addEventListener('click',function(){
         var it=itemByK(btn.getAttribute('data-k')); if(!it)return;
-        if(opts.onNav){ opts.onNav(it); } else { window.location.href=it.to; }
+        // standalone pages (not an index.html screen) always navigate, so a host onNav that only knows its own screens can't swallow them
+        if(opts.onNav && it.to.indexOf('index.html')===0){ opts.onNav(it); } else { window.location.href=it.to; }
       });
     });
     var ws=container.querySelector('[data-act="ws"]');
