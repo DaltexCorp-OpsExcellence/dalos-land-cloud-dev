@@ -1058,17 +1058,24 @@ function RegisterScreen(ctx){
     // edge — the latter catches IN-PROGRESS replants where the old planting is still bearing
     // and the successor is only planned (e.g. SA 00-06A: Prime '13 → Sweet Celebration '26).
     // The letter must match (or overlap, 'BC' → 'B'+'C'): a retired 00-39A next to a current
-    // 00-39B is two different blocks, not a replant (Menia 00-39, 2026-11-18).
-    supabase.from('farm_blocks').select('id,product_id,farm_code,sector_code,plot_code,block_add,lifecycle').then(function(r){
+    // 00-39B is two different blocks, not a replant (Menia 00-39, 2026-11-18). A name match also
+    // needs a LATER planting year: same name + same year = rootstock sections of one planting
+    // (El Khair 09-06B MC retired, CA/SO bearing, all 2018) — only a lineage edge flags those.
+    // Value 'pending' = replant recorded but the new planting is still only planned → '↻ replant planned'.
+    supabase.from('farm_blocks').select('id,product_id,farm_code,sector_code,plot_code,block_add,lifecycle,planting_year').then(function(r){
       if(r.error||!r.data) return; var byLand={};
       var sup={};   // superseded plantings belong under Replanted; cancelled/fallow are not plantings
       // letters overlap = same block: 'A'~'A', and a merged old block 'BC' ~ its split replants 'B' + 'C' (Badr 05-10)
       var lt=function(x){ return String(x.block_add||'').trim().toUpperCase(); };
       var ov=function(a,b){ if(a===b) return true; for(var i=0;i<a.length;i++){ if(b.indexOf(a[i])>=0) return true; } return false; };
       r.data.forEach(function(x){ if(isNonPlanted(x.lifecycle)) return; if(x.lifecycle==='superseded'){ sup[x.id]=1; return; } var k=x.product_id+'|'+x.farm_code+'|'+x.sector_code+'|'+x.plot_code; var o=byLand[k]=byLand[k]||{ret:[],cur:[]}; (x.lifecycle==='retired'?o.ret:o.cur).push(x); });
-      var s=Object.assign({},sup); Object.keys(byLand).forEach(function(k){ var o=byLand[k]; o.ret.forEach(function(p){ o.cur.forEach(function(c){ if(ov(lt(p),lt(c))){ s[p.id]=1; s[c.id]=1; } }); }); });
+      var later=function(p,c){ return p.planting_year==null||c.planting_year==null||Number(p.planting_year)<Number(c.planting_year); };
+      var s=Object.assign({},sup); Object.keys(byLand).forEach(function(k){ var o=byLand[k]; o.ret.forEach(function(p){ o.cur.forEach(function(c){ if(ov(lt(p),lt(c))&&later(p,c)){ s[p.id]=1; s[c.id]=1; } }); }); });
+      var lc={}; r.data.forEach(function(x){ lc[x.id]=x.lifecycle; });
       supabase.from('farm_block_lineage').select('parent_block_id,child_block_id').then(function(lr){
-        if(lr.data) lr.data.forEach(function(e){ if(e.parent_block_id)s[e.parent_block_id]=1; if(e.child_block_id)s[e.child_block_id]=1; });
+        if(lr.data) lr.data.forEach(function(e){ if(e.parent_block_id&&!s[e.parent_block_id])s[e.parent_block_id]=1; if(e.child_block_id&&!s[e.child_block_id])s[e.child_block_id]=1; });
+        // old planting still standing (not retired/superseded) with a planned successor → replant planned
+        if(lr.data) lr.data.forEach(function(e){ var pl=lc[e.parent_block_id]; if(lc[e.child_block_id]==='planned'&&pl&&pl!=='retired'&&pl!=='superseded'){ s[e.parent_block_id]='pending'; s[e.child_block_id]='pending'; } });
         chainLoaded.current=true; setChainSet(s);   // → loadCounts re-runs with the Replanted count
       }); });
   }
@@ -1137,7 +1144,7 @@ function RegisterScreen(ctx){
               ce('td',{className:'num',style:b.jde_cost_center_id?null:{color:'var(--amber)'}}, b.jde_cost_center_id||'—'),
               ce('td',null, ce('span',{style:{display:'inline-flex',alignItems:'center',gap:6,flexWrap:'wrap'}},
                 ce('span',{className:'badge '+lcBadge(b.lifecycle),title:lcTip(b.lifecycle)}, lcText(b.lifecycle)),
-                chainSet[b.id]?ce('span',{title:'This plot has a replant lineage — open to see the timeline',style:{fontSize:10,fontWeight:600,color:'var(--accent)',border:'1px solid var(--accent2)',background:'color-mix(in srgb,var(--accent2) 12%,transparent)',borderRadius:20,padding:'1px 7px',whiteSpace:'nowrap'}},'↻ replanted'):null)),
+                chainSet[b.id]?ce('span',{title:chainSet[b.id]==='pending'?'A replant is planned for this block; the current planting is still standing — open to see the timeline':'This plot has a replant lineage — open to see the timeline',style:{fontSize:10,fontWeight:600,color:'var(--accent)',border:'1px solid var(--accent2)',background:'color-mix(in srgb,var(--accent2) 12%,transparent)',borderRadius:20,padding:'1px 7px',whiteSpace:'nowrap'}},chainSet[b.id]==='pending'?'↻ replant planned':'↻ replanted'):null)),
               showAero ? aeroRegisterCells(aeroSum[b.id], b.product_id, aeroLoading) : null
             );
           }))
