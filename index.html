@@ -1053,15 +1053,20 @@ function RegisterScreen(ctx){
     var pq=supabase.from('v_farm_block_current').select('id,latest_prod_year,latest_prod_t').limit(1000);
     if(ctx.crop!=='all') pq=pq.eq('product_id',ctx.crop);
     pq.then(function(r){ if(r.error||!r.data) return; var m={}; r.data.forEach(function(x){ if(x.latest_prod_t!=null) m[x.id]={y:x.latest_prod_year,t:Number(x.latest_prod_t)}; }); setProdMap(m); });
-    // "↻ replanted" badge: (a) a land (product/farm/sector/plot) holding BOTH a retired
-    // predecessor and a current planting, OR (b) any block on a recorded farm_block_lineage
+    // "↻ replanted" badge: (a) a land (product/farm/sector/plot/BLOCK LETTER) holding BOTH a
+    // retired predecessor and a current planting, OR (b) any block on a recorded farm_block_lineage
     // edge — the latter catches IN-PROGRESS replants where the old planting is still bearing
     // and the successor is only planned (e.g. SA 00-06A: Prime '13 → Sweet Celebration '26).
-    supabase.from('farm_blocks').select('id,product_id,farm_code,sector_code,plot_code,lifecycle').then(function(r){
+    // The letter must match (or overlap, 'BC' → 'B'+'C'): a retired 00-39A next to a current
+    // 00-39B is two different blocks, not a replant (Menia 00-39, 2026-11-18).
+    supabase.from('farm_blocks').select('id,product_id,farm_code,sector_code,plot_code,block_add,lifecycle').then(function(r){
       if(r.error||!r.data) return; var byLand={};
       var sup={};   // superseded plantings belong under Replanted; cancelled/fallow are not plantings
-      r.data.forEach(function(x){ if(isNonPlanted(x.lifecycle)) return; if(x.lifecycle==='superseded'){ sup[x.id]=1; return; } var k=x.product_id+'|'+x.farm_code+'|'+x.sector_code+'|'+x.plot_code; var o=byLand[k]=byLand[k]||{ids:[],ret:0,cur:0}; o.ids.push(x.id); if(x.lifecycle==='retired')o.ret++; else o.cur++; });
-      var s=Object.assign({},sup); Object.keys(byLand).forEach(function(k){ var o=byLand[k]; if(o.ret>0&&o.cur>0) o.ids.forEach(function(id){s[id]=1;}); });
+      // letters overlap = same block: 'A'~'A', and a merged old block 'BC' ~ its split replants 'B' + 'C' (Badr 05-10)
+      var lt=function(x){ return String(x.block_add||'').trim().toUpperCase(); };
+      var ov=function(a,b){ if(a===b) return true; for(var i=0;i<a.length;i++){ if(b.indexOf(a[i])>=0) return true; } return false; };
+      r.data.forEach(function(x){ if(isNonPlanted(x.lifecycle)) return; if(x.lifecycle==='superseded'){ sup[x.id]=1; return; } var k=x.product_id+'|'+x.farm_code+'|'+x.sector_code+'|'+x.plot_code; var o=byLand[k]=byLand[k]||{ret:[],cur:[]}; (x.lifecycle==='retired'?o.ret:o.cur).push(x); });
+      var s=Object.assign({},sup); Object.keys(byLand).forEach(function(k){ var o=byLand[k]; o.ret.forEach(function(p){ o.cur.forEach(function(c){ if(ov(lt(p),lt(c))){ s[p.id]=1; s[c.id]=1; } }); }); });
       supabase.from('farm_block_lineage').select('parent_block_id,child_block_id').then(function(lr){
         if(lr.data) lr.data.forEach(function(e){ if(e.parent_block_id)s[e.parent_block_id]=1; if(e.child_block_id)s[e.child_block_id]=1; });
         chainLoaded.current=true; setChainSet(s);   // → loadCounts re-runs with the Replanted count
