@@ -129,6 +129,8 @@
     return { n };
   }
   const sumFields = (o) => FIELDS.reduce((a, f) => a + (o && isNum(o[f]) ? o[f] : 0), 0);
+  // Progress vs plan counts packhouse only (to_packhouse_t), same as the planner raw_pk_t / remaining_t.
+  const pkOf = (o) => (o && isNum(o.to_packhouse_t) ? o.to_packhouse_t : 0);
   const clampPct = (p) => Math.max(0, Math.min(100, p));
 
   // ───────── dates ─────────
@@ -586,7 +588,7 @@
     });
     sec.appendChild(sel);
 
-    const pg = p ? buildProgress(p.progress, 'المسجل', null) : null;
+    const pg = p ? buildProgress(p.progress, 'وارد محطة', null) : null;
     if (pg) sec.appendChild(h('div', 'progress', h('div', 'progress-line', pg.line), pg.bar));
 
     const grid = h('div', 'qty-grid');
@@ -931,8 +933,9 @@
       }
       const pr = sn && sn.progress;
       if (pr && isNum(pr.picked_t)) {
-        const after = Math.max(0, old ? pr.picked_t - sumFields(old) + newTot : pr.picked_t + newTot);
-        const pg = buildProgress(pr, 'بعد التسجيل', after);
+        const newPk = cleared ? 0 : pkOf(nw);
+        const after = Math.max(0, old ? pr.picked_t - pkOf(old) + newPk : pr.picked_t + newPk);
+        const pg = buildProgress(pr, 'وارد محطة بعد التسجيل', after);
         ps.appendChild(h('div', 'prog', pg.line));
         if (pg.bar) ps.appendChild(pg.bar);
       }
